@@ -85,6 +85,12 @@ Choosing where a provider starts works remotely too. Here the Mac is browsing th
   <img src="docs/assets/favo-remote.png" alt="favo's folder picker browsing folders on a remote machine called devbox" width="760">
 </p>
 
+When a machine falls behind, favo says so and keeps it working. Press `U` to update them all:
+
+<p align="center">
+  <img src="docs/assets/favo-update.png" alt="favo marking two machines as running an older favo, with a key to update them all" width="760">
+</p>
+
 ### A TUI you will want to leave open
 
 See every machine, account and login, spot what needs signing in, and press `enter` to launch. Prefer scripts? Everything is a command too, and `favo list --json` gives you the same view as data.
@@ -110,7 +116,11 @@ favo app personal claude     # back to the app you always had
 favo app work claude --close # close it first if it is open
 ```
 
-The first time, sign in inside the app. It remembers each account after that, and the Claude Code or Codex inside it uses the same seat as the CLI. `p` only appears when the app is installed on the computer you are at.
+The first time, sign in inside the app. It remembers each account after that, and the Claude Code or Codex inside it uses the same seat as the CLI. `p` only appears when the app is installed on the computer you are at. If the app is already open, favo asks first:
+
+<p align="center">
+  <img src="docs/assets/favo-desktop.png" alt="favo asking before it closes the Claude desktop app to reopen it as the work account" width="760">
+</p>
 
 > [!WARNING]
 > **This is unofficial.** Neither app documents running several accounts, so an update could break it. Your apps themselves stay as they were, and `personal` always opens the default one.

@@ -6,6 +6,7 @@
   "exports": {
     "./App": "./src/App.tsx",
     "./main": "./src/main.tsx",
+    "./scenes": "./src/__tests__/scenes.ts",
     "./shared/*": "./src/shared/*.ts"
   },
   "dependencies": {

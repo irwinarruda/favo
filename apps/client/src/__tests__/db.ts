@@ -26,7 +26,7 @@ function seatOf(home: string, account: string, provider: ProviderId, overrides: 
   };
 }
 
-function accountOf(
+export function accountOf(
   home: string,
   name: string,
   overrides: Partial<Record<ProviderId, Partial<SeatView>>> = {}

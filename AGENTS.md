@@ -15,6 +15,7 @@ Use Bun `1.3.14` (`.bun-version`).
 - `bun run build` builds the binary for this machine; `bun run build:all` builds every target.
 - `bun run install:local` copies the binaries to `~/.favo` and links `~/.local/bin/favo`. `favo machine add` from source needs this first, because it uploads from `~/.favo/assets/<version>/`.
 - `bun run package:release` writes `dist/release`: the gzipped binaries, `SHA256SUMS` and `THIRD-PARTY-NOTICES.md`.
+- `bun run screenshots` retakes the README images into `docs/assets`, in a private Ghostty on macOS. Name scenes to retake only those; `bun run dev:mock <scene>` shows one by hand.
 
 `bun run typecheck` and the architecture test do not cover `scripts/` or `apps/npm/bin/favo.mjs`, so check those by hand.
 
@@ -52,5 +53,6 @@ Load the skills that govern the paths a task touches:
 | `apps/server`                  | `server-architecture` always, plus `server-service-styleguide` for use cases, gateways and tests, and `server-providers` for anything about a provider CLI |
 | `apps/client`                  | `client-architecture` always, plus `client-service-styleguide` for services and ports, `client-jsx-styleguide` for views, and `client-tests` for tests     |
 | A new file in `.agents/plans/` | `numbered-specs`                                                                                                                                           |
+| `docs/assets/*.png`            | `readme-screenshots`                                                                                                                                       |
 
 Skills that govern one workspace carry its prefix (`server-`, `client-`, `domain-`, `contracts-`). Skills that span workspaces have no prefix. A `-styleguide` skill says how one layer's code is written; an `-architecture` skill says where things live and which way dependencies point.

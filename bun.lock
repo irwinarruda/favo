@@ -6,6 +6,7 @@
       "name": "favo",
       "devDependencies": {
         "@biomejs/biome": "^2.3.0",
+        "@favo/client": "workspace:*",
         "@favo/contracts": "workspace:*",
         "@types/bun": "latest",
         "@types/react": "^19.0.0",
@@ -41,7 +42,7 @@
     },
     "apps/npm": {
       "name": "favo-cli",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "bin": {
         "favo": "bin/favo.mjs",
       },

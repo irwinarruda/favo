@@ -21,10 +21,12 @@
     "check:release-version": "bun scripts/check-release-version.ts",
     "release:notes": "bun scripts/release-notes.ts",
     "verify": "bun run lint && bun run typecheck && bun run test && bun run build",
-    "install:local": "bun scripts/install.ts"
+    "install:local": "bun scripts/install.ts",
+    "screenshots": "bun scripts/screenshots.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.0",
+    "@favo/client": "workspace:*",
     "@favo/contracts": "workspace:*",
     "@types/bun": "latest",
     "@types/react": "^19.0.0",
