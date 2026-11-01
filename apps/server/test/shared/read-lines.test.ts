@@ -58,10 +58,42 @@ describe('reading a tail', () => {
   });
 });
 
+describe('serveStdio', () => {
+  it('says when the input closes, and still answers what was in flight', async () => {
+    const events: string[] = [];
+    const { promise, resolve } = Promise.withResolvers<void>();
+    const router = {
+      async send({ id }: { id: number }) {
+        await promise;
+        return { id, ok: true as const, result: {} };
+      },
+    };
+    const line = `${JSON.stringify({ id: 1, method: 'seats.usage', params: {} })}\n`;
+    const serving = serveStdio(
+      router,
+      streamOf(line),
+      () => events.push('answered'),
+      () => {
+        events.push('closed');
+        resolve();
+      }
+    );
+    await serving;
+    expect(events).toEqual(['closed', 'answered']);
+  });
+});
+
 describe('serving on stdio', () => {
   it('ends with a domain error when the other side sends a line that never ends', async () => {
     const huge = new Uint8Array(MaximumLineBytes + 1).fill(120);
     const router = { send: async () => ({ id: 0, ok: true as const, result: {} }) };
-    await expect(serveStdio(router, streamOf(huge), () => {})).rejects.toBeInstanceOf(DomainError);
+    await expect(
+      serveStdio(
+        router,
+        streamOf(huge),
+        () => {},
+        () => {}
+      )
+    ).rejects.toBeInstanceOf(DomainError);
   });
 });

@@ -112,8 +112,10 @@ function _sameSeat(left: SeatUsageView, right: SeatUsageView) {
 
 function _withLastGood(previous: SeatUsageView[], next: SeatUsageView[]) {
   return next.map((seat) => {
-    const usage = previous.find((candidate) => _sameSeat(candidate, seat))?.usage;
-    return { ...seat, usage: keepLastGoodUsage(usage, seat.usage) };
+    const last = previous.find((candidate) => _sameSeat(candidate, seat));
+    const identity = seat.identity ?? last?.identity;
+    const plan = seat.plan ?? last?.plan;
+    return { ...seat, identity, plan, usage: keepLastGoodUsage(last?.usage, seat.usage) };
   });
 }
 

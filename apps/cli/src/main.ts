@@ -15,8 +15,7 @@ async function main() {
     const server = createProductionServer(process.env);
     await server.prepare();
     if (command.kind === CommandKind.serve) {
-      await serveStdio(server.router, Bun.stdin.stream(), (line) => process.stdout.write(`${line}\n`));
-      server.close();
+      await serveStdio(server.router, Bun.stdin.stream(), (line) => process.stdout.write(`${line}\n`), server.close);
       return 0;
     }
     if (command.kind === CommandKind.tui) {

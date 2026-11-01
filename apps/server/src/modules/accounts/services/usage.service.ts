@@ -1,4 +1,4 @@
-import { LoginState, type SeatUsageView, type SeatView } from '@favo/contracts/rpc/views';
+import { LoginState, SeatUsageView, type SeatView } from '@favo/contracts/rpc/views';
 import type { ProviderId } from '@favo/domain/providers/provider';
 import { UsageUnavailableReason, unavailableUsage } from '@favo/domain/usage/seat-usage';
 import type { AccountsService } from '@/modules/accounts/services/accounts.service';
@@ -12,6 +12,8 @@ const MaximumReadsAtOnce = 4;
 type ReadableSeat = SeatView & { displayName: string };
 
 export class UsageService {
+  private isStopped = false;
+
   constructor(
     private readonly accounts: AccountsService,
     private readonly providers: ProvidersService,
@@ -20,6 +22,10 @@ export class UsageService {
     private readonly paths: FavoPaths,
     private readonly callerEnv: Record<string, string | undefined>
   ) {}
+
+  stop() {
+    this.isStopped = true;
+  }
 
   async read() {
     const accounts = await this.accounts.list();
@@ -30,7 +36,7 @@ export class UsageService {
     const views: (SeatUsageView | undefined)[] = [];
     let next = 0;
     const readNext = async () => {
-      while (next < seats.length) {
+      while (next < seats.length && !this.isStopped) {
         const index = next++;
         views[index] = await this.readSeat(seats[index]!);
       }
@@ -39,28 +45,29 @@ export class UsageService {
     return views.filter((view) => view !== undefined);
   }
 
-  private async readSeat({ account, provider, displayName }: ReadableSeat) {
+  private async readSeat({ account, provider, displayName }: ReadableSeat): Promise<SeatUsageView | undefined> {
+    const checkedAt = this.clock.now().toISOString();
+    const failure = unavailableUsage(checkedAt, UsageUnavailableReason.probeFailed);
+    const failed = { account, displayName, provider, usage: failure };
     try {
-      const { login, identity, plan } = await this.providers.loginOf(account, provider);
-      if (login !== LoginState.signedIn) return undefined;
-      return { account, displayName, provider, identity, plan, usage: await this.usageOf(account, provider) };
+      const cli = this.providers.cliOf(provider);
+      const session = await this.sessionOf(account, provider);
+      const { login, identity, plan } = await cli.status(session);
+      if (login === LoginState.signedOut) return undefined;
+      if (login !== LoginState.signedIn) return failed;
+      const usage = await cli.usage(session, checkedAt).catch(() => failure);
+      const view = { account, displayName, provider, identity, plan, usage };
+      return SeatUsageView.safeParse(view).success ? view : failed;
     } catch {
-      return undefined;
+      return failed;
     }
   }
 
-  private async usageOf(account: string, provider: ProviderId) {
-    const checkedAt = this.clock.now().toISOString();
-    try {
-      const binary = await this.providers.requireBinary(provider);
-      const cli = this.providers.cliOf(provider);
-      const { env, unsetEnv } = cli.usageEnvironment(this.callerEnv);
-      const cleared = Object.fromEntries(unsetEnv.map((name) => [name, undefined]));
-      const seatEnv = await this.providers.environmentOf(account, provider);
-      const session = { binary, env: { ...cleared, ...seatEnv, ...env }, cwd: this.paths.emptyFolder };
-      return await cli.usage(session, checkedAt);
-    } catch {
-      return unavailableUsage(checkedAt, UsageUnavailableReason.probeFailed);
-    }
+  private async sessionOf(account: string, provider: ProviderId) {
+    const { env, unsetEnv } = this.providers.cliOf(provider).usageEnvironment(this.callerEnv);
+    const cleared = Object.fromEntries(unsetEnv.map((name) => [name, undefined]));
+    const seatEnv = await this.providers.environmentOf(account, provider);
+    const binary = await this.providers.requireBinary(provider);
+    return { binary, env: { ...cleared, ...seatEnv, ...env }, cwd: this.paths.emptyFolder };
   }
 }

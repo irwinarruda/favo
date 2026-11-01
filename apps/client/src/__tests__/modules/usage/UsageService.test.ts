@@ -184,6 +184,17 @@ describe('failures', () => {
     expect(column?.member?.isStale).toBe(true);
     expect(column?.seat.usage.checkedAt).toBe(Start.toISOString());
   });
+  test('keeps who a seat is when its login could not be read', async () => {
+    const app = await openApp();
+    const seats = mockDb.seatUsage.local!;
+    const { account, displayName, provider } = seats[0]!;
+    const unread = { checkedAt: Start.toISOString(), windows: [], unavailable: failed };
+    mockDb.seatUsage.local = [{ account, displayName, provider, usage: unread }, ...seats.slice(1)];
+    await app.state.refreshUsage();
+    const seat = app.state.machineUsage.local?.seats[0];
+    expect(seat).toMatchObject({ identity: 'bee@hive.dev', plan: 'max' });
+    expect(seat?.usage.windows).toHaveLength(3);
+  });
   test('shows a failed seat as a notice the first time, with nothing to keep', async () => {
     const app = await openApp(() => {
       const [personal, ...others] = mockDb.seatUsage.local!;

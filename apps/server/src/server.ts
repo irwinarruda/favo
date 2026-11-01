@@ -92,6 +92,7 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
     router,
     prepare: () => fileSystem.ensurePrivateDirectory(paths.root),
     close() {
+      usage.stop();
       remotes.closeAll();
       processes.killOpen();
     },

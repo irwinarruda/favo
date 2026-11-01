@@ -4,7 +4,8 @@ import { readLines } from '@/shared/rpc/read-lines';
 export async function serveStdio(
   router: RpcTransport,
   input: ReadableStream<Uint8Array>,
-  write: (line: string) => void
+  write: (line: string) => void,
+  onInputClosed: () => void
 ) {
   const inFlight = new Set<Promise<void>>();
   await readLines(input, (line) => {
@@ -14,6 +15,7 @@ export async function serveStdio(
     inFlight.add(reply);
     void reply.finally(() => inFlight.delete(reply));
   });
+  onInputClosed();
   await Promise.all(inFlight);
 }
 

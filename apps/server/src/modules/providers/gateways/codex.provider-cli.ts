@@ -1,6 +1,6 @@
 import { LoginState } from '@favo/contracts/rpc/views';
 import { ProviderId } from '@favo/domain/providers/provider';
-import { UsageUnavailableReason, unavailableUsage } from '@favo/domain/usage/seat-usage';
+import { NoSubscriptionLimitsMessage, UsageUnavailableReason, unavailableUsage } from '@favo/domain/usage/seat-usage';
 import {
   type LoginContext,
   ProviderCli,
@@ -10,6 +10,7 @@ import {
 import { type CodexRateLimits, codexUsageOf } from '@/modules/providers/utils/codex-usage';
 import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 
+const ApiKeyAccount = 'apiKey';
 const QuestionId = 2;
 const ConversationTimeoutMs = 8_000;
 const StatusTimeoutMs = 10_000;
@@ -41,16 +42,26 @@ export class CodexProviderCli extends ProviderCli {
     return ['logout'];
   }
 
-  override async usage({ binary, env, cwd }: ProviderSession, checkedAt: string) {
+  override usageEnvironment() {
+    return { env: {}, unsetEnv: ['CODEX_HOME'] };
+  }
+
+  override async usage(session: ProviderSession, checkedAt: string) {
+    const { binary, env, cwd } = session;
     const server = this.processes.open({ command: binary, args: ['app-server'], env, cwd });
     const question = { id: QuestionId, method: 'account/rateLimits/read' };
     const answer = await this.ask(server, [...Greeting, question], usageAnswerOf, this.usageTimeoutMs);
     if (!answer) return unavailableUsage(checkedAt, UsageUnavailableReason.probeFailed, 'Codex did not answer.');
-    if (answer.error) {
-      const message = 'Codex could not read usage.';
-      return unavailableUsage(checkedAt, UsageUnavailableReason.probeFailed, message);
-    }
+    if (answer.error) return this.refusedUsage(session, checkedAt);
     return codexUsageOf(answer.result, checkedAt);
+  }
+
+  private async refusedUsage(session: ProviderSession, checkedAt: string) {
+    const login = await this.readAccount(session);
+    if (login?.identity === ApiKeyAccount) {
+      return unavailableUsage(checkedAt, UsageUnavailableReason.unsupported, NoSubscriptionLimitsMessage);
+    }
+    return unavailableUsage(checkedAt, UsageUnavailableReason.probeFailed, 'Codex could not read usage.');
   }
 
   private async readAccount(session: ProviderSession) {

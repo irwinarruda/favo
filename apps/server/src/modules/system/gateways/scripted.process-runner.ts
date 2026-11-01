@@ -13,6 +13,7 @@ export class ScriptedProcessRunner extends ProcessRunner {
   killOpenCount = 0;
   private readonly replies = new Map<string, Reply>();
   private readonly conversations = new Map<string, string[]>();
+  private readonly conversationsInTurn = new Map<string, string[][]>();
   private readonly installed = new Map<string, string>();
   private readonly undetachable = new Set<string>();
 
@@ -28,6 +29,10 @@ export class ScriptedProcessRunner extends ProcessRunner {
     this.conversations.set(commandLine, lines);
   }
 
+  converseInTurn(commandLine: string, conversations: string[][]) {
+    this.conversationsInTurn.set(commandLine, conversations);
+  }
+
   async run(request: ProcessRequest) {
     this.calls.push(request);
     const reply = this.replies.get(lineOf(request));
@@ -36,7 +41,7 @@ export class ScriptedProcessRunner extends ProcessRunner {
 
   open(request: ProcessRequest): PipedProcess {
     this.calls.push(request);
-    const lines = this.conversations.get(lineOf(request));
+    const lines = this.conversationsInTurn.get(lineOf(request))?.shift() ?? this.conversations.get(lineOf(request));
     const listeners: ((line: string) => void)[] = [];
     const { killed } = this;
     return {

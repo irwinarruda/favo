@@ -22,6 +22,15 @@ describe('Claude Code shim', () => {
       plan: 'max · Hive',
     });
   });
+  it('turns the null a claude.ai login can report into no identity', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.reply(status, { stdout: JSON.stringify({ loggedIn: true, email: null, subscriptionType: 'max' }) });
+    expect(await new ClaudeProviderCli(processes).status(sessionOf('claude'))).toEqual({
+      login: 'signedIn',
+      identity: undefined,
+      plan: 'max',
+    });
+  });
   it('leaves out the organization every personal plan has', async () => {
     const processes = new ScriptedProcessRunner();
     const stdout = JSON.stringify({ loggedIn: true, orgName: "bee@hive.dev's Organization", subscriptionType: 'max' });
@@ -270,6 +279,26 @@ describe('Codex usage', () => {
     ['no limits', {}],
   ])('fails softly on %s', async (_name, result) => {
     expect((await read(result)).unavailable?.reason).toBe('probeFailed');
+  });
+  it('says an API key seat has no limits, because retrying can never help', async () => {
+    const processes = new ScriptedProcessRunner();
+    const refused = JSON.stringify({ id: 2, error: { code: -32600, message: 'chatgpt authentication required' } });
+    const apiKey = JSON.stringify({ id: 2, result: { account: { type: 'apiKey' } } });
+    processes.converseInTurn('codex app-server', [[refused], [apiKey]]);
+    expect((await new CodexProviderCli(processes).usage(session, CheckedAt)).unavailable).toEqual({
+      reason: 'unsupported',
+      message: 'This account has no subscription limits.',
+    });
+  });
+  it('asks what kind of account it is only when the read was refused', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.converse('codex app-server', [answerLine({ rateLimits: {} })]);
+    await new CodexProviderCli(processes).usage(session, CheckedAt);
+    expect(processes.calls).toHaveLength(1);
+  });
+  it('clears CODEX_HOME, so a read from inside another seat cannot follow it', () => {
+    const cli = new CodexProviderCli(new ScriptedProcessRunner());
+    expect(cli.usageEnvironment()).toEqual({ env: {}, unsetEnv: ['CODEX_HOME'] });
   });
   it('fails softly when the app server refuses', async () => {
     const processes = new ScriptedProcessRunner();
