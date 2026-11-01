@@ -1,0 +1,14 @@
+node_modules
+dist
+*.log
+.DS_Store
+coverage
+apps/npm/LICENSE
+apps/npm/SHA256SUMS
+apps/npm/THIRD-PARTY-NOTICES.md
+.env
+.env.*
+*.pem
+*.key
+*.p12
+.npmrc

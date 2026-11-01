@@ -1,0 +1,15 @@
+{
+  "name": "@favo/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./test/*": "./test/*.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@favo/contracts": "workspace:*",
+    "@favo/domain": "workspace:*",
+    "zod": "^4.0.0"
+  }
+}

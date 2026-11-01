@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/react",
+    "lib": ["ESNext", "DOM"],
+    "paths": {
+      "@/*": ["./src/*", "../server/src/*", "../client/src/*"],
+      "#test/*": ["../server/test/*"]
+    }
+  },
+  "include": ["src", "test"]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@favo/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "imports": {
+    "#contracts/*": "./src/*.ts"
+  },
+  "dependencies": {
+    "zod": "^4.0.0",
+    "@favo/domain": "workspace:*"
+  }
+}

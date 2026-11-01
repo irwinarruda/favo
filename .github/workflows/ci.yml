@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# windows-latest defaults to PowerShell. These steps are bash, so every runner
+# reads them the same way.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --os='*' --cpu='*'
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Audit dependencies
+        run: bun audit
+
+  # favo drives other programs, their terminals and their home folders, and
+  # each of those is done differently on each platform. Running the suite
+  # everywhere it ships keeps a change that only works on the machine it was
+  # written on from reaching a release.
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # The launcher's tests run it under real node. This is the oldest version
+      # apps/npm/package.json promises, so `engines` stays a tested claim.
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "20.11"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --os='*' --cpu='*'
+
+      - name: Run tests
+        run: bun test
+
+  # Compiling for a target only needs its Bun runtime and its OpenTUI package,
+  # so one Linux runner proves all five. These binaries are thrown away: the Mac
+  # ones are only signed on a Mac, and the release job is what builds those.
+  build:
+    name: Build every target
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --os='*' --cpu='*'
+
+      - name: Build every target
+        run: bun run build:all
+
+      - name: Check favo ignores the folder it starts in
+        run: bash .github/scripts/check-no-autoload.sh "${GITHUB_WORKSPACE}/dist/favo-linux-x64"
+
+  # gitleaks' GitHub action needs a paid licence for repositories owned by an
+  # organisation and the binary does not, so the binary is what runs here.
+  secrets:
+    name: Scan history for secrets
+    runs-on: ubuntu-latest
+
+    steps:
+      # The default shallow clone holds one commit, and a secret that was
+      # committed and later removed is still a leaked secret.
+      - name: Check out the full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The hash is copied from gitleaks_8.30.1_checksums.txt in the release and
+      # kept here on purpose. A checksum file fetched at run time comes from the
+      # same place as the binary, so it would move along with a replaced binary.
+      # Dependabot does not see this pin, so bump both values together.
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --fail --silent --show-error --location --output "${RUNNER_TEMP}/${archive}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check --strict
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" gitleaks
+
+      - name: Scan the history
+        run: |
+          "${RUNNER_TEMP}/gitleaks" git --redact --verbose .

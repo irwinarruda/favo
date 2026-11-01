@@ -1,0 +1,37 @@
+import { useKeyboard } from '@opentui/react';
+import { Dialog } from '@/shared/components/Dialog';
+import { useApp } from '@/shared/stores/app';
+
+const Keys = [
+  ['↑ ↓ / j k', 'move between seats'],
+  ['← → / h l', 'move between accounts'],
+  ['tab', 'next machine'],
+  ['enter', 'launch, or sign in'],
+  ['s / o', 'sign in / sign out'],
+  ['c', 'copy the config path'],
+  ['a / n / x', 'add / rename / delete a cell'],
+  ['m / X', 'add / forget a machine'],
+  ['i', 'install favo on the machine'],
+  ['r / R', 'refresh / mend shared links'],
+  ['d', 'choose the launch folder'],
+  ['t', 'change the theme'],
+  ['q', 'quit'],
+];
+
+export function HelpDialog({ onClose }: { onClose(): void }) {
+  const colors = useApp((state) => state.colors);
+  useKeyboard((key) => {
+    if (key.name === 'escape' || key.sequence === '?' || key.name === 'return') onClose();
+  });
+
+  return (
+    <Dialog title="keys" width={46}>
+      {Keys.map(([keys, label]) => (
+        <text key={keys}>
+          <span fg={colors.accent}>{keys!.padEnd(12)}</span>
+          <span fg={colors.text}>{label}</span>
+        </text>
+      ))}
+    </Dialog>
+  );
+}

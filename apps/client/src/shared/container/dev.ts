@@ -1,0 +1,20 @@
+import { mockDb } from '@/__tests__/db';
+import { TestFleetRepository } from '@/modules/comb/app/repositories/TestFleetRepository';
+import { TestDirectoryRepository } from '@/modules/directories/app/repositories/TestDirectoryRepository';
+import { TestMachineRepository } from '@/modules/machines/app/repositories/TestMachineRepository';
+import { TestTerminalRepository } from '@/modules/sessions/app/repositories/TestTerminalRepository';
+import { TestThemeRepository } from '@/modules/themes/app/repositories/TestThemeRepository';
+import { TestClipboardGateway } from '@/shared/app/gateways/TestClipboardGateway';
+import { TestTerminalGateway } from '@/shared/app/gateways/TestTerminalGateway';
+import { container } from '@/shared/container';
+
+export function bootstrapDevContainer() {
+  mockDb.reset();
+  container.register('IFleetRepository', new TestFleetRepository());
+  container.register('IMachineRepository', new TestMachineRepository());
+  container.register('ITerminalRepository', new TestTerminalRepository());
+  container.register('IThemeRepository', new TestThemeRepository());
+  container.register('IDirectoryRepository', new TestDirectoryRepository());
+  container.register('IClipboardGateway', new TestClipboardGateway());
+  container.register('ITerminalGateway', new TestTerminalGateway());
+}

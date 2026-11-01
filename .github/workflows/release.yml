@@ -1,0 +1,380 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The version tag this run was dispatched on (gh workflow run release.yml --ref v1.2.3 -f tag=v1.2.3)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Keyed on the tag's short name so a manual re-run waits for a push of that same
+# tag instead of racing it. Never cancelled: a half-uploaded release or a
+# half-finished publish is worse than a slow one.
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+# windows-latest defaults to PowerShell. These steps are bash, so every runner
+# reads them the same way.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  verify:
+    name: Verify release
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+
+    steps:
+      # GitHub runs this file as it is on the ref a run is dispatched from, so a
+      # run started from a branch would follow that branch's steps while claiming
+      # to ship the tag. refs/tags/ rather than the bare name, so a branch that
+      # happens to be called v1.2.3 can't stand in for the tag either.
+      - name: Check the run started from the tag
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/tags/${RELEASE_TAG}" ]]; then
+            echo "::error::This run started from ${GITHUB_REF}. Start it from the tag: gh workflow run release.yml --ref ${RELEASE_TAG} -f tag=${RELEASE_TAG}"
+            exit 1
+          fi
+
+      # With no ref, checkout takes the commit this run started on, which is the
+      # one this file came from and the check above ties to the tag.
+      - name: Check out the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Every later job checks out this commit rather than asking for the tag by
+      # name again, so moving the tag mid-run can't change what ships.
+      - name: Record the commit to release
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+          no-cache: true
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --os='*' --cpu='*'
+
+      - name: Verify the tag matches both versions
+        run: bun run check:release-version "${RELEASE_TAG}"
+
+  # The release ships a binary for each platform, so the suite has to pass on
+  # each platform before any of them is built.
+  test:
+    name: Test on ${{ matrix.os }}
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+          no-cache: true
+
+      # The launcher's tests run it under real node. This is the oldest version
+      # apps/npm/package.json promises, so `engines` stays a tested claim.
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "20.11"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --os='*' --cpu='*'
+
+      - name: Run tests
+        run: bun test
+
+  # One macOS runner cross-compiles all five targets. It has to be macOS because
+  # scripts/build.ts re-signs the Mac binaries with the real `codesign`, and a
+  # Mac binary without a valid signature is killed on launch on Apple Silicon.
+  build:
+    name: Build the release files
+    needs: [verify, test]
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+          no-cache: true
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --os='*' --cpu='*'
+
+      - name: Build every target
+        run: bun run build:all
+
+      - name: Package the release files
+        run: bun run package:release
+
+      # The .gz files are already compressed, so zipping them again only costs
+      # time on both ends.
+      - name: Upload the release files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: dist/release/*
+          compression-level: 0
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download the release files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: dist/release
+
+      # This job has no checkout and `gh release create` goes by the tag's name,
+      # and an immutable release then locks that tag for good. So this is the last
+      # moment the tag can disagree with the commit everything above tested.
+      # commits/refs/tags/ resolves an annotated tag to its commit as well.
+      - name: Check the tag still points at the verified commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.verify.outputs.sha }}
+        run: |
+          tagged="$(gh api "repos/${GITHUB_REPOSITORY}/commits/refs/tags/${RELEASE_TAG}" --jq .sha)"
+          if [[ "${tagged}" != "${RELEASE_SHA}" ]]; then
+            echo "::error::${RELEASE_TAG} moved to ${tagged} during this run, but ${RELEASE_SHA} is what was tested"
+            exit 1
+          fi
+
+      # A re-run reaches a release that is already published. Immutable releases
+      # lock its files, so it is left alone and the run carries on. A draft is not
+      # that: gh uploads into one before publishing, so a failed upload leaves one
+      # behind, and creating the release again is what finishes the job.
+      # --verify-tag stops gh from quietly creating a missing tag on the default
+      # branch.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          is_draft="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft 2> /dev/null || true)"
+          if [[ "${is_draft}" == "false" ]]; then
+            echo "${RELEASE_TAG} is already published, so its files stay as they are"
+            exit 0
+          fi
+          gh release create "${RELEASE_TAG}" dist/release/* \
+            --generate-notes \
+            --title "${RELEASE_TAG}" \
+            --verify-tag \
+            --repo "${GITHUB_REPOSITORY}"
+
+  # Runs against the real, public release, through the launcher that is about to
+  # be published. Each runner is the machine that file is for, so this proves
+  # every binary starts somewhere real before anything reaches npm, and an npm
+  # version can't exist whose download is broken. FAVO_HOME is a new folder
+  # because a binary already sitting there would skip the download being tested.
+  # A checkout has no bundled SHA256SUMS, so here the hashes come from the release.
+  smoke:
+    name: Smoke test on ${{ matrix.os }}
+    needs: [verify, release]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
+          - windows-latest
+
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "20.11"
+
+      - name: Run favo through the launcher
+        env:
+          FAVO_HOME: ${{ runner.temp }}/favo-smoke-home
+        run: |
+          rm -rf "${FAVO_HOME}"
+          printed="$(node apps/npm/bin/favo.mjs --version | tr -d '\r')"
+          echo "favo --version printed ${printed}"
+          if [[ "v${printed}" != "${RELEASE_TAG}" ]]; then
+            echo "::error::favo --version printed ${printed}, expected ${RELEASE_TAG}"
+            exit 1
+          fi
+
+      # The released binary itself, then through the launcher on a fresh download.
+      - name: Check favo ignores the folder it starts in
+        env:
+          FAVO_HOME: ${{ runner.temp }}/favo-smoke-home
+        run: |
+          binary="${FAVO_HOME}/runtime/${RELEASE_TAG#v}/favo"
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            binary="${binary}.exe"
+          fi
+          bash .github/scripts/check-no-autoload.sh "${binary}"
+          bash .github/scripts/check-no-autoload.sh node "${GITHUB_WORKSPACE}/apps/npm/bin/favo.mjs"
+
+  # npm comes last because it is the one step that can't be taken back: a version
+  # number is spent for good once published. By now the launcher it ships has
+  # downloaded and run every binary on a real machine.
+  npm:
+    name: Publish to npm
+    needs: [verify, smoke]
+    runs-on: ubuntu-latest
+    # The trusted publisher on npmjs.com names this environment and release.yml,
+    # and the identity GitHub mints here is what proves both. CI holds no token:
+    # a hand-published 0.0.0 created the package so the publisher could be set up.
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+
+      # Trusted publishing needs Node 22.14 or newer. There is no registry-url
+      # here on purpose: setup-node would write an .npmrc holding a placeholder
+      # token, and the workflow's OIDC identity is the only thing that
+      # authenticates this job.
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      # GitHub's Node images can carry an npm too old to exchange the workflow's
+      # OIDC identity for a publishing token. Trusted publishing arrived in
+      # 11.5.1, so the publisher brings its own npm rather than depending on
+      # when the runner image catches up. An exact version, because this job can
+      # publish and a new npm shouldn't reach it unreviewed. Dependabot does not
+      # see this pin, so it is bumped by hand.
+      - name: Install npm with trusted publishing support
+        run: |
+          npm install --global --prefix "${RUNNER_TEMP}/npm" npm@11.21.1
+          echo "${RUNNER_TEMP}/npm/bin" >> "${GITHUB_PATH}"
+
+      - name: Report the npm that will publish
+        run: |
+          echo "node $(node --version), npm $(npm --version)"
+          if [[ "$(printf '%s\n11.5.1\n' "$(npm --version)" | sort -V | head -1)" != "11.5.1" ]]; then
+            echo "::error::npm $(npm --version) predates trusted publishing"
+            exit 1
+          fi
+
+      # A re-run reaches a version that is already up, and npm refuses to publish
+      # over one rather than skip it, so the registry is asked first. Asked
+      # directly so an outage fails here instead of reading as "not published".
+      - name: Check publication status
+        id: published
+        run: |
+          version="${RELEASE_TAG#v}"
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            "https://registry.npmjs.org/favo-cli/${version}")"
+          case "${status}" in
+            200)
+              echo "exists=true" >> "${GITHUB_OUTPUT}"
+              echo "favo-cli ${version} is already published"
+              ;;
+            404)
+              echo "exists=false" >> "${GITHUB_OUTPUT}"
+              ;;
+            *)
+              echo "::error::npm answered ${status} for favo-cli ${version}"
+              exit 1
+              ;;
+          esac
+
+      - name: Download the release files
+        if: steps.published.outputs.exists != 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+
+      # A manual re-run rebuilds, but a published release keeps the files it has,
+      # and a build is only identical if nothing about it changed. Hashes that
+      # disagree with the release would make the package reject every download,
+      # on a version number npm will never give back, so that stops here.
+      - name: Check this run's hashes match the published release
+        if: steps.published.outputs.exists != 'true'
+        run: |
+          curl --fail --silent --show-error --location --output "${RUNNER_TEMP}/published-SHA256SUMS" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/SHA256SUMS"
+          if ! cmp release/SHA256SUMS "${RUNNER_TEMP}/published-SHA256SUMS"; then
+            echo "::error::This run built different files than ${RELEASE_TAG} published. Re-run the failed jobs of the run that created the release, or cut a new version."
+            exit 1
+          fi
+
+      # Locally these files may be absent and `npm pack` stays quiet about it, so
+      # the check is here: ask npm what it would ship, not whether the files
+      # exist, and stop if any is missing. SHA256SUMS is the one that matters most:
+      # it is why a swapped release can't reach anyone who installed from npm.
+      - name: Copy the license, notices and hashes into the package
+        if: steps.published.outputs.exists != 'true'
+        run: |
+          cp LICENSE apps/npm/LICENSE
+          cp release/SHA256SUMS apps/npm/SHA256SUMS
+          cp release/THIRD-PARTY-NOTICES.md apps/npm/THIRD-PARTY-NOTICES.md
+          packed="$(npm pack ./apps/npm --dry-run --json --ignore-scripts)"
+          for file in LICENSE SHA256SUMS THIRD-PARTY-NOTICES.md; do
+            if ! jq --exit-status --arg file "${file}" '.[0].files | any(.path == $file)' <<< "${packed}" > /dev/null; then
+              echo "::error::${file} would not be published"
+              exit 1
+            fi
+          done
+
+      # The `./` is load-bearing: npm reads a bare `a/b` as GitHub shorthand. npm
+      # authenticates through the trusted publisher set up on npmjs.com, using
+      # this workflow's OIDC identity.
+      - name: Publish the package
+        if: steps.published.outputs.exists != 'true'
+        run: npm publish ./apps/npm --access public --provenance --ignore-scripts

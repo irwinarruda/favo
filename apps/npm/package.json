@@ -1,0 +1,39 @@
+{
+  "name": "favo-cli",
+  "version": "0.1.0",
+  "description": "favo keeps several AI subscriptions on every computer you own. Downloads the self-contained executable for this platform from the GitHub Release.",
+  "keywords": [
+    "favo",
+    "cli",
+    "tui",
+    "ai",
+    "accounts",
+    "claude",
+    "codex",
+    "opencode"
+  ],
+  "homepage": "https://github.com/irwinarruda/favo#readme",
+  "bugs": {
+    "url": "https://github.com/irwinarruda/favo/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/irwinarruda/favo.git"
+  },
+  "license": "MIT",
+  "bin": {
+    "favo": "bin/favo.mjs"
+  },
+  "files": [
+    "bin",
+    "LICENSE",
+    "SHA256SUMS",
+    "THIRD-PARTY-NOTICES.md"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

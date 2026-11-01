@@ -1,0 +1,283 @@
+import { adoptAccount } from '@favo/contracts/rpc/accounts/adopt-account';
+import { createAccount } from '@favo/contracts/rpc/accounts/create-account';
+import { listAccounts } from '@favo/contracts/rpc/accounts/list-accounts';
+import { removeAccount } from '@favo/contracts/rpc/accounts/remove-account';
+import { renameAccount } from '@favo/contracts/rpc/accounts/rename-account';
+import type { RpcClient } from '@favo/contracts/rpc/client';
+import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
+import { discoverMachines } from '@favo/contracts/rpc/machines/discover-machines';
+import { getMachineStatus } from '@favo/contracts/rpc/machines/get-machine-status';
+import { installMachine } from '@favo/contracts/rpc/machines/install-machine';
+import { listMachines } from '@favo/contracts/rpc/machines/list-machines';
+import { removeMachine } from '@favo/contracts/rpc/machines/remove-machine';
+import { getSeatStatus } from '@favo/contracts/rpc/seats/get-seat-status';
+import { inspectSeat } from '@favo/contracts/rpc/seats/inspect-seat';
+import { provisionSeat } from '@favo/contracts/rpc/seats/provision-seat';
+import { repairSeats } from '@favo/contracts/rpc/seats/repair-seats';
+import { planTerminal } from '@favo/contracts/rpc/terminal/plan-terminal';
+import { listThemes } from '@favo/contracts/rpc/themes/list-themes';
+import { selectTheme } from '@favo/contracts/rpc/themes/select-theme';
+import { LoginState } from '@favo/contracts/rpc/views';
+import { FavoVersion } from '@favo/contracts/version';
+import { PersonalAccount } from '@favo/domain/accounts/account';
+import { type Machine, MachineState } from '@favo/domain/machines/machine';
+import { Providers } from '@favo/domain/providers/provider';
+import { DomainError } from '@favo/domain/shared/domain-error';
+import { TerminalAction, type TerminalPlan } from '@favo/domain/terminal/terminal-plan';
+import { ThemeSource } from '@favo/domain/themes/theme';
+import { HelpText } from '@/help-text';
+import type { Paint } from '@/paint';
+import { type Command, CommandKind } from '@/parse-command';
+
+export type CommandContext = {
+  client: RpcClient;
+  paint: Paint;
+  print(line: string): void;
+  runPlan(plan: TerminalPlan): Promise<number>;
+};
+
+export async function runCommand(parsed: Command, context: CommandContext) {
+  const { client, print } = context;
+  const command = await withStoredAccount(parsed, client);
+  const { machineId, account, provider, args, isJson } = command;
+  const options = { machineId };
+  switch (command.kind) {
+    case CommandKind.help:
+      print(HelpText);
+      return 0;
+    case CommandKind.version:
+      print(FavoVersion);
+      return 0;
+    case CommandKind.launch:
+      return runPlanned(context, {
+        ...seatOf(command),
+        action: TerminalAction.launch,
+        args,
+        machineId,
+        directory: command.directory,
+      });
+    case CommandKind.login:
+      return runPlanned(context, { ...seatOf(command), action: TerminalAction.login, args: [], machineId });
+    case CommandKind.logout:
+      return runPlanned(context, { ...seatOf(command), action: TerminalAction.logout, args: [], machineId });
+    case CommandKind.list:
+      await printFleet(context, isJson);
+      return 0;
+    case CommandKind.add:
+      await client.call(createAccount, { name: account! }, options);
+      print(`${context.paint.accent('⬢')} ${account} is ready. Sign in with: favo login ${account} claude`);
+      return 0;
+    case CommandKind.rename: {
+      const { displayName } = await client.call(renameAccount, { name: account!, newName: command.name! }, options);
+      print(`${context.paint.accent('⬢')} ${parsed.account} is now ${displayName}. Its folder stayed where it was.`);
+      return 0;
+    }
+    case CommandKind.remove: {
+      const { trashedTo } = await client.call(removeAccount, { name: account! }, options);
+      print(`Moved to ${trashedTo}. Its logins stay there, still signed in, until you delete that folder.`);
+      return 0;
+    }
+    case CommandKind.adopt:
+      await client.call(adoptAccount, { name: account!, provider: provider!, from: command.from! }, options);
+      print(`${context.paint.accent('⬢')} ${command.from} now lives in ${account}. Sign in again to use it.`);
+      return 0;
+    case CommandKind.path: {
+      await client.call(provisionSeat, seatOf(command), options);
+      const accounts = await client.call(listAccounts, {}, options);
+      const seat = accounts
+        .find(({ name }) => name === account)
+        ?.seats.find((candidate) => candidate.provider === provider);
+      print(seat?.path ?? '');
+      return seat ? 0 : 1;
+    }
+    case CommandKind.sync: {
+      const repairs = await client.call(repairSeats, { account }, options);
+      if (isJson) print(JSON.stringify(repairs, undefined, 2));
+      else for (const repair of repairs) printRepair(context, repair);
+      if (!isJson && repairs.length === 0) print('Nothing to repair.');
+      return 0;
+    }
+    case CommandKind.inspect: {
+      const inspection = await client.call(inspectSeat, seatOf(command), options);
+      if (isJson) print(JSON.stringify(inspection, undefined, 2));
+      else {
+        for (const item of inspection.items) print(`  ${item.state.padEnd(10)} ${item.name}`);
+        print(context.paint.dim(`  private    ${inspection.privateItems.join(', ')}`));
+        if (inspection.unclassified.length > 0) {
+          print(context.paint.dim(`  unclassified, kept private: ${inspection.unclassified.join(', ')}`));
+        }
+      }
+      return 0;
+    }
+    case CommandKind.theme:
+      await runTheme(context, command);
+      return 0;
+    case CommandKind.machineList: {
+      const machines = await client.call(listMachines, {});
+      const statuses = await Promise.all(machines.map(({ id }) => client.call(getMachineStatus, { id })));
+      if (isJson)
+        print(
+          JSON.stringify(
+            machines.map((machine, index) => ({ ...machine, ...statuses[index] })),
+            undefined,
+            2
+          )
+        );
+      else {
+        machines.forEach((machine, index) => {
+          print(
+            `${machine.name.padEnd(20)} ${(machine.target ?? 'this machine').padEnd(28)} ${statuses[index]!.state}`
+          );
+        });
+      }
+      return 0;
+    }
+    case CommandKind.machineDiscover: {
+      const found = await client.call(discoverMachines, {});
+      if (isJson) print(JSON.stringify(found, undefined, 2));
+      else for (const machine of found) print(`${machine.name.padEnd(24)} ${machine.source}`);
+      if (!isJson && found.length === 0) print('Nothing new on ssh or Tailscale.');
+      return 0;
+    }
+    case CommandKind.machineAdd: {
+      const machine = await client.call(addMachine, { target: command.target!, name: command.name });
+      print(`${context.paint.accent('⬢')} ${machine.name} joined. Installing favo there...`);
+      const { version } = await client.call(installMachine, { id: machine.id });
+      print(`${context.paint.accent('⬢')} favo ${version} is running on ${machine.name}.`);
+      return 0;
+    }
+    case CommandKind.machineRemove:
+      await client.call(removeMachine, { id: command.target! });
+      print(`Forgot ${command.target}. favo stays installed there.`);
+      return 0;
+    case CommandKind.machineInstall: {
+      print(`Installing favo on ${command.target}...`);
+      const { version } = await client.call(installMachine, { id: command.target! });
+      print(`${context.paint.accent('⬢')} favo ${version} is running on ${command.target}.`);
+      return 0;
+    }
+    default:
+      return 1;
+  }
+}
+
+function seatOf(command: Command) {
+  return { account: command.account!, provider: command.provider! };
+}
+
+async function withStoredAccount(command: Command, client: RpcClient) {
+  const { account, kind, machineId } = command;
+  if (!account || account === PersonalAccount || kind === CommandKind.add) return command;
+  const accounts = await client.call(listAccounts, {}, { machineId });
+  const found = accounts.find(({ displayName }) => displayName === account);
+  return found ? { ...command, account: found.name } : command;
+}
+
+async function runPlanned(context: CommandContext, params: Parameters<typeof planFor>[1]) {
+  return context.runPlan(await planFor(context.client, params));
+}
+
+function planFor(
+  client: RpcClient,
+  params: {
+    account: string;
+    provider: Command['provider'] & string;
+    action: TerminalAction;
+    args: string[];
+    machineId?: string;
+    directory?: string;
+  }
+) {
+  return client.call(planTerminal, params);
+}
+
+function printRepair(
+  context: CommandContext,
+  repair: { account: string; provider: string; linked: string[]; problems: { name: string; state: string }[] }
+) {
+  const { paint, print } = context;
+  const summary = repair.linked.length > 0 ? `linked ${repair.linked.join(', ')}` : 'ok';
+  print(`${paint.accent('⬢')} ${repair.account} ${repair.provider}: ${summary}`);
+  for (const problem of repair.problems) print(`  ${problem.state}: ${problem.name} (left untouched)`);
+}
+
+async function runTheme(context: CommandContext, command: Command) {
+  const { client, print, paint } = context;
+  if (command.target) {
+    await client.call(selectTheme, { id: command.target });
+    print(`${paint.accent('⬢')} ${command.target} it is.`);
+    return;
+  }
+  const { activeId, themes, problems } = await client.call(listThemes, {});
+  if (command.isJson) {
+    print(JSON.stringify({ activeId, themes, problems }, undefined, 2));
+    return;
+  }
+  for (const theme of themes) {
+    const swatches = [theme.colors.accent, theme.colors.accentBright, theme.colors.success, theme.colors.danger];
+    const marks = swatches.map((color) => paint.color(color, '■')).join(' ');
+    const source = theme.source === ThemeSource.custom ? paint.dim(' custom') : '';
+    print(`${theme.id === activeId ? paint.accent('▸') : ' '} ${theme.id.padEnd(30)} ${marks}${source}`);
+  }
+  for (const problem of problems) print(`${problem.file}: ${problem.message}`);
+}
+
+async function printFleet(context: CommandContext, isJson: boolean) {
+  const { client, print, paint } = context;
+  const machines = await client.call(listMachines, {});
+  const report = await Promise.all(
+    machines.map(async (machine) => {
+      const status = await client.call(getMachineStatus, { id: machine.id });
+      if (status.state !== MachineState.online) return { machine, status, accounts: [] };
+      return { machine, status, ...(await accountsWithLogins(client, machine)) };
+    })
+  );
+  if (isJson) {
+    print(JSON.stringify(report, undefined, 2));
+    return;
+  }
+  for (const { machine, status, accounts, problem } of report) {
+    const where = machine.isLocal ? 'this machine' : machine.target;
+    const facts = [where, status.state, status.directory].filter(Boolean).join(' · ');
+    print(`${paint.bold(machine.name)} ${paint.dim(facts)}`);
+    if (problem) print(`  ${problem}`);
+    for (const account of accounts) {
+      print(`  ${paint.accent(account.displayName)}`);
+      for (const seat of account.seats) {
+        const isIn = seat.status.login === LoginState.signedIn;
+        const mark = isIn ? paint.accent('⬢') : paint.dim('⬡');
+        const label = Providers[seat.provider].executable.padEnd(9);
+        const detail = [seat.status.identity, seat.status.plan].filter(Boolean).join(' · ');
+        print(`    ${mark} ${label} ${detail || paint.dim(loginLabel(seat.status.login))}`);
+      }
+    }
+  }
+}
+
+async function accountsWithLogins(client: RpcClient, machine: Machine) {
+  try {
+    const options = { machineId: machine.id };
+    const listed = await client.call(listAccounts, {}, options);
+    const accounts = await Promise.all(
+      listed.map(async (account) => ({
+        ...account,
+        seats: await Promise.all(
+          account.seats.map(async (seat) => {
+            const params = { account: seat.account, provider: seat.provider };
+            return { ...seat, status: await client.call(getSeatStatus, params, options) };
+          })
+        ),
+      }))
+    );
+    return { accounts };
+  } catch (error) {
+    if (!(error instanceof DomainError)) throw error;
+    return { accounts: [], problem: error.message };
+  }
+}
+
+function loginLabel(login: LoginState) {
+  if (login === LoginState.notInstalled) return 'not installed';
+  if (login === LoginState.unknown) return 'unknown';
+  return login === LoginState.signedIn ? 'signed in' : 'signed out';
+}

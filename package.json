@@ -1,0 +1,32 @@
+{
+  "name": "favo",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun apps/cli/src/main.ts",
+    "dev:mock": "bun apps/client/src/dev.tsx",
+    "lint": "biome ci .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/contracts && tsc --noEmit -p apps/server && tsc --noEmit -p apps/client && tsc --noEmit -p apps/cli && tsc --noEmit -p apps/npm",
+    "test": "bun test",
+    "build": "bun scripts/build.ts",
+    "build:all": "bun scripts/build.ts --all",
+    "package:release": "bun scripts/package-release.ts",
+    "check:release-version": "bun scripts/check-release-version.ts",
+    "verify": "bun run lint && bun run typecheck && bun run test && bun run build",
+    "install:local": "bun scripts/install.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.0",
+    "@favo/contracts": "workspace:*",
+    "@types/bun": "latest",
+    "@types/react": "^19.0.0",
+    "typescript": "^5.9.0"
+  }
+}

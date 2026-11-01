@@ -1,0 +1,210 @@
+import { describe, expect, it } from 'bun:test';
+import { createAccount } from '@favo/contracts/rpc/accounts/create-account';
+import { Protocol, type RpcRequest } from '@favo/contracts/rpc/envelope';
+import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
+import { LoginState } from '@favo/contracts/rpc/views';
+import { installPlanFor } from '@favo/domain/machines/remote-commands';
+import type { TerminalPlan } from '@favo/domain/terminal/terminal-plan';
+import { BuiltInThemes } from '@favo/domain/themes/built-in-themes';
+import { SshRemoteBackends } from '@favo/server/modules/machines/gateways/ssh.remote-backends';
+import { ReplyingSsh } from '@favo/server/test/support/replying-ssh';
+import { createTestServer, Home, seedClaudeBase } from '@favo/server/test/support/test-server';
+import { createPaint } from '@/paint';
+import { parseCommand } from '@/parse-command';
+import { runCommand } from '@/run-command';
+
+function harness(server = createTestServer(), isPainted = false) {
+  const lines: string[] = [];
+  const plans: TerminalPlan[] = [];
+  const context = {
+    client: server.client,
+    paint: createPaint(isPainted, BuiltInThemes[0]!.colors),
+    print: (line: string) => lines.push(line),
+    async runPlan(plan: TerminalPlan) {
+      plans.push(plan);
+      return 7;
+    },
+  };
+  return { ...server, lines, plans, run: (...argv: string[]) => runCommand(parseCommand(argv), context) };
+}
+
+describe('commands', () => {
+  it('prints the whole fleet in one list', async () => {
+    const mac = harness();
+    const devbox = createTestServer({ hostname: 'devbox' });
+    await seedClaudeBase(mac.fileSystem);
+    await seedClaudeBase(devbox.fileSystem);
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', devbox.router);
+    mac.clis.claude.login = { login: LoginState.signedIn, identity: 'mac@bee.dev' };
+    devbox.clis.claude.login = { login: LoginState.signedIn, identity: 'devbox@bee.dev', plan: 'max' };
+    await mac.run('list');
+    const output = mac.lines.join('\n');
+    expect(output).toContain('macbook this machine · online');
+    expect(output).toContain('devbox bee@devbox · online');
+    expect(output).toContain('⬢ claude    mac@bee.dev');
+    expect(output).toContain('⬢ claude    devbox@bee.dev · max');
+  });
+  it('says which directory a launch runs in on each machine', async () => {
+    const mac = harness(createTestServer({ directory: '/Users/bee/code/app' }));
+    const devbox = createTestServer({ hostname: 'devbox', directory: '/home/bee' });
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', devbox.router);
+    await mac.run('list');
+    const output = mac.lines.join('\n');
+    expect(output).toContain('macbook this machine · online · /Users/bee/code/app');
+    expect(output).toContain('devbox bee@devbox · online · /home/bee');
+  });
+  it('lists themes and marks the active one', async () => {
+    const { run, lines, fileSystem, paths } = harness();
+    await fileSystem.writePrivateText(`${paths.themes}/mine.json`, JSON.stringify({ colors: {} }));
+    await run('theme');
+    expect(lines.find((line) => line.includes('honey'))).toStartWith('▸ honey');
+    expect(lines.find((line) => line.includes('mine'))).toContain('custom');
+  });
+  it('sets a theme and keeps the rest of the config', async () => {
+    const { run, lines, fileSystem, paths } = harness();
+    await fileSystem.writePrivateText(paths.configFile, JSON.stringify({ providers: {} }));
+    await run('theme', 'nord');
+    expect(lines).toEqual(['⬢ nord it is.']);
+    expect(JSON.parse((await fileSystem.readText(paths.configFile))!)).toEqual({ providers: {}, theme: 'nord' });
+  });
+  it('keeps listing when a machine is down', async () => {
+    const mac = harness();
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    await mac.run('list');
+    expect(mac.lines.join('\n')).toContain('devbox bee@devbox · offline');
+  });
+  it('keeps listing when one machine sends a reply it cannot read', async () => {
+    const mac = harness();
+    const devbox = createTestServer({ hostname: 'devbox' });
+    await seedClaudeBase(devbox.fileSystem);
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    await mac.client.call(addMachine, { target: 'bee@evil' });
+    mac.remotes.connect('devbox', devbox.router);
+    mac.remotes.connect('evil', {
+      send: async (request) => {
+        if (request.method === 'system.ping') return devbox.router.send(request);
+        return { id: request.id, ok: true, result: { nope: true } };
+      },
+    });
+    devbox.clis.claude.login = { login: LoginState.signedIn, identity: 'devbox@bee.dev' };
+    await mac.run('list');
+    const output = mac.lines.join('\n');
+    expect(output).toContain('devbox@bee.dev');
+    expect(output).toContain('evil sent a reply favo could not read.');
+    await mac.run('list', '--json');
+    const report = JSON.parse(mac.lines.at(-1)!);
+    expect(report.at(-1)).toMatchObject({ accounts: [], problem: 'evil sent a reply favo could not read.' });
+  });
+  it('keeps listing when a machine drops out halfway', async () => {
+    const mac = harness();
+    const devbox = createTestServer({ hostname: 'devbox' });
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', {
+      send: async (request) => {
+        if (request.method === 'system.ping') return devbox.router.send(request);
+        return { id: request.id, ok: false, error: { code: 'machineUnreachable', message: 'devbox: gone' } };
+      },
+    });
+    await mac.run('list');
+    expect(mac.lines.join('\n')).toContain('  devbox: gone');
+    expect(mac.lines.join('\n')).toContain('macbook this machine');
+  });
+  it('keeps its own colors while a machine can send none', async () => {
+    const mac = harness(createTestServer(), true);
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    const sequence = '\u001b]0;pwned\u0007\u001b[2J\u009b31m';
+    const facts = { version: '0.1.0', protocol: Protocol, hostname: 'evil', platform: 'x', arch: 'x', home: '/h' };
+    const ping = { ...facts, directory: `/srv${sequence}` };
+    const accounts = [{ name: 'boss', displayName: `boss${sequence}`, isPersonal: false, seats: [] }];
+    const reply = ({ id, method }: RpcRequest) =>
+      JSON.stringify({ id, ok: true, result: method === 'system.ping' ? ping : accounts });
+    const backends = new SshRemoteBackends(new ReplyingSsh(reply));
+    const machine = { id: 'devbox', name: 'devbox', target: 'bee@devbox', isLocal: false };
+    mac.remotes.connect('devbox', { send: (request) => backends.request(machine, request) });
+    await mac.run('list');
+    const output = mac.lines.join('\n');
+    const ownColor = new RegExp(`${String.fromCharCode(27)}\\[(?:0|1|38;2;\\d+;\\d+;\\d+)m`, 'g');
+    const withoutOwnColors = output.replaceAll(ownColor, '');
+    expect(output).toContain('\u001b[1mdevbox\u001b[0m');
+    expect(output).toContain('\u001b[38;2;');
+    expect(withoutOwnColors).toContain('boss]0;pwned[2J31m');
+    expect(withoutOwnColors).not.toMatch(/\p{Cc}(?<!\n)/u);
+  });
+  it('says where a removed account went and that its logins are still there', async () => {
+    const { run, lines, client } = harness();
+    await client.call(createAccount, { name: 'work' });
+    await run('rm', 'work');
+    expect(lines.at(-1)).toStartWith(`Moved to ${Home}/.favo/trash/work-`);
+    expect(lines.at(-1)).toEndWith('Its logins stay there, still signed in, until you delete that folder.');
+  });
+  it('prints machine readable output', async () => {
+    const { run, lines } = harness();
+    await run('list', '--json');
+    expect(JSON.parse(lines.join('\n'))[0].machine.id).toBe('local');
+  });
+  it('runs the plan and passes its exit code on', async () => {
+    const { run, plans, client, fileSystem } = harness();
+    await seedClaudeBase(fileSystem);
+    await client.call(createAccount, { name: 'work' });
+    expect(await run('claude', 'work', '--', '-c')).toBe(7);
+    expect(plans[0]?.args).toEqual(['-c']);
+    expect(plans[0]?.env.CLAUDE_CONFIG_DIR).toBe(`${Home}/.favo/accounts/work/claude`);
+  });
+  it('renames a cell and answers to both names, on the same folder', async () => {
+    const { run, lines, plans, client, fileSystem } = harness();
+    await seedClaudeBase(fileSystem);
+    await client.call(createAccount, { name: 'work' });
+    await run('rename', 'work', 'side');
+    expect(lines.at(-1)).toContain('work is now side');
+    await run('list');
+    expect(lines.join('\n')).toContain('  side');
+    await run('claude', 'side');
+    await run('claude', 'work');
+    const folder = `${Home}/.favo/accounts/work/claude`;
+    expect(plans.map((plan) => plan.env.CLAUDE_CONFIG_DIR)).toEqual([folder, folder]);
+    await run('rename', 'side', 'hive');
+    expect(lines.at(-1)).toContain('side is now hive');
+    await run('path', 'hive', 'claude');
+    expect(lines.at(-1)).toBe(folder);
+  });
+  it('renames the base and still runs it by default', async () => {
+    const { run, plans, fileSystem } = harness();
+    await seedClaudeBase(fileSystem);
+    await run('rename', 'personal', 'bee');
+    await run('claude', 'bee');
+    await run('claude');
+    expect(plans).toHaveLength(2);
+    expect(plans[0]?.env).toEqual(plans[1]!.env);
+    await expect(run('rm', 'bee')).rejects.toMatchObject({ code: 'accountIsPersonal' });
+  });
+  it('prints a stable path and makes sure it exists', async () => {
+    const { run, lines, client, fileSystem } = harness();
+    await seedClaudeBase(fileSystem);
+    await client.call(createAccount, { name: 'work' });
+    await run('path', 'work', 'claude');
+    expect(lines).toEqual([`${Home}/.favo/accounts/work/claude`]);
+    expect((await fileSystem.entry(lines[0]!)).kind).toBe('directory');
+  });
+  it('adds a machine and installs favo on it in one step', async () => {
+    const { run, lines, ssh, fileSystem } = harness();
+    await fileSystem.writePrivateText('/assets/favo-linux-x64', 'binary');
+    ssh.reply('uname -sm', { stdout: 'Linux x86_64' });
+    ssh.reply(installPlanFor('posix', 'Linux x86_64').activate, { stdout: '0.1.0' });
+    await run('machine', 'add', 'bee@devbox');
+    expect(ssh.uploads).toHaveLength(1);
+    expect(lines.at(-1)).toContain('running on devbox');
+  });
+  it('explains shared and private for a seat', async () => {
+    const { run, lines, client, fileSystem } = harness();
+    await seedClaudeBase(fileSystem);
+    await client.call(createAccount, { name: 'work' });
+    await run('sync');
+    await run('path', 'work', 'claude');
+    await run('inspect', 'work', 'claude');
+    const output = lines.join('\n');
+    expect(output).toContain('linked     skills');
+    expect(output).toContain('private    .claude.json');
+  });
+});
