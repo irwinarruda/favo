@@ -37,7 +37,13 @@ export function RenameAccount() {
       </box>
       {!!renameAccountError && <text fg={colors.danger}>{renameAccountError}</text>}
       <box flexDirection="row" marginTop={1}>
-        {isRenamingAccount ? <Spinner label="renaming…" /> : <KeyHint keys="enter" label="rename" />}
+        {isRenamingAccount ? (
+          <box flexShrink={0} marginRight={2}>
+            <Spinner label="renaming…" />
+          </box>
+        ) : (
+          <KeyHint keys="enter" label="rename" />
+        )}
         <KeyHint keys="esc" label="cancel" onPress={closeRenameAccount} />
       </box>
     </Dialog>

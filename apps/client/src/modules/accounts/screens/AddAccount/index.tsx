@@ -38,7 +38,13 @@ export function AddAccount() {
       </box>
       {!!addAccountError && <text fg={colors.danger}>{addAccountError}</text>}
       <box flexDirection="row" marginTop={1}>
-        {isAddingAccount ? <Spinner label="building the cell…" /> : <KeyHint keys="enter" label="add" />}
+        {isAddingAccount ? (
+          <box flexShrink={0} marginRight={2}>
+            <Spinner label="building the cell…" />
+          </box>
+        ) : (
+          <KeyHint keys="enter" label="add" />
+        )}
         <KeyHint keys="esc" label="cancel" onPress={closeAddAccount} />
       </box>
     </Dialog>

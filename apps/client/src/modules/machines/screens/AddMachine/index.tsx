@@ -54,7 +54,13 @@ export function AddMachine() {
       </box>
       {!!addMachineError && <text fg={colors.danger}>{addMachineError}</text>}
       <box flexDirection="row" marginTop={1}>
-        {isJoiningMachine ? <Spinner label="moving in…" /> : <KeyHint keys="enter" label="connect" />}
+        {isJoiningMachine ? (
+          <box flexShrink={0} marginRight={2}>
+            <Spinner label="moving in…" />
+          </box>
+        ) : (
+          <KeyHint keys="enter" label="connect" />
+        )}
         <KeyHint keys="esc" label="cancel" onPress={closeAddMachine} />
       </box>
     </Dialog>
