@@ -6,6 +6,7 @@ import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 
 const CloseTimeoutMs = 3000;
 const StopTimeoutMs = 5000;
+const PowerShellTimeoutMs = 15_000;
 
 export class WindowsDesktopApps extends DesktopApps {
   constructor(
@@ -30,7 +31,8 @@ export class WindowsDesktopApps extends DesktopApps {
   }
 
   async isRunning(app: InstalledDesktopApp) {
-    const { stdout } = await this.powershell(`@(${processesOf(app)}).Count`);
+    const { code, stdout } = await this.powershell(`@(${processesOf(app)}).Count`);
+    assertDomain(code === 0, DomainErrorCode.desktopAppFailed, `Could not tell whether ${app.spec.label} is open.`);
     return Number(stdout.trim()) > 0;
   }
 
@@ -55,6 +57,7 @@ export class WindowsDesktopApps extends DesktopApps {
     return this.processes.run({
       command: 'powershell.exe',
       args: ['-NoProfile', '-NonInteractive', '-Command', script],
+      timeoutMs: PowerShellTimeoutMs,
     });
   }
 }

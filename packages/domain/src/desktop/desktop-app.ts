@@ -14,7 +14,7 @@ export type DesktopAppSpec = {
   profileFolder: string;
   userDataVariable?: string;
   mac: { bundleId: string; appNames: string[] };
-  linux: { launcher: string; executable: string };
+  linux: { executable: string; processNames: string[] };
   windows: { packageName: string; alias: string; executable: string };
 };
 
@@ -23,13 +23,16 @@ export type DesktopLaunch = {
   env: Record<string, string | undefined>;
 };
 
-export const DesktopApps: Partial<Record<ProviderId, DesktopAppSpec>> = {
+export const DesktopAppSpecs: Partial<Record<ProviderId, DesktopAppSpec>> = {
   claude: {
     provider: ProviderId.claude,
     label: 'Claude',
     profileFolder: 'claude-app',
     mac: { bundleId: 'com.anthropic.claudefordesktop', appNames: ['Claude'] },
-    linux: { launcher: 'claude-desktop', executable: '/usr/lib/claude-desktop/claude-desktop' },
+    linux: {
+      executable: '/usr/lib/claude-desktop/claude-desktop',
+      processNames: ['/usr/lib/claude-desktop/claude-desktop', '/usr/bin/claude-desktop', 'claude-desktop'],
+    },
     windows: { packageName: 'Claude', alias: 'claude-desktop.exe', executable: 'app\\claude.exe' },
   },
   codex: {
@@ -38,7 +41,7 @@ export const DesktopApps: Partial<Record<ProviderId, DesktopAppSpec>> = {
     profileFolder: 'chatgpt-app',
     userDataVariable: 'CODEX_ELECTRON_USER_DATA_PATH',
     mac: { bundleId: 'com.openai.codex', appNames: ['ChatGPT', 'Codex'] },
-    linux: { launcher: 'chatgpt', executable: '/usr/lib/chatgpt/ChatGPT' },
+    linux: { executable: '/usr/lib/chatgpt/ChatGPT', processNames: ['/usr/lib/chatgpt/ChatGPT'] },
     windows: { packageName: 'OpenAI.Codex', alias: 'chatgpt-desktop.exe', executable: 'app\\ChatGPT.exe' },
   },
 };

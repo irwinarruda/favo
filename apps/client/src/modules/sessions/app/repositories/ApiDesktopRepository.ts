@@ -11,7 +11,7 @@ export class ApiDesktopRepository implements IDesktopRepository {
     return this.client.call(listDesktopApps, {});
   }
 
-  open(seat: Seat, shouldClose: boolean) {
-    return this.client.call(openDesktopApp, { account: seat.account, provider: seat.provider, shouldClose });
+  open(seat: Seat, canClose: boolean) {
+    return this.client.call(openDesktopApp, { account: seat.account, provider: seat.provider, canClose });
   }
 }

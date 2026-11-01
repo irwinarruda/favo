@@ -6,7 +6,7 @@ import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
 import { EntryKind } from '@favo/domain/sharing/shared-item';
 import { createTestServer, Home, seedClaudeBase } from '#test/support/test-server';
 
-const openWork = { account: 'work', provider: 'claude', shouldClose: false } as const;
+const openWork = { account: 'work', provider: 'claude', canClose: false } as const;
 
 async function serverWithWork() {
   const server = createTestServer();
@@ -96,11 +96,27 @@ describe('opening an app', () => {
     expect(desktopApps.quitCalls).toEqual([]);
     expect(desktopApps.opened).toEqual([]);
   });
+  it('sets nothing up while it is only asking', async () => {
+    const { client, desktopApps, fileSystem } = await serverWithWork();
+    desktopApps.install('claude');
+    desktopApps.run('claude');
+    await client.call(openDesktopApp, openWork);
+    expect((await fileSystem.entry(`${Home}/.favo/accounts/work/claude/CLAUDE.md`)).kind).toBe(EntryKind.missing);
+    expect((await fileSystem.entry(`${Home}/.favo/accounts/work/claude-app`)).kind).toBe(EntryKind.missing);
+  });
+  it('closes nothing when the account cannot be opened anyway', async () => {
+    const { client, desktopApps } = await serverWithWork();
+    desktopApps.install('claude');
+    desktopApps.run('claude');
+    const params = { ...openWork, account: 'ghost', canClose: true };
+    await expect(client.call(openDesktopApp, params)).rejects.toMatchObject({ code: 'accountNotFound' });
+    expect(desktopApps.quitCalls).toEqual([]);
+  });
   it('closes the app and reopens it once told to', async () => {
     const { client, desktopApps } = await serverWithWork();
     desktopApps.install('claude');
     desktopApps.run('claude');
-    const result = await client.call(openDesktopApp, { ...openWork, shouldClose: true });
+    const result = await client.call(openDesktopApp, { ...openWork, canClose: true });
     expect(result.opening).toBe('opened');
     expect(desktopApps.quitCalls).toEqual(['claude']);
     expect(desktopApps.opened).toHaveLength(1);
@@ -110,7 +126,7 @@ describe('opening an app', () => {
     desktopApps.install('claude');
     desktopApps.run('claude');
     desktopApps.refuseToQuit('claude');
-    const params = { ...openWork, shouldClose: true };
+    const params = { ...openWork, canClose: true };
     await expect(client.call(openDesktopApp, params)).rejects.toMatchObject({ code: 'desktopAppStuck' });
     expect(desktopApps.opened).toEqual([]);
   });
@@ -119,7 +135,7 @@ describe('opening an app', () => {
     desktopApps.install('claude');
     desktopApps.install('codex');
     desktopApps.run('codex');
-    await client.call(openDesktopApp, { ...openWork, shouldClose: true });
+    await client.call(openDesktopApp, { ...openWork, canClose: true });
     expect(desktopApps.quitCalls).toEqual([]);
   });
 });

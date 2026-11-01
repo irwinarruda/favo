@@ -23,7 +23,7 @@ export class ScriptedDesktopApps extends DesktopApps {
 
   async find(spec: DesktopAppSpec) {
     if (!this.installed.has(spec.provider)) return undefined;
-    return { spec, launcher: spec.linux.launcher, executables: [spec.linux.executable] };
+    return { spec, launcher: spec.linux.executable, executables: spec.linux.processNames };
   }
 
   async isRunning({ spec }: InstalledDesktopApp) {

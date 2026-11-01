@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test';
+import { DomainError } from '@favo/domain/shared/domain-error';
 import { mockDb } from '@/__tests__/db';
 import { getApp } from '@/__tests__/utils/getApp';
+import { container } from '@/shared/container';
 
 describe('SessionService', () => {
   test('launches a signed in seat', async () => {
@@ -70,30 +72,71 @@ describe('SessionService', () => {
     const app = await getApp();
     app.state.selectRow('seat:local/personal/codex');
     expect(app.state.selectedDesktopApp).toBeUndefined();
-    expect(await app.state.openSelectedDesktopApp()).toBeUndefined();
-    expect(mockDb.desktopOpenings).toEqual([]);
   });
   test('offers nothing on another machine, even with the same provider', async () => {
     const app = await getApp();
     app.state.selectRow('seat:devbox/personal/claude');
     expect(app.state.selectedDesktopApp).toBeUndefined();
-    expect(await app.state.openSelectedDesktopApp()).toBeUndefined();
   });
-  test('opens the app as the selected account and says so', async () => {
+  test('notices an app installed later, on a refresh of this machine', async () => {
+    const app = await getApp();
+    app.state.selectRow('seat:local/personal/codex');
+    mockDb.desktopApps.push({ provider: 'codex', label: 'ChatGPT' });
+    await app.state.refreshMachine('local');
+    expect(app.state.selectedDesktopApp?.label).toBe('ChatGPT');
+  });
+  test('stops offering an app removed later, on a refresh of this machine', async () => {
+    const app = await getApp();
+    mockDb.desktopApps = [];
+    await app.state.refreshMachine('local');
+    expect(app.state.selectedDesktopApp).toBeUndefined();
+  });
+  test('still refreshes the machines when the app lookup fails', async () => {
+    const app = await getApp({ isLoaded: false });
+    const repository = container.get('IDesktopRepository');
+    repository.getApps = () => Promise.reject(new Error('no lookup'));
+    await expect(app.state.loadFleet()).rejects.toThrow('no lookup');
+    expect(app.state.accounts.length).toBeGreaterThan(0);
+  });
+  test('opens the app as the given account and says so', async () => {
     const app = await getApp();
     app.state.selectRow('seat:local/work/claude');
-    expect(await app.state.openSelectedDesktopApp()).toBe('opened');
+    expect(await app.state.openDesktopApp(app.state.selectedSeat!)).toBe('opened');
     expect(mockDb.desktopOpenings).toEqual(['seat:local/work/claude']);
     expect(app.state.toast?.message).toBe('Claude is opening as work.');
+  });
+  test('refreshes the seat after opening, because its links were mended', async () => {
+    const app = await getApp();
+    app.state.selectRow('seat:local/work/claude');
+    mockDb.seatStatuses['seat:local/work/claude'] = { login: 'signedIn', identity: 'bee@work.dev', problems: 0 };
+    await app.state.openDesktopApp(app.state.selectedSeat!);
+    expect(app.state.selectedSeat?.problems).toBe(0);
   });
   test('leaves an open app alone until it is told to close it', async () => {
     const app = await getApp();
     mockDb.runningDesktopApps = ['claude'];
     app.state.selectRow('seat:local/work/claude');
-    expect(await app.state.openSelectedDesktopApp()).toBe('stillOpen');
+    const seat = app.state.selectedSeat!;
+    expect(await app.state.openDesktopApp(seat)).toBe('stillOpen');
     expect(mockDb.desktopOpenings).toEqual([]);
-    expect(await app.state.openSelectedDesktopApp(true)).toBe('opened');
+    expect(await app.state.openDesktopApp(seat, true)).toBe('opened');
     expect(mockDb.desktopOpenings).toEqual(['seat:local/work/claude']);
+  });
+  test('ignores a second open while the first is running', async () => {
+    const app = await getApp();
+    const seat = app.state.selectedSeat!;
+    const opening = app.state.openDesktopApp(seat);
+    expect(app.state.isDesktopAppBusy).toBe(true);
+    expect(await app.state.openDesktopApp(seat)).toBeUndefined();
+    await opening;
+    expect(mockDb.desktopOpenings).toHaveLength(1);
+    expect(app.state.isDesktopAppBusy).toBe(false);
+  });
+  test('is free again after a failure', async () => {
+    const app = await getApp();
+    mockDb.desktopFailure = new DomainError('desktopAppStuck', 'Claude did not close.');
+    await expect(app.state.openDesktopApp(app.state.selectedSeat!, true)).rejects.toThrow('Claude did not close.');
+    expect(app.state.isDesktopAppBusy).toBe(false);
   });
   test('does nothing on a machine row', async () => {
     const app = await getApp();

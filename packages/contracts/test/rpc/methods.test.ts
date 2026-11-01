@@ -57,7 +57,7 @@ describe('desktop apps', () => {
     expect(openDesktopApp.routing).toBe('hub');
   });
   it('accepts an open request and refuses one for an unknown provider', () => {
-    const params = { account: 'work', provider: 'claude', shouldClose: false };
+    const params = { account: 'work', provider: 'claude', canClose: false };
     expect(openDesktopApp.params.safeParse(params).success).toBe(true);
     expect(openDesktopApp.params.safeParse({ ...params, provider: 'gemini' }).success).toBe(false);
   });

@@ -1,4 +1,5 @@
 import { PersonalAccount } from '@favo/domain/accounts/account';
+import { LocalMachineId } from '@favo/domain/machines/machine';
 import { findProvider, type ProviderId } from '@favo/domain/providers/provider';
 import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import type { ValueOf } from '@favo/domain/shared/value-of';
@@ -42,7 +43,7 @@ export type Command = {
   target?: string;
   name?: string;
   directory?: string;
-  shouldClose?: boolean;
+  canClose?: boolean;
 };
 
 export function parseCommand(rawArgv: string[]): Command {
@@ -82,10 +83,15 @@ export function parseCommand(rawArgv: string[]): Command {
     case 'path':
       return { ...base, kind: CommandKind.path, ...seatOf(second, third, 'favo path <account> <provider>') };
     case 'app':
+      assertDomain(
+        flags.machine === undefined || flags.machine === LocalMachineId,
+        DomainErrorCode.invalidParams,
+        'favo app opens a window on this computer, so it takes no --machine.'
+      );
       return {
         ...base,
         kind: CommandKind.app,
-        shouldClose: flags.shouldClose,
+        canClose: flags.canClose,
         ...seatOf(second, third, 'favo app <account> <provider> [--close]'),
       };
     case 'inspect':
@@ -141,7 +147,7 @@ function readFlags(argv: string[]) {
     isJson: false,
     isHelp: false,
     isVersion: false,
-    shouldClose: false,
+    canClose: false,
     machine: undefined as string | undefined,
     name: undefined as string | undefined,
     directory: undefined as string | undefined,
@@ -151,7 +157,7 @@ function readFlags(argv: string[]) {
     if (word === '--json') flags.isJson = true;
     else if (word === '--help' || word === '-h') flags.isHelp = true;
     else if (word === '--version' || word === '-v') flags.isVersion = true;
-    else if (word === '--close') flags.shouldClose = true;
+    else if (word === '--close') flags.canClose = true;
     else if (word === '--stdio') continue;
     else if (word === '--machine' || word === '-m') flags.machine = required(argv[++index], '--machine <machine>');
     else if (word === '--name') flags.name = required(argv[++index], '--name <name>');

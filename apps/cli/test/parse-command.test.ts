@@ -28,11 +28,15 @@ describe('parseCommand', () => {
       kind: CommandKind.app,
       account: 'work',
       provider: 'codex',
-      shouldClose: false,
+      canClose: false,
     });
   });
   it('closes the app first only when told to', () => {
-    expect(parseCommand(['app', 'work', 'claude', '--close']).shouldClose).toBe(true);
+    expect(parseCommand(['app', 'work', 'claude', '--close']).canClose).toBe(true);
+  });
+  it('refuses to open a window on another machine, before asking that machine anything', () => {
+    expect(() => parseCommand(['app', 'work', 'claude', '--machine', 'devbox'])).toThrow('takes no --machine');
+    expect(parseCommand(['app', 'work', 'claude', '--machine', 'local']).kind).toBe(CommandKind.app);
   });
   it('needs an account and a provider to open an app', () => {
     expect(() => parseCommand(['app', 'work'])).toThrow('favo app <account> <provider>');

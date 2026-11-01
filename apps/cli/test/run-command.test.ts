@@ -85,12 +85,6 @@ describe('commands', () => {
     expect(await run('app', 'work', 'claude', '--close')).toBe(0);
     expect(desktopApps.quitCalls).toEqual(['claude']);
   });
-  it('refuses to open a window on another machine', async () => {
-    const { run, desktopApps } = harness();
-    desktopApps.install('claude');
-    await expect(run('app', 'personal', 'claude', '--machine', 'devbox')).rejects.toThrow('takes no --machine');
-    expect(desktopApps.opened).toEqual([]);
-  });
   it('lists themes and marks the active one', async () => {
     const { run, lines, fileSystem, paths } = harness();
     await fileSystem.writePrivateText(`${paths.themes}/mine.json`, JSON.stringify({ colors: {} }));

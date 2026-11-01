@@ -22,9 +22,9 @@ import { LoginState } from '@favo/contracts/rpc/views';
 import { FavoVersion } from '@favo/contracts/version';
 import { PersonalAccount } from '@favo/domain/accounts/account';
 import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
-import { LocalMachineId, type Machine, MachineState } from '@favo/domain/machines/machine';
+import { type Machine, MachineState } from '@favo/domain/machines/machine';
 import { Providers } from '@favo/domain/providers/provider';
-import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
+import { DomainError } from '@favo/domain/shared/domain-error';
 import { TerminalAction, type TerminalPlan } from '@favo/domain/terminal/terminal-plan';
 import { ThemeSource } from '@favo/domain/themes/theme';
 import { HelpText } from '@/help-text';
@@ -169,14 +169,8 @@ export async function runCommand(parsed: Command, context: CommandContext) {
 
 async function openApp(context: CommandContext, parsed: Command, command: Command) {
   const { client, print, paint } = context;
-  const isLocal = command.machineId === undefined || command.machineId === LocalMachineId;
-  assertDomain(
-    isLocal,
-    DomainErrorCode.invalidParams,
-    'favo app opens a window on this computer, so it takes no --machine.'
-  );
   const seat = seatOf(command);
-  const { opening, label } = await client.call(openDesktopApp, { ...seat, shouldClose: command.shouldClose ?? false });
+  const { opening, label } = await client.call(openDesktopApp, { ...seat, canClose: command.canClose ?? false });
   if (opening === DesktopOpening.stillOpen) {
     const { executable } = Providers[seat.provider];
     print(`${label} is open. To close it and reopen: favo app ${parsed.account} ${executable} --close`);

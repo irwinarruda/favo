@@ -1,7 +1,7 @@
 import type { OpenDesktopAppParams } from '@favo/contracts/rpc/desktop/open-desktop-app';
 import {
   type DesktopAppSpec,
-  DesktopApps as DesktopAppSpecs,
+  DesktopAppSpecs,
   DesktopOpening,
   desktopLaunchOf,
   desktopProfileOf,
@@ -29,22 +29,24 @@ export class DesktopAppsService {
     return found.flatMap((app) => (app ? [{ provider: app.spec.provider, label: app.spec.label }] : []));
   }
 
-  async open({ account, provider, shouldClose }: OpenDesktopAppParams) {
+  async open({ account, provider, canClose }: OpenDesktopAppParams) {
     const spec = this.requireSpec(provider);
     const { label } = spec;
     const app = await this.desktopApps.find(spec);
     assertDomain(app, DomainErrorCode.desktopAppMissing, `The ${label} app is not installed here.`);
+    const isRunning = await this.desktopApps.isRunning(app);
+    if (isRunning && !canClose) return { opening: DesktopOpening.stillOpen, label };
     await this.seats.reconcile(account, provider);
-    if (await this.desktopApps.isRunning(app)) {
-      if (!shouldClose) return { opening: DesktopOpening.stillOpen, label };
+    const profile = desktopProfileOf(this.paths, account, spec);
+    if (profile) await this.fileSystem.ensurePrivateDirectory(profile);
+    if (isRunning) {
+      const isClosed = await this.desktopApps.quit(app);
       assertDomain(
-        await this.desktopApps.quit(app),
+        isClosed,
         DomainErrorCode.desktopAppStuck,
         `${label} did not close. Quit it yourself, then try again.`
       );
     }
-    const profile = desktopProfileOf(this.paths, account, spec);
-    if (profile) await this.fileSystem.ensurePrivateDirectory(profile);
     await this.desktopApps.open(app, desktopLaunchOf(spec, this.providers.seatHome(account, provider), profile));
     return { opening: DesktopOpening.opened, label };
   }

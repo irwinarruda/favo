@@ -1,7 +1,7 @@
 import type { DesktopAppSpec, DesktopLaunch } from '@favo/domain/desktop/desktop-app';
 import { assertDomain, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import type { InstalledDesktopApp } from '@/modules/desktop/gateways/desktop-apps';
-import { UnixDesktopApps } from '@/modules/desktop/gateways/unix.desktop-apps';
+import { CommandTimeoutMs, UnixDesktopApps } from '@/modules/desktop/gateways/unix.desktop-apps';
 import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 
 export class MacDesktopApps extends UnixDesktopApps {
@@ -33,6 +33,7 @@ export class MacDesktopApps extends UnixDesktopApps {
     const { code } = await this.processes.run({
       command: 'open',
       args: [...(isIsolated ? ['-n'] : []), ...variables, launcher, ...(isIsolated ? ['--args', ...args] : [])],
+      timeoutMs: CommandTimeoutMs,
     });
     assertDomain(code === 0, DomainErrorCode.desktopAppFailed, `macOS could not open ${spec.label}.`);
   }
@@ -41,6 +42,7 @@ export class MacDesktopApps extends UnixDesktopApps {
     const { code, stdout } = await this.processes.run({
       command: 'plutil',
       args: ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', `${bundle}/Contents/Info.plist`],
+      timeoutMs: CommandTimeoutMs,
     });
     return code === 0 && stdout.trim() === bundleId;
   }

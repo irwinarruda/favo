@@ -18,6 +18,7 @@ export type FleetService = {
   hasMachinesBehind: boolean;
   loadFleet(): Promise<void>;
   refreshMachine(machineId: string): Promise<void>;
+  loadMachine(machine: Machine): Promise<void>;
   refreshSeat(seat: Seat): Promise<void>;
   replaceSeat(seat: Seat): void;
   setMachinePresence(machineId: string, presence: MachinePresence, message?: string): void;
@@ -42,16 +43,20 @@ export const createFleetService: ServiceCreator<FleetService> = (set, get) => ({
       const fleetRepository = container.get('IFleetRepository');
       const machines = await fleetRepository.getMachines();
       set({ machines });
-      await get().loadDesktopApps();
       await Promise.all(machines.map((machine) => get().refreshMachine(machine.id)));
     } finally {
       set({ isFleetLoading: false });
     }
   },
   async refreshMachine(machineId) {
-    const { machines, setMachinePresence } = get();
+    const { machines, loadMachine, loadDesktopApps } = get();
     const machine = machines.find((candidate) => candidate.id === machineId);
     if (!machine) return;
+    await Promise.all([loadMachine(machine), machine.isLocal ? loadDesktopApps() : undefined]);
+  },
+  async loadMachine(machine) {
+    const { setMachinePresence } = get();
+    const machineId = machine.id;
     setMachinePresence(machineId, MachinePresence.connecting);
     const fleetRepository = container.get('IFleetRepository');
     const status = await fleetRepository.getMachineStatus(machine);

@@ -1,9 +1,11 @@
 import { mainProcessIds } from '@favo/domain/desktop/desktop-app';
+import { assertDomain, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { DesktopApps, type InstalledDesktopApp } from '@/modules/desktop/gateways/desktop-apps';
 import { waitUntil } from '@/modules/desktop/utils/wait-until';
 import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 
 const QuitTimeoutMs = 10_000;
+export const CommandTimeoutMs = 10_000;
 
 export abstract class UnixDesktopApps extends DesktopApps {
   constructor(
@@ -24,7 +26,12 @@ export abstract class UnixDesktopApps extends DesktopApps {
   }
 
   private async mainProcesses(app: InstalledDesktopApp) {
-    const { stdout } = await this.processes.run({ command: 'ps', args: ['-eo', 'pid=,args='] });
+    const { code, stdout } = await this.processes.run({
+      command: 'ps',
+      args: ['x', '-o', 'pid=,args='],
+      timeoutMs: CommandTimeoutMs,
+    });
+    assertDomain(code === 0, DomainErrorCode.desktopAppFailed, `Could not tell whether ${app.spec.label} is open.`);
     return mainProcessIds(stdout, app.executables);
   }
 }

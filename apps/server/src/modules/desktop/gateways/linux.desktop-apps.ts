@@ -16,10 +16,10 @@ export class LinuxDesktopApps extends UnixDesktopApps {
   }
 
   async find(spec: DesktopAppSpec) {
-    const { launcher, executable } = spec.linux;
+    const { executable, processNames } = spec.linux;
     const entry = await this.fileSystem.entry(executable);
     if (entry.kind === EntryKind.missing) return undefined;
-    return { spec, launcher: executable, executables: [executable, `/usr/bin/${launcher}`, launcher] };
+    return { spec, launcher: executable, executables: processNames };
   }
 
   async open({ spec, launcher }: InstalledDesktopApp, { args, env }: DesktopLaunch) {

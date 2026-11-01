@@ -4,6 +4,7 @@ import type { ThemeList } from '@favo/contracts/rpc/themes/list-themes';
 import type { AccountView, DesktopAppView, SeatInspection, SeatStatus, SeatView } from '@favo/contracts/rpc/views';
 import type { Machine } from '@favo/domain/machines/machine';
 import { ProviderId, ProviderOrder, Providers } from '@favo/domain/providers/provider';
+import type { DomainError } from '@favo/domain/shared/domain-error';
 import type { TerminalPlan } from '@favo/domain/terminal/terminal-plan';
 import { BuiltInThemes } from '@favo/domain/themes/built-in-themes';
 import { type Theme, ThemeSource } from '@favo/domain/themes/theme';
@@ -150,6 +151,7 @@ export const mockDb = {
   desktopApps: seedDesktopApps(),
   runningDesktopApps: [] as ProviderId[],
   desktopOpenings: [] as string[],
+  desktopFailure: undefined as DomainError | undefined,
   unreachableTargets: ['down@host'],
   clipboard: [] as string[],
   terminalRuns: [] as TerminalPlan[],
@@ -170,6 +172,7 @@ export const mockDb = {
     this.desktopApps = seedDesktopApps();
     this.runningDesktopApps = [];
     this.desktopOpenings = [];
+    this.desktopFailure = undefined;
     this.unreachableTargets = ['down@host'];
     this.clipboard = [];
     this.terminalRuns = [];
