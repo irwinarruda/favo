@@ -75,6 +75,22 @@ describe.skipIf(process.platform === 'win32')('the process runner', () => {
     expect(lines[0] === expected).toBe(true);
     expect(lines[1]).toBe('after');
   });
+  it('starts in the folder it is given', async () => {
+    const child = runner.open({ ...sh('pwd'), cwd: '/' });
+    const lines: string[] = [];
+    child.onLine((line) => lines.push(line));
+    await child.exited;
+    expect(lines).toEqual(['/']);
+  });
+  it('stops every open process when asked, and forgets the ones that ended', async () => {
+    const ended = runner.open(sh('exit 0'));
+    await ended.exited;
+    const running = runner.run(sh('exec sleep 30'));
+    const children = [runner.open(sh('exec sleep 30')), runner.open(sh('exec sleep 30'))];
+    runner.killOpen();
+    const exits = await Promise.all([running, ...children.map((child) => child.exited)]);
+    expect(exits.every(({ code }) => code !== 0)).toBe(true);
+  });
   it('still reads lines and answers on a healthy connection', async () => {
     const child = runner.open(sh('read line; echo "you said $line"'));
     const lines: string[] = [];

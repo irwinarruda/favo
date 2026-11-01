@@ -3,9 +3,22 @@ import {
   assertMachineName,
   assertMachineTarget,
   assetNameFor,
+  isOlderFavoError,
   isOlderVersion,
   machineNameFromTarget,
 } from '#domain/machines/machine';
+import { DomainError } from '#domain/shared/domain-error';
+
+describe('an older favo', () => {
+  it('shows as a method it does not know, or a reply favo cannot read', () => {
+    expect(isOlderFavoError(new DomainError('unknownMethod', 'x'))).toBe(true);
+    expect(isOlderFavoError(new DomainError('machineOutdated', 'x'))).toBe(true);
+  });
+  it('is not any other failure', () => {
+    expect(isOlderFavoError(new DomainError('machineUnreachable', 'x'))).toBe(false);
+    expect(isOlderFavoError(new Error('unknownMethod'))).toBe(false);
+  });
+});
 
 describe('machines', () => {
   it('names a machine after its host', () => {

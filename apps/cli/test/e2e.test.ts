@@ -69,6 +69,48 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+describe('favo usage', () => {
+  it('reads a real conversation with the provider and prints what is left', async () => {
+    const { stdout, code } = await favo(['usage']);
+    expect(code).toBe(0);
+    expect(stdout).toContain('Claude Code');
+    expect(stdout).toContain('68% left');
+    expect(stdout).toMatch(/personal +[█│╱░]+ +↻ 44m/);
+  });
+  it('reads the subscription even with an API key around', async () => {
+    const { stdout } = await favo(['usage'], { ANTHROPIC_API_KEY: 'sk-test', CLAUDE_CODE_ENTRYPOINT: 'cli' });
+    expect(stdout).toContain('68% left');
+    expect(stdout).not.toContain('no subscription limits');
+  });
+  it('starts each read in an empty folder, whatever folder favo runs from', async () => {
+    mkdirSync(`${root}/project`);
+    writeFileSync(`${root}/project/settings.json`, '{}');
+    const { stdout } = await favo(['usage'], {}, `${root}/project`);
+    expect(stdout).toContain('68% left');
+  });
+  it('reads a seat that lives in a cell, from its own folder', async () => {
+    await favo(['add', 'work']);
+    const path = (await favo(['path', 'work', 'claude'])).stdout.trim();
+    writeFileSync(`${path}/identity`, 'work@bee.dev');
+    const { stdout } = await favo(['usage']);
+    expect(stdout).toContain('Session');
+    expect(stdout).toMatch(/work +[█│╱░]+ +68%/);
+  });
+  it('reads Codex from its app server', async () => {
+    mkdirSync(`${home}/.codex`, { recursive: true });
+    writeFileSync(`${home}/.codex/identity`, 'bee@hive.dev');
+    const { stdout } = await favo(['usage']);
+    expect(stdout).toContain('Codex');
+    expect(stdout).toContain('90% left');
+  });
+  it('gives machine readable output', async () => {
+    const { stdout } = await favo(['usage', '--json']);
+    const [{ machine, seats }] = JSON.parse(stdout);
+    expect(machine.id).toBe('local');
+    expect(seats[0].usage.windows[0]).toMatchObject({ id: 'five_hour', usedPercent: 32 });
+  });
+});
+
 describe('favo on this machine', () => {
   it('adds an account, links the shared walls and keeps the login sealed', async () => {
     expect((await favo(['add', 'work'])).code).toBe(0);
@@ -235,6 +277,11 @@ describe.skipIf(isWindows)('favo with another machine', () => {
     const { stdout } = await favo(['machine', 'list', '--json']);
     const machines = JSON.parse(stdout);
     expect(machines[1]).toMatchObject({ id: 'remote', state: 'online', hostname: 'fake-remote' });
+  });
+  it('reads usage on the other machine, over the same pipe', async () => {
+    await joinRemote();
+    const { stdout } = await favo(['usage', '--machine', 'remote']);
+    expect(stdout).toContain('68% left');
   });
   it('shows both machines in one list', async () => {
     await joinRemote();

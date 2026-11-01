@@ -209,6 +209,7 @@ favo claude work             # run Claude Code as work
 favo claude work -- --resume # everything after -- goes to the provider
 favo claude work --dir ~/app # start it in that folder
 favo list                    # every machine, account and login
+favo usage                   # what every seat has left, and when it comes back
 favo rename work client      # a new name, on this machine
 favo rm work                 # move a cell to the trash
 favo sync                    # repair shared links
@@ -219,6 +220,8 @@ favo theme tokyo-night       # pick a theme
 ```
 
 Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--machine <machine>` to run on another computer. `favo --help` lists the rest.
+
+`favo usage` and the `u` screen ask Claude Code and Codex through their own commands, so no token is read and no thread starts. OpenCode and Antigravity show no limits for now, because neither has a source that works without a token. The bars show what is left: `╱` is what the next reset gives back, and `│` is how much of the window is left, so a bar that stops short of it is spending too fast.
 
 `favo rm` keeps the cell in `~/.favo/trash`, login included, until you delete that folder yourself. `favo adopt` refuses a folder inside `~/.favo` or a provider's base folder.
 
@@ -231,6 +234,7 @@ Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--mac
 | `enter`             | launch the selected seat            |
 | `s` / `o`           | sign in / sign out                  |
 | `c`                 | copy its config path                |
+| `u`                 | see what every seat has left        |
 | `d`                 | choose the folder it launches in    |
 | `a`                 | add an account                      |
 | `n`                 | rename the selected cell            |

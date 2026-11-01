@@ -14,6 +14,7 @@ export const CommandKind = {
   login: 'login',
   logout: 'logout',
   list: 'list',
+  usage: 'usage',
   add: 'add',
   rename: 'rename',
   remove: 'remove',
@@ -64,6 +65,8 @@ export function parseCommand(rawArgv: string[]): Command {
     case 'list':
     case 'ls':
       return { ...base, kind: CommandKind.list };
+    case 'usage':
+      return { ...base, kind: CommandKind.usage };
     case 'add':
       return { ...base, kind: CommandKind.add, account: required(second, 'favo add <account>') };
     case 'rename':

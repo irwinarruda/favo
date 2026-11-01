@@ -57,6 +57,32 @@ afterEach(async () => {
   dispose = undefined;
 });
 
+describe('usage on a real backend', () => {
+  const session = { id: 'five_hour', kind: 'session' as const, label: 'Session', usedPercent: 32 };
+
+  test('reads both machines through the contracts', async () => {
+    const { mac, devbox, mockInput, waitForFrame } = await openFleet();
+    mac.clis.claude.usageReading = { windows: [session] };
+    devbox.clis.claude.usageReading = { windows: [{ ...session, usedPercent: 7 }] };
+    mockInput.pressKey('u');
+    await waitForFrame((frame) => frame.includes('81% left') && frame.includes('devbox read'));
+  });
+  test('shows a machine with no such method as older favo, and keeps the rest', async () => {
+    const { mac, mockInput, waitForFrame } = await openFleet();
+    mac.clis.claude.usageReading = { windows: [session] };
+    mac.remotes.connect('devbox', {
+      send: async ({ id, method }) => {
+        if (method === 'seats.usage') {
+          return { id, ok: false, error: { code: 'unknownMethod', message: `Unknown method "${method}".` } };
+        }
+        return { id, ok: true, result: [] };
+      },
+    });
+    mockInput.pressKey('u');
+    await waitForFrame((frame) => frame.includes('devbox older favo') && frame.includes('68% left'));
+  });
+});
+
 describe('the TUI on a real backend', () => {
   test('shows both machines through the contracts', async () => {
     const { captureCharFrame } = await openFleet();

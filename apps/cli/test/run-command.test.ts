@@ -28,6 +28,122 @@ function harness(server = createTestServer(), isPainted = false) {
   return { ...server, lines, plans, run: (...argv: string[]) => runCommand(parseCommand(argv), context) };
 }
 
+describe('usage', () => {
+  const inMinutes = (minutes: number) => new Date(Date.now() + (minutes + 0.5) * 60_000).toISOString();
+  const session = (usedPercent: number, minutes: number) => ({
+    id: 'five_hour',
+    kind: 'session' as const,
+    label: 'Session',
+    usedPercent,
+    windowDurationMins: 300,
+    resetsAt: inMinutes(minutes),
+  });
+
+  async function signedIn(
+    server: ReturnType<typeof createTestServer>,
+    identity: string,
+    usedPercent: number,
+    resetMinutes = 44
+  ) {
+    await seedClaudeBase(server.fileSystem);
+    server.clis.claude.login = { login: LoginState.signedIn, identity };
+    server.clis.claude.usageReading = { windows: [session(usedPercent, resetMinutes)] };
+  }
+
+  it('pools the seats of every machine', async () => {
+    const mac = harness();
+    const devbox = createTestServer({ hostname: 'devbox' });
+    await signedIn(mac, 'mac@bee.dev', 32);
+    await signedIn(devbox, 'devbox@bee.dev', 7, 54);
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', devbox.router);
+    expect(await mac.run('usage')).toBe(0);
+    const output = mac.lines.join('\n');
+    expect(output).toContain('Claude Code');
+    expect(output).toContain('  Session    81% left  ↘   ↻ +16%');
+    expect(output).toMatch(/personal · macbook {2}[█│]+╱+ {2}68% {2}↻ 44m/);
+    expect(output).toMatch(/personal · devbox {3}[█│]+╱* {2}93% {2}↻ 54m/);
+  });
+  it('does not repeat the percentage for a single seat', async () => {
+    const mac = harness();
+    await signedIn(mac, 'mac@bee.dev', 32);
+    await mac.run('usage');
+    const output = mac.lines.join('\n');
+    expect(output).toContain('68% left');
+    expect(output).not.toMatch(/╱ +68%/);
+  });
+  it('reads one machine when told to', async () => {
+    const mac = harness();
+    const devbox = createTestServer({ hostname: 'devbox' });
+    await signedIn(mac, 'mac@bee.dev', 32);
+    await signedIn(devbox, 'devbox@bee.dev', 7);
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', devbox.router);
+    await mac.run('usage', '--machine', 'devbox');
+    expect(mac.clis.claude.usageSessions).toEqual([]);
+    expect(mac.lines.join('\n')).toContain('93% left');
+  });
+  it('refuses a machine it does not know', async () => {
+    const { run } = harness();
+    await expect(run('usage', '--machine', 'ghost')).rejects.toMatchObject({ code: 'machineNotFound' });
+  });
+  it('prints machine readable output, with what each machine said', async () => {
+    const mac = harness();
+    await signedIn(mac, 'mac@bee.dev', 32);
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    await mac.run('usage', '--json');
+    const report = JSON.parse(mac.lines.join('\n'));
+    expect(report[0].machine.id).toBe('local');
+    expect(report[0].seats[0]).toMatchObject({ account: 'personal', provider: 'claude', identity: 'mac@bee.dev' });
+    expect(report[0].seats[0].usage.windows[0].usedPercent).toBe(32);
+    expect(report[1].machine.id).toBe('devbox');
+    expect(report[1].seats).toEqual([]);
+    expect(report[1].problem).toContain('devbox');
+  });
+  it('keeps reading when a machine runs an older favo', async () => {
+    const mac = harness();
+    await signedIn(mac, 'mac@bee.dev', 32);
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', {
+      send: async ({ id, method }) => ({
+        id,
+        ok: false,
+        error: { code: 'unknownMethod', message: `Unknown method "${method}".` },
+      }),
+    });
+    expect(await mac.run('usage')).toBe(0);
+    const output = mac.lines.join('\n');
+    expect(output).toContain('68% left');
+    expect(output).toContain('devbox: older favo');
+  });
+  it('sums up a provider with no limits', async () => {
+    const mac = harness();
+    await signedIn(mac, 'mac@bee.dev', 32);
+    mac.clis.claude.usageReading = undefined;
+    await mac.run('usage');
+    expect(mac.lines.join('\n')).toMatch(/Claude Code +no limits available/);
+  });
+  it('explains a seat with no bars beside one with bars', async () => {
+    const mac = harness();
+    const devbox = createTestServer({ hostname: 'devbox' });
+    await signedIn(mac, 'mac@bee.dev', 32);
+    await signedIn(devbox, 'devbox@bee.dev', 7);
+    const unavailable = { reason: 'probeFailed' as const, message: 'Claude Code did not answer.' };
+    devbox.clis.claude.usageReading = { windows: [], unavailable };
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', devbox.router);
+    await mac.run('usage');
+    const output = mac.lines.join('\n');
+    expect(output).toContain('68% left');
+    expect(output).toContain('personal · devbox: Claude Code did not answer.');
+  });
+  it('says so when nothing is signed in', async () => {
+    const { run, lines } = harness();
+    await run('usage');
+    expect(lines).toEqual(['No signed in seat reports limits.']);
+  });
+});
+
 describe('commands', () => {
   it('prints the whole fleet in one list', async () => {
     const mac = harness();

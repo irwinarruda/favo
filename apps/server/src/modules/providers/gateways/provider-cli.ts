@@ -1,7 +1,9 @@
 import type { LoginState } from '@favo/contracts/rpc/views';
 import type { ProviderId } from '@favo/domain/providers/provider';
+import { type SeatUsage, UsageUnavailableReason, unavailableUsage } from '@favo/domain/usage/seat-usage';
+import type { PipedProcess } from '@/modules/system/gateways/process-runner';
 
-export type ProviderSession = { binary: string; env: Record<string, string> };
+export type ProviderSession = { binary: string; env: Record<string, string | undefined>; cwd?: string };
 export type ProviderLogin = { login: LoginState; identity?: string; plan?: string };
 export type LaunchEnvironment = { env: Record<string, string>; unsetEnv: string[] };
 
@@ -19,5 +21,42 @@ export abstract class ProviderCli {
 
   launchEnvironment(_current: Record<string, string | undefined>): LaunchEnvironment {
     return { env: {}, unsetEnv: [] };
+  }
+
+  usageEnvironment(current: Record<string, string | undefined>) {
+    return this.launchEnvironment(current);
+  }
+
+  async usage(_session: ProviderSession, checkedAt: string): Promise<SeatUsage> {
+    return unavailableUsage(checkedAt, UsageUnavailableReason.unsupported);
+  }
+
+  protected async ask<Message, Answer>(
+    server: PipedProcess,
+    requests: unknown[],
+    answerOf: (message: Message) => Answer | undefined,
+    timeoutMs: number
+  ) {
+    const { promise, resolve } = Promise.withResolvers<Answer | undefined>();
+    const timer = setTimeout(() => resolve(undefined), timeoutMs);
+    server.onLine((line) => {
+      const message = parseLine<Message>(line);
+      const answer = message === undefined ? undefined : answerOf(message);
+      if (answer !== undefined) resolve(answer);
+    });
+    void server.exited.then(() => resolve(undefined));
+    for (const request of requests) server.write(JSON.stringify(request));
+    const answer = await promise;
+    clearTimeout(timer);
+    server.kill();
+    return answer;
+  }
+}
+
+function parseLine<Message>(line: string) {
+  try {
+    return JSON.parse(line) as Message;
+  } catch {
+    return undefined;
   }
 }

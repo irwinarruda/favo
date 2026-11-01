@@ -1,7 +1,14 @@
 import type { DiscoveredMachine } from '@favo/contracts/rpc/machines/discover-machines';
 import type { MachineStatus } from '@favo/contracts/rpc/machines/get-machine-status';
 import type { ThemeList } from '@favo/contracts/rpc/themes/list-themes';
-import type { AccountView, DesktopAppView, SeatInspection, SeatStatus, SeatView } from '@favo/contracts/rpc/views';
+import type {
+  AccountView,
+  DesktopAppView,
+  SeatInspection,
+  SeatStatus,
+  SeatUsageView,
+  SeatView,
+} from '@favo/contracts/rpc/views';
 import type { Machine } from '@favo/domain/machines/machine';
 import { ProviderId, ProviderOrder, Providers } from '@favo/domain/providers/provider';
 import type { DomainError } from '@favo/domain/shared/domain-error';
@@ -79,6 +86,75 @@ function seedSeatStatuses(): Record<string, SeatStatus> {
   };
 }
 
+function seedSeatUsage(): Record<string, SeatUsageView[]> {
+  const checkedAt = new Date().toISOString();
+  const inMinutes = (minutes: number) => new Date(Date.now() + (minutes + 0.5) * 60_000).toISOString();
+  const session = (usedPercent: number, minutes: number) => ({
+    id: 'five_hour',
+    kind: 'session' as const,
+    label: 'Session',
+    usedPercent,
+    windowDurationMins: 300,
+    resetsAt: inMinutes(minutes),
+  });
+  const weekly = (usedPercent: number, minutes: number) => ({
+    id: 'seven_day',
+    kind: 'weekly' as const,
+    label: 'Weekly',
+    usedPercent,
+    windowDurationMins: 10080,
+    resetsAt: inMinutes(minutes),
+  });
+  const fable = (minutes: number) => ({
+    ...weekly(0, minutes),
+    id: 'seven_day_fable',
+    label: 'Weekly · Fable',
+  });
+  const personalClaude = {
+    account: 'personal',
+    displayName: 'personal',
+    provider: ProviderId.claude,
+    identity: 'bee@hive.dev',
+    plan: 'max',
+    usage: { checkedAt, windows: [session(32, 44), weekly(25, 3600), fable(3600)] },
+  };
+  return {
+    local: [
+      personalClaude,
+      {
+        account: 'work',
+        displayName: 'work',
+        provider: ProviderId.claude,
+        identity: 'bee@work.dev',
+        plan: 'team',
+        usage: { checkedAt, windows: [session(7, 54), weekly(65, 2100), fable(2100)] },
+      },
+      {
+        account: 'personal',
+        displayName: 'personal',
+        provider: ProviderId.codex,
+        identity: 'bee@hive.dev',
+        plan: 'plus',
+        usage: {
+          checkedAt,
+          windows: [
+            { ...session(10, 120), id: 'primary' },
+            { ...weekly(75, 4000), id: 'secondary' },
+          ],
+        },
+      },
+      {
+        account: 'personal',
+        displayName: 'personal',
+        provider: ProviderId.opencode,
+        identity: '4 logins',
+        usage: { checkedAt, windows: [], unavailable: { reason: 'unsupported' } },
+      },
+    ],
+    devbox: [personalClaude],
+  };
+}
+
 function seedInspection(): SeatInspection {
   return {
     items: [
@@ -144,6 +220,9 @@ export const mockDb = {
   machineStatuses: seedMachineStatuses(),
   accounts: seedAccounts(),
   seatStatuses: seedSeatStatuses(),
+  seatUsage: seedSeatUsage(),
+  usageFailures: {} as Record<string, Error>,
+  usageReads: [] as string[],
   inspection: seedInspection(),
   themeList: seedThemeList(),
   directoryTrees: seedDirectoryTrees(),
@@ -165,6 +244,9 @@ export const mockDb = {
     this.machineStatuses = seedMachineStatuses();
     this.accounts = seedAccounts();
     this.seatStatuses = seedSeatStatuses();
+    this.seatUsage = seedSeatUsage();
+    this.usageFailures = {};
+    this.usageReads = [];
     this.inspection = seedInspection();
     this.themeList = seedThemeList();
     this.directoryTrees = seedDirectoryTrees();

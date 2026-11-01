@@ -4,6 +4,7 @@ import type { IMachineRepository } from '@/modules/machines/app/repositories/IMa
 import type { IDesktopRepository } from '@/modules/sessions/app/repositories/IDesktopRepository';
 import type { ITerminalRepository } from '@/modules/sessions/app/repositories/ITerminalRepository';
 import type { IThemeRepository } from '@/modules/themes/app/repositories/IThemeRepository';
+import type { IUsageRepository } from '@/modules/usage/app/repositories/IUsageRepository';
 import type { IClipboardGateway } from '@/shared/app/gateways/IClipboardGateway';
 import type { ITerminalGateway } from '@/shared/app/gateways/ITerminalGateway';
 
@@ -13,6 +14,7 @@ export interface InjectableItems {
   ITerminalRepository: ITerminalRepository;
   IDesktopRepository: IDesktopRepository;
   IThemeRepository: IThemeRepository;
+  IUsageRepository: IUsageRepository;
   IDirectoryRepository: IDirectoryRepository;
   IClipboardGateway: IClipboardGateway;
   ITerminalGateway: ITerminalGateway;

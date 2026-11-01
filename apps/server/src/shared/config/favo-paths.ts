@@ -13,6 +13,7 @@ export function favoPathsOf(input: { home: string; favoHome?: string; isWindows:
     assets: `${root}/assets`,
     versionedAssets: `${root}/assets/${FavoVersion}`,
     themes: `${root}/themes`,
+    emptyFolder: `${root}/empty`,
     machinesFile: `${root}/machines.json`,
     configFile: `${root}/config.json`,
   };

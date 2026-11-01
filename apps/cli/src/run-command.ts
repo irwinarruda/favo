@@ -14,6 +14,7 @@ import { removeMachine } from '@favo/contracts/rpc/machines/remove-machine';
 import { getSeatStatus } from '@favo/contracts/rpc/seats/get-seat-status';
 import { inspectSeat } from '@favo/contracts/rpc/seats/inspect-seat';
 import { provisionSeat } from '@favo/contracts/rpc/seats/provision-seat';
+import { readUsage } from '@favo/contracts/rpc/seats/read-usage';
 import { repairSeats } from '@favo/contracts/rpc/seats/repair-seats';
 import { planTerminal } from '@favo/contracts/rpc/terminal/plan-terminal';
 import { listThemes } from '@favo/contracts/rpc/themes/list-themes';
@@ -22,14 +23,19 @@ import { LoginState } from '@favo/contracts/rpc/views';
 import { FavoVersion } from '@favo/contracts/version';
 import { PersonalAccount } from '@favo/domain/accounts/account';
 import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
-import { type Machine, MachineState } from '@favo/domain/machines/machine';
+import { isOlderFavoError, type Machine, MachineState } from '@favo/domain/machines/machine';
 import { Providers } from '@favo/domain/providers/provider';
-import { DomainError } from '@favo/domain/shared/domain-error';
+import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { TerminalAction, type TerminalPlan } from '@favo/domain/terminal/terminal-plan';
 import { ThemeSource } from '@favo/domain/themes/theme';
+import { UsageBarPart, usageHeadlineOf, usageRowOf } from '@favo/domain/usage/usage-bar';
+import { collectUsagePools, type UsagePool, type UsagePoolColumn } from '@favo/domain/usage/usage-pool';
 import { HelpText } from '@/help-text';
 import type { Paint } from '@/paint';
 import { type Command, CommandKind } from '@/parse-command';
+
+const UsageBarWidth = 20;
+const UsageLabelWidth = 16;
 
 export type CommandContext = {
   client: RpcClient;
@@ -64,6 +70,9 @@ export async function runCommand(parsed: Command, context: CommandContext) {
       return runPlanned(context, { ...seatOf(command), action: TerminalAction.logout, args: [], machineId });
     case CommandKind.list:
       await printFleet(context, isJson);
+      return 0;
+    case CommandKind.usage:
+      await printUsage(context, command);
       return 0;
     case CommandKind.add:
       await client.call(createAccount, { name: account! }, options);
@@ -301,6 +310,75 @@ async function printFleet(context: CommandContext, isJson: boolean) {
       }
     }
   }
+}
+
+async function printUsage(context: CommandContext, { machineId, isJson }: Command) {
+  const { client, print } = context;
+  const machines = await client.call(listMachines, {});
+  const chosen = machines.filter(({ id }) => machineId === undefined || id === machineId);
+  assertDomain(chosen.length > 0, DomainErrorCode.machineNotFound, `No machine named "${machineId}".`);
+  const report = await Promise.all(chosen.map((machine) => machineUsageOf(client, machine)));
+  if (isJson) {
+    print(JSON.stringify(report, undefined, 2));
+    return;
+  }
+  const now = Date.now();
+  const seats = report.flatMap(({ machine, seats }) =>
+    seats.map((seat) => ({
+      ...seat,
+      key: `${machine.id}/${seat.account}/${seat.provider}`,
+      machineName: machine.name,
+    }))
+  );
+  const pools = collectUsagePools(seats, now);
+  for (const pool of pools) printPool(context, pool, now);
+  const problems = report.flatMap(({ machine, problem }) => (problem ? [`${machine.name}: ${problem}`] : []));
+  for (const problem of problems) print(problem);
+  if (pools.length === 0 && problems.length === 0) print('No signed in seat reports limits.');
+}
+
+async function machineUsageOf(client: RpcClient, machine: Machine) {
+  try {
+    return { machine, seats: await client.call(readUsage, {}, { machineId: machine.id }) };
+  } catch (error) {
+    if (!(error instanceof DomainError)) throw error;
+    return { machine, seats: [], problem: isOlderFavoError(error) ? 'older favo' : error.message };
+  }
+}
+
+function printPool({ print, paint }: CommandContext, pool: UsagePool, now: number) {
+  if (pool.summary) {
+    print(`${paint.bold(pool.label.padEnd(UsageLabelWidth))}${paint.dim(pool.summary)}`);
+    return;
+  }
+  const nameWidth = Math.max(0, ...pool.seats.map(({ name }) => name.length));
+  const context = { paint, nameWidth, showPercent: pool.seats.length > 1, now };
+  print(paint.bold(pool.label));
+  for (const window of pool.windows) {
+    const { label, remaining, facts } = usageHeadlineOf(window);
+    print('');
+    print(`  ${label}${paint.accent(remaining)}${paint.dim(facts)}`);
+    for (const column of window.columns) print(`    ${usageRowText(column, context)}`);
+  }
+  for (const { name, message } of pool.notices) print(paint.dim(`\n  ${name}: ${message}`));
+  print('');
+}
+
+function usageRowText(
+  { seat, member }: UsagePoolColumn,
+  context: { paint: Paint; nameWidth: number; showPercent: boolean; now: number }
+) {
+  const { paint, nameWidth, showPercent, now } = context;
+  const name = seat.name.padEnd(nameWidth);
+  if (!member) return paint.dim(`${name}  not reported`);
+  const { bar, percent, facts } = usageRowOf(member, UsageBarWidth, now);
+  const barText = bar.map(({ part, text }) => {
+    if (member.isStale || part === UsageBarPart.refill || part === UsageBarPart.track) return paint.dim(text);
+    return part === UsageBarPart.left ? paint.accent(text) : text;
+  });
+  const shownPercent = showPercent ? ` ${percent}` : '';
+  const row = `${shownPercent}  ${facts}`.trimEnd();
+  return `${name}  ${barText.join('')}${member.isStale ? paint.dim(row) : row}`;
 }
 
 async function accountsWithLogins(client: RpcClient, machine: Machine) {

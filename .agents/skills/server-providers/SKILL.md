@@ -19,6 +19,15 @@ Test a provider on the real binary before changing its entry. Documentation has 
 | Antigravity | `agy` follows only `HOME`, not `GEMINI_HOME`. There is no login or logout command: launching signs in, and `agy models` is the only status signal. Whether the login itself is per account is unverified, so `loginScope` is `unverified` and the UI says so.                                                                                                         |
 | OpenCode    | Move `XDG_DATA_HOME` and `XDG_STATE_HOME`, never `XDG_CONFIG_HOME`, which other tools read (`gh` shows logged out when it moves). `--standalone` is required because the background service has a fixed port. One account holds several logins.                                                                                                                       |
 
+## Usage
+
+`ProviderCli.usage` reads limits through the official CLI, never a token. Claude Code and Codex override it; the default answers `unsupported`, so OpenCode and Antigravity need no code. Verified on 2026-11-01 on real seats with Claude Code 2.1.316 and Codex 0.164.0: both answered in about 2 seconds with their own numbers, and no thread, project folder or process stayed behind.
+
+- **Claude Code:** `claude -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --setting-sources local`, then `initialize` and `get_usage` with `skip_behaviors: true` as `control_request` lines. Nothing is sent to a model. This is an unstable API the Agent SDK marks experimental, so parse loosely and turn anything unexpected into `probeFailed`. `resets_at` has microseconds and an offset, so normalize it. `model_scoped` holds the per-model weeks.
+- **Claude Code environment:** an `ANTHROPIC_API_KEY` around makes a subscription seat look like an API key seat, so `usageEnvironment` clears every `CLAUDE*`, `ANTHROPIC*` and `HERDR*` variable, then the seat's own `CLAUDE_CONFIG_DIR` goes back in. It runs from `~/.favo/empty` so no project settings load.
+- **Codex:** `account/rateLimits/read` on `app-server`. `primary` and `secondary` are positions, so read the kind from `windowDurationMins`. `resetsAt` is epoch seconds, unlike Claude. The answer also holds reset credits, which favo ignores.
+- **Antigravity:** `agy` was not installed on the machine used, so whether `agy models` reports quota is still unknown.
+
 ## Desktop apps
 
 `DesktopAppSpecs` in `packages/domain/src/desktop/desktop-app.ts` is a table entry like `Providers`. Each app keeps its local data in one folder, and favo points it at `accounts/<account>/<profileFolder>`, which it never reads. `personal` passes nothing, so it is the default folder. Methods are `hub` because the window opens on the computer you are at; there is no remote case and no `Protocol` bump.

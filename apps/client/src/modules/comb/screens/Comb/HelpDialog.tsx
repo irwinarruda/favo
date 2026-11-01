@@ -10,6 +10,7 @@ const Keys = [
   ['s / o', 'sign in / sign out'],
   ['c', 'copy the config path'],
   ['p', 'open the desktop app'],
+  ['u', 'see what every seat has left'],
   ['a / n / x', 'add / rename / delete a cell'],
   ['m / X', 'add / forget a machine'],
   ['i', 'install or update favo there'],
@@ -18,6 +19,8 @@ const Keys = [
   ['d', 'choose the launch folder'],
   ['t', 'change the theme'],
   ['q', 'quit'],
+  ['↗ → ↘', 'ahead of, on or under pace'],
+  ['█ ╱ ░ │', 'left, next reset, rest, pace'],
 ];
 
 export function HelpDialog({ onClose }: { onClose(): void }) {

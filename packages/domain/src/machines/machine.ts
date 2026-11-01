@@ -53,6 +53,11 @@ export function isOlderVersion(version: string, than: string) {
   return index !== -1 && parts[index]! < others[index]!;
 }
 
+export function isOlderFavoError(error: unknown) {
+  if (!(error instanceof DomainError)) return false;
+  return error.code === DomainErrorCode.unknownMethod || error.code === DomainErrorCode.machineOutdated;
+}
+
 export function assertMachineName(name: string) {
   assertDomain(
     MachineNamePattern.test(name),

@@ -9,6 +9,7 @@ import type { RpcResponse } from '#contracts/rpc/envelope';
 import { Protocol, RpcRequest, RpcResponse as RpcResponseSchema } from '#contracts/rpc/envelope';
 import { addMachine } from '#contracts/rpc/machines/add-machine';
 import { getSeatStatus } from '#contracts/rpc/seats/get-seat-status';
+import { readUsage } from '#contracts/rpc/seats/read-usage';
 import { ping } from '#contracts/rpc/system/ping';
 import { planTerminal } from '#contracts/rpc/terminal/plan-terminal';
 import { listThemes } from '#contracts/rpc/themes/list-themes';
@@ -48,6 +49,29 @@ describe('method descriptors', () => {
     const params = { machineId: 'devbox', action: 'login', account: 'work', provider: 'codex', args: [] };
     expect(planTerminal.params.safeParse(params).success).toBe(true);
     expect(planTerminal.params.safeParse({ ...params, action: 'delete' }).success).toBe(false);
+  });
+});
+
+describe('usage', () => {
+  const window = { id: 'five_hour', kind: 'session', label: 'Session', usedPercent: 32 };
+  const reading = { account: 'work', displayName: 'side', provider: 'claude' };
+  const usage = { checkedAt: '2026-11-01T12:00:00.000Z', windows: [window] };
+
+  it('is forwarded to the machine, because the seats live there', () => {
+    expect(readUsage.routing).toBe('machine');
+  });
+  it('takes no parameters, and refuses a stray one', () => {
+    expect(readUsage.params.safeParse({}).success).toBe(true);
+    expect(readUsage.params.safeParse({ account: 'work' }).success).toBe(false);
+  });
+  it('parses a reading and refuses a window of an unknown kind', () => {
+    expect(readUsage.result.safeParse([{ ...reading, usage }]).success).toBe(true);
+    const unknownKind = { ...usage, windows: [{ ...window, kind: 'daily' }] };
+    expect(readUsage.result.safeParse([{ ...reading, usage: unknownKind }]).success).toBe(false);
+  });
+  it('accepts a seat that could not be read, with no bars', () => {
+    const failed = { checkedAt: usage.checkedAt, windows: [], unavailable: { reason: 'probeFailed' } };
+    expect(readUsage.result.safeParse([{ ...reading, usage: failed }]).success).toBe(true);
   });
 });
 

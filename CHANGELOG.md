@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- See how much limit every seat has left and when it comes back, on every machine, in one screen. Press `u` in the comb, or run `favo usage`, which also takes `--machine <machine>` and `--json`. It covers Claude Code and Codex, and reads them through their own commands. OpenCode and Antigravity show no limits for now, because favo never reads a token.
+
 ## [0.3.0] - 2026-11-01
 
 ### Added
