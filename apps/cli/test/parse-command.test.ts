@@ -23,6 +23,20 @@ describe('parseCommand', () => {
   it('hands everything after -- to the provider, flags included', () => {
     expect(parseCommand(['claude', 'work', '--', '--resume', '-c']).args).toEqual(['--resume', '-c']);
   });
+  it('opens a desktop app as an account', () => {
+    expect(parseCommand(['app', 'work', 'codex'])).toMatchObject({
+      kind: CommandKind.app,
+      account: 'work',
+      provider: 'codex',
+      shouldClose: false,
+    });
+  });
+  it('closes the app first only when told to', () => {
+    expect(parseCommand(['app', 'work', 'claude', '--close']).shouldClose).toBe(true);
+  });
+  it('needs an account and a provider to open an app', () => {
+    expect(() => parseCommand(['app', 'work'])).toThrow('favo app <account> <provider>');
+  });
   it('takes a machine anywhere', () => {
     expect(parseCommand(['list', '--json']).isJson).toBe(true);
     expect(parseCommand(['add', 'side', '-m', 'devbox']).machineId).toBe('devbox');

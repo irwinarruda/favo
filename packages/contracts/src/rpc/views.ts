@@ -24,6 +24,12 @@ export const SeatView = z.strictObject({
 });
 export type SeatView = z.infer<typeof SeatView>;
 
+export const DesktopAppView = z.strictObject({
+  provider: z.enum(ProviderId),
+  label: z.string(),
+});
+export type DesktopAppView = z.infer<typeof DesktopAppView>;
+
 export const AccountView = z.strictObject({
   name: z.string(),
   displayName: z.string(),

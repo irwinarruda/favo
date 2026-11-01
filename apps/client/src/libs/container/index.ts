@@ -1,6 +1,7 @@
 import type { IFleetRepository } from '@/modules/comb/app/repositories/IFleetRepository';
 import type { IDirectoryRepository } from '@/modules/directories/app/repositories/IDirectoryRepository';
 import type { IMachineRepository } from '@/modules/machines/app/repositories/IMachineRepository';
+import type { IDesktopRepository } from '@/modules/sessions/app/repositories/IDesktopRepository';
 import type { ITerminalRepository } from '@/modules/sessions/app/repositories/ITerminalRepository';
 import type { IThemeRepository } from '@/modules/themes/app/repositories/IThemeRepository';
 import type { IClipboardGateway } from '@/shared/app/gateways/IClipboardGateway';
@@ -10,6 +11,7 @@ export interface InjectableItems {
   IFleetRepository: IFleetRepository;
   IMachineRepository: IMachineRepository;
   ITerminalRepository: ITerminalRepository;
+  IDesktopRepository: IDesktopRepository;
   IThemeRepository: IThemeRepository;
   IDirectoryRepository: IDirectoryRepository;
   IClipboardGateway: IClipboardGateway;

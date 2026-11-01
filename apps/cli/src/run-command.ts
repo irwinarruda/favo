@@ -4,6 +4,7 @@ import { listAccounts } from '@favo/contracts/rpc/accounts/list-accounts';
 import { removeAccount } from '@favo/contracts/rpc/accounts/remove-account';
 import { renameAccount } from '@favo/contracts/rpc/accounts/rename-account';
 import type { RpcClient } from '@favo/contracts/rpc/client';
+import { openDesktopApp } from '@favo/contracts/rpc/desktop/open-desktop-app';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
 import { discoverMachines } from '@favo/contracts/rpc/machines/discover-machines';
 import { getMachineStatus, type MachineStatus } from '@favo/contracts/rpc/machines/get-machine-status';
@@ -20,9 +21,10 @@ import { selectTheme } from '@favo/contracts/rpc/themes/select-theme';
 import { LoginState } from '@favo/contracts/rpc/views';
 import { FavoVersion } from '@favo/contracts/version';
 import { PersonalAccount } from '@favo/domain/accounts/account';
-import { type Machine, MachineState } from '@favo/domain/machines/machine';
+import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
+import { LocalMachineId, type Machine, MachineState } from '@favo/domain/machines/machine';
 import { Providers } from '@favo/domain/providers/provider';
-import { DomainError } from '@favo/domain/shared/domain-error';
+import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { TerminalAction, type TerminalPlan } from '@favo/domain/terminal/terminal-plan';
 import { ThemeSource } from '@favo/domain/themes/theme';
 import { HelpText } from '@/help-text';
@@ -90,6 +92,8 @@ export async function runCommand(parsed: Command, context: CommandContext) {
       print(seat?.path ?? '');
       return seat ? 0 : 1;
     }
+    case CommandKind.app:
+      return openApp(context, parsed, command);
     case CommandKind.sync: {
       const repairs = await client.call(repairSeats, { account }, options);
       if (isJson) print(JSON.stringify(repairs, undefined, 2));
@@ -161,6 +165,25 @@ export async function runCommand(parsed: Command, context: CommandContext) {
     default:
       return 1;
   }
+}
+
+async function openApp(context: CommandContext, parsed: Command, command: Command) {
+  const { client, print, paint } = context;
+  const isLocal = command.machineId === undefined || command.machineId === LocalMachineId;
+  assertDomain(
+    isLocal,
+    DomainErrorCode.invalidParams,
+    'favo app opens a window on this computer, so it takes no --machine.'
+  );
+  const seat = seatOf(command);
+  const { opening, label } = await client.call(openDesktopApp, { ...seat, shouldClose: command.shouldClose ?? false });
+  if (opening === DesktopOpening.stillOpen) {
+    const { executable } = Providers[seat.provider];
+    print(`${label} is open. To close it and reopen: favo app ${parsed.account} ${executable} --close`);
+    return 1;
+  }
+  print(`${paint.accent('⬢')} ${label} is opening as ${parsed.account}.`);
+  return 0;
 }
 
 function stateOf(status: MachineStatus) {

@@ -13,6 +13,9 @@ Accounts
   favo login <account> <provider>    sign in, with the official command
   favo logout <account> <provider>   sign out
   favo path <account> <provider>     print the config path, for T3 Code
+  favo app <account> <provider>      open the Claude or ChatGPT app as an account
+                                     (claude, codex), on this computer
+                                     --close closes it first if it is open
   favo sync [account]                repair shared links
   favo inspect <account> <provider>  show what is shared and what is private
   favo adopt <account> <provider> <folder>

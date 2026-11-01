@@ -62,6 +62,39 @@ describe('SessionService', () => {
     expect(mockDb.repaired).toEqual(['devbox']);
     expect(app.state.toast?.message).toBe('Mended 2 shared links.');
   });
+  test('offers the app of the selected seat on this machine', async () => {
+    const app = await getApp();
+    expect(app.state.selectedDesktopApp).toEqual({ provider: 'claude', label: 'Claude' });
+  });
+  test('offers nothing for a provider whose app is not installed', async () => {
+    const app = await getApp();
+    app.state.selectRow('seat:local/personal/codex');
+    expect(app.state.selectedDesktopApp).toBeUndefined();
+    expect(await app.state.openSelectedDesktopApp()).toBeUndefined();
+    expect(mockDb.desktopOpenings).toEqual([]);
+  });
+  test('offers nothing on another machine, even with the same provider', async () => {
+    const app = await getApp();
+    app.state.selectRow('seat:devbox/personal/claude');
+    expect(app.state.selectedDesktopApp).toBeUndefined();
+    expect(await app.state.openSelectedDesktopApp()).toBeUndefined();
+  });
+  test('opens the app as the selected account and says so', async () => {
+    const app = await getApp();
+    app.state.selectRow('seat:local/work/claude');
+    expect(await app.state.openSelectedDesktopApp()).toBe('opened');
+    expect(mockDb.desktopOpenings).toEqual(['seat:local/work/claude']);
+    expect(app.state.toast?.message).toBe('Claude is opening as work.');
+  });
+  test('leaves an open app alone until it is told to close it', async () => {
+    const app = await getApp();
+    mockDb.runningDesktopApps = ['claude'];
+    app.state.selectRow('seat:local/work/claude');
+    expect(await app.state.openSelectedDesktopApp()).toBe('stillOpen');
+    expect(mockDb.desktopOpenings).toEqual([]);
+    expect(await app.state.openSelectedDesktopApp(true)).toBe('opened');
+    expect(mockDb.desktopOpenings).toEqual(['seat:local/work/claude']);
+  });
   test('does nothing on a machine row', async () => {
     const app = await getApp();
     app.state.selectRow('machine:studio');

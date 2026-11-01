@@ -1,7 +1,7 @@
 import type { DiscoveredMachine } from '@favo/contracts/rpc/machines/discover-machines';
 import type { MachineStatus } from '@favo/contracts/rpc/machines/get-machine-status';
 import type { ThemeList } from '@favo/contracts/rpc/themes/list-themes';
-import type { AccountView, SeatInspection, SeatStatus, SeatView } from '@favo/contracts/rpc/views';
+import type { AccountView, DesktopAppView, SeatInspection, SeatStatus, SeatView } from '@favo/contracts/rpc/views';
 import type { Machine } from '@favo/domain/machines/machine';
 import { ProviderId, ProviderOrder, Providers } from '@favo/domain/providers/provider';
 import type { TerminalPlan } from '@favo/domain/terminal/terminal-plan';
@@ -127,6 +127,10 @@ function seedDirectoryTrees(): Record<string, Record<string, string[]>> {
   };
 }
 
+function seedDesktopApps(): DesktopAppView[] {
+  return [{ provider: ProviderId.claude, label: 'Claude' }];
+}
+
 function seedDiscovered(): DiscoveredMachine[] {
   return [
     { name: 'pi', target: 'pi', source: 'tailscale', isOnline: true },
@@ -143,6 +147,9 @@ export const mockDb = {
   themeList: seedThemeList(),
   directoryTrees: seedDirectoryTrees(),
   discovered: seedDiscovered(),
+  desktopApps: seedDesktopApps(),
+  runningDesktopApps: [] as ProviderId[],
+  desktopOpenings: [] as string[],
   unreachableTargets: ['down@host'],
   clipboard: [] as string[],
   terminalRuns: [] as TerminalPlan[],
@@ -160,6 +167,9 @@ export const mockDb = {
     this.themeList = seedThemeList();
     this.directoryTrees = seedDirectoryTrees();
     this.discovered = seedDiscovered();
+    this.desktopApps = seedDesktopApps();
+    this.runningDesktopApps = [];
+    this.desktopOpenings = [];
     this.unreachableTargets = ['down@host'];
     this.clipboard = [];
     this.terminalRuns = [];

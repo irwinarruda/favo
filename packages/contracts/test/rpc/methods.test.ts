@@ -3,6 +3,8 @@ import { BuiltInThemes } from '@favo/domain/themes/built-in-themes';
 import { createAccount } from '#contracts/rpc/accounts/create-account';
 import { listAccounts } from '#contracts/rpc/accounts/list-accounts';
 import { createRpcClient } from '#contracts/rpc/client';
+import { listDesktopApps } from '#contracts/rpc/desktop/list-desktop-apps';
+import { openDesktopApp } from '#contracts/rpc/desktop/open-desktop-app';
 import type { RpcResponse } from '#contracts/rpc/envelope';
 import { Protocol, RpcRequest, RpcResponse as RpcResponseSchema } from '#contracts/rpc/envelope';
 import { addMachine } from '#contracts/rpc/machines/add-machine';
@@ -46,6 +48,25 @@ describe('method descriptors', () => {
     const params = { machineId: 'devbox', action: 'login', account: 'work', provider: 'codex', args: [] };
     expect(planTerminal.params.safeParse(params).success).toBe(true);
     expect(planTerminal.params.safeParse({ ...params, action: 'delete' }).success).toBe(false);
+  });
+});
+
+describe('desktop apps', () => {
+  it('run on the computer you are at, because that is where the window opens', () => {
+    expect(listDesktopApps.routing).toBe('hub');
+    expect(openDesktopApp.routing).toBe('hub');
+  });
+  it('accepts an open request and refuses one for an unknown provider', () => {
+    const params = { account: 'work', provider: 'claude', shouldClose: false };
+    expect(openDesktopApp.params.safeParse(params).success).toBe(true);
+    expect(openDesktopApp.params.safeParse({ ...params, provider: 'gemini' }).success).toBe(false);
+  });
+  it('requires the caller to say whether the app may be closed', () => {
+    expect(openDesktopApp.params.safeParse({ account: 'work', provider: 'claude' }).success).toBe(false);
+  });
+  it('parses the apps found and refuses one with no label', () => {
+    expect(listDesktopApps.result.safeParse([{ provider: 'codex', label: 'ChatGPT' }]).success).toBe(true);
+    expect(listDesktopApps.result.safeParse([{ provider: 'codex' }]).success).toBe(false);
   });
 });
 

@@ -1,5 +1,6 @@
 import { createRpcClient } from '@favo/contracts/rpc/client';
 import { ProviderId } from '@favo/domain/providers/provider';
+import { ScriptedDesktopApps } from '@/modules/desktop/gateways/scripted.desktop-apps';
 import { LoopbackRemoteBackends } from '@/modules/machines/gateways/loopback.remote-backends';
 import { ScriptedReleaseAssets } from '@/modules/machines/gateways/scripted.release-assets';
 import { ScriptedSsh } from '@/modules/machines/gateways/scripted.ssh';
@@ -37,6 +38,7 @@ export function createTestServer(options: TestServerOptions = {}) {
   const ssh = new ScriptedSsh();
   const remotes = new LoopbackRemoteBackends();
   const releaseAssets = new ScriptedReleaseAssets(fileSystem);
+  const desktopApps = new ScriptedDesktopApps();
   const paths = favoPathsOf({ home: Home, isWindows: options.isWindows ?? false });
   const server = createServer(
     {
@@ -49,6 +51,7 @@ export function createTestServer(options: TestServerOptions = {}) {
       tailscale: new StaticTailscale(options.peers),
       remotes,
       releaseAssets,
+      desktopApps,
     },
     {
       paths,
@@ -71,6 +74,7 @@ export function createTestServer(options: TestServerOptions = {}) {
     ssh,
     remotes,
     releaseAssets,
+    desktopApps,
     paths,
   };
 }

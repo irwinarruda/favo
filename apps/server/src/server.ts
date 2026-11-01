@@ -4,6 +4,9 @@ import { registerAccountsController } from '@/modules/accounts/controllers/accou
 import { AccountRepository } from '@/modules/accounts/repositories/account.repository';
 import { AccountsService } from '@/modules/accounts/services/accounts.service';
 import { SeatsService } from '@/modules/accounts/services/seats.service';
+import { registerDesktopController } from '@/modules/desktop/controllers/desktop.controller';
+import type { DesktopApps } from '@/modules/desktop/gateways/desktop-apps';
+import { DesktopAppsService } from '@/modules/desktop/services/desktop-apps.service';
 import { registerDirectoriesController } from '@/modules/directories/controllers/directories.controller';
 import { DirectoriesService } from '@/modules/directories/services/directories.service';
 import { registerMachinesController } from '@/modules/machines/controllers/machines.controller';
@@ -41,6 +44,7 @@ export type ServerGateways = {
   tailscale: Tailscale;
   remotes: RemoteBackends;
   releaseAssets: ReleaseAssets;
+  desktopApps: DesktopApps;
 };
 
 export type ServerOptions = {
@@ -50,7 +54,7 @@ export type ServerOptions = {
 };
 
 export function createServer(gateways: ServerGateways, options: ServerOptions) {
-  const { fileSystem, processes, shell, clock, clis, ssh, tailscale, remotes, releaseAssets } = gateways;
+  const { fileSystem, processes, shell, clock, clis, ssh, tailscale, remotes, releaseAssets, desktopApps } = gateways;
   const { paths, host, callerEnv } = options;
   const router = new RpcRouter();
   const providers = new ProvidersService(clis, processes, shell, paths);
@@ -73,10 +77,12 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
   const directories = new DirectoriesService(fileSystem, paths, host);
   const terminal = new TerminalService(providers, seats, machines, directories, config, callerEnv);
   const themes = new ThemesService(new ThemeRepository(fileSystem, paths), config);
+  const desktop = new DesktopAppsService(desktopApps, seats, providers, fileSystem, paths);
   registerSystemController(router, host);
   registerAccountsController(router, accounts, seats);
   registerMachinesController(router, machines, installer);
   registerTerminalController(router, terminal);
+  registerDesktopController(router, desktop);
   registerThemesController(router, themes);
   registerDirectoriesController(router, directories);
   router.forwardWith((request) => machines.forward(request));

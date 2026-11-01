@@ -12,6 +12,7 @@ export class ScriptedProcessRunner extends ProcessRunner {
   private readonly replies = new Map<string, Reply>();
   private readonly conversations = new Map<string, string[]>();
   private readonly installed = new Map<string, string>();
+  private readonly undetachable = new Set<string>();
 
   install(command: string, path = `/usr/bin/${command}`) {
     this.installed.set(command, path);
@@ -45,6 +46,15 @@ export class ScriptedProcessRunner extends ProcessRunner {
       exited: lines ? new Promise(() => {}) : Promise.resolve({ code: 127, stderr: 'not found' }),
       kill() {},
     };
+  }
+
+  detach(request: ProcessRequest) {
+    this.calls.push(request);
+    return !this.undetachable.has(request.command);
+  }
+
+  failToDetach(command: string) {
+    this.undetachable.add(command);
   }
 
   which(command: string) {
