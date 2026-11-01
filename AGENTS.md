@@ -20,7 +20,9 @@ Use Bun `1.3.14` (`.bun-version`).
 
 ## Releasing
 
-Set the new version in both `packages/contracts/src/version.ts` and `apps/npm/package.json`, commit it to `main`, then push a `vX.Y.Z` tag. `.github/workflows/release.yml` tests on all three systems, builds, creates the GitHub Release, starts the binary on every platform, then publishes `favo-cli` to npm through trusted publishing. Nothing is published by hand, and no npm token lives in CI.
+Set the new version in both `packages/contracts/src/version.ts` and `apps/npm/package.json`, commit it to `main`, then push a `vX.Y.Z` tag. `.github/workflows/release.yml` tests on all three systems, builds, creates the GitHub Release, starts the binary on every platform, then publishes `favo-cli` to npm through trusted publishing and updates the formula in `irwinarruda/homebrew-tap`. Nothing is published by hand, and no npm token lives in CI. The tap is pushed with a deploy key limited to that repository, kept in the `homebrew` environment, which only release tags can reach.
+
+`gh workflow run homebrew-check.yml -f tag=vX.Y.Z` installs from the public tap on every platform, and each release does this by itself.
 
 Releases are immutable, so a bad binary burns its version number; fix it in a new version. To re-run a failed release, use `gh workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z`.
 

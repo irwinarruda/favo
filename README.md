@@ -46,11 +46,11 @@ favo codex client      # Codex as a client's account
 ## Install
 
 ```sh
-npm install --global favo-cli
-favo
+npm install --global favo-cli       # macOS, Linux and Windows
+brew install irwinarruda/tap/favo   # or Homebrew, on macOS and Linux
 ```
 
-Or try it without installing, using `npx favo-cli`. The package is `favo-cli`, and the command is `favo`; plain `npx favo` runs an unrelated package. It runs on macOS, Linux and Windows and needs Node 20.11 or newer ([details](#install-details)).
+Then run `favo`. The npm install needs Node 20.11 or newer, and Homebrew needs nothing else ([details](#install-details)). To try it without installing, use `npx favo-cli`; plain `npx favo` runs an unrelated package.
 
 Your first account is already there: `personal` is the setup you have today. To add another:
 
@@ -141,13 +141,13 @@ favo never reads them. Logins run each provider's own command, and credentials s
 It stays where it is and becomes your `personal` account. Shared items in other accounts are links to it, so editing one edits your original.
 
 **Does favo phone home?**
-There is no telemetry. favo's own network use is downloading its release from GitHub: on first run, and when it installs itself on another machine. Reaching your machines goes over your own ssh.
+There is no telemetry. favo's own network use is downloading its release from GitHub: on the npm package's first run, and when it installs itself on another machine. Reaching your machines goes over your own ssh.
 
 **Why not a shell alias with `CLAUDE_CONFIG_DIR`?**
 That gives you a second login, and it's how many of us started. The new folder starts empty, though, so you maintain your setup twice, and it stops at one machine and one provider. favo keeps the setup shared and does the same for all four providers, across your computers.
 
 **How do I uninstall it?**
-Run `npm uninstall --global favo-cli`, then delete `~/.favo`. That removes every account except `personal`, along with their logins and threads, and leaves your normal config folders alone.
+Run `npm uninstall --global favo-cli` or `brew uninstall favo`, then delete `~/.favo`. That removes every account except `personal`, along with their logins and threads, and leaves your normal config folders alone.
 
 ## Reference
 
@@ -159,9 +159,9 @@ Run `npm uninstall --global favo-cli`, then delete `~/.favo`. That removes every
 | Linux   | x64 and arm64, glibc (not Alpine or musl) |
 | Windows | x64                                       |
 
-The npm package is a small launcher with no dependencies and no install scripts. The first run downloads the right binary, about 40 MB, from [GitHub Releases](https://github.com/irwinarruda/favo/releases) and checks it against the hashes published in the npm package. After that, favo starts with no network.
+The npm package is a small launcher with no dependencies and no install scripts. The first run downloads the right binary, about 40 MB, from [GitHub Releases](https://github.com/irwinarruda/favo/releases) and checks it against the hashes published in the npm package. After that, favo starts with no network. Homebrew installs the same binary directly, with no launcher and no Node.
 
-To update, run `npm install --global favo-cli@latest`, then `favo machine install <machine>` for each other machine.
+To update, run `npm install --global favo-cli@latest` or `brew upgrade favo`, then `favo machine install <machine>` for each other machine.
 
 ### Use it with T3 Code
 
