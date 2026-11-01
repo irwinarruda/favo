@@ -75,7 +75,7 @@ describe('favo usage', () => {
     expect(code).toBe(0);
     expect(stdout).toContain('Claude Code');
     expect(stdout).toContain('68% left');
-    expect(stdout).toMatch(/personal +[█│╱░]+ +↻ 44m/);
+    expect(stdout).toMatch(/personal +[▄█▂▁]+ +↻ 44m/);
   });
   it('reads the subscription even with an API key around', async () => {
     const { stdout } = await favo(['usage'], { ANTHROPIC_API_KEY: 'sk-test', CLAUDE_CODE_ENTRYPOINT: 'cli' });
@@ -94,7 +94,7 @@ describe('favo usage', () => {
     writeFileSync(`${path}/identity`, 'work@bee.dev');
     const { stdout } = await favo(['usage']);
     expect(stdout).toContain('Session');
-    expect(stdout).toMatch(/work +[█│╱░]+ +68%/);
+    expect(stdout).toMatch(/work +[▄█▂▁]+ +68%/);
   });
   it('reads Codex from its app server', async () => {
     mkdirSync(`${home}/.codex`, { recursive: true });

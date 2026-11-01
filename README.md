@@ -221,7 +221,7 @@ favo theme tokyo-night       # pick a theme
 
 Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--machine <machine>` to run on another computer. `favo --help` lists the rest.
 
-`favo usage` and the `u` screen ask Claude Code and Codex through their own commands, so no token is read and no thread starts. OpenCode and Antigravity show no limits for now, because neither has a source that works without a token. The bars show what is left: `╱` is what the next reset gives back, and `│` is how much of the window is left, so a bar that stops short of it is spending too fast.
+`favo usage` and the `u` screen ask Claude Code and Codex through their own commands, so no token is read and no thread starts. OpenCode and Antigravity show no limits for now, because neither has a source that works without a token. favo reads them once when the TUI opens, so the numbers are ready when you press `u`, and `favo usage` reads them when you run it. The bars show what is left: the thick part is yours now, the thinner part is what the next reset gives back, and the tall mark is how much of the window's time is left, so a bar that stops short of it is spending too fast.
 
 `favo rm` keeps the cell in `~/.favo/trash`, login included, until you delete that folder yourself. `favo adopt` refuses a folder inside `~/.favo` or a provider's base folder.
 

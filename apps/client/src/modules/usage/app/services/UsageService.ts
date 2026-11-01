@@ -32,6 +32,7 @@ export type UsageService = {
   usagePools: UsagePool[];
   usageMachineLines: UsageMachineLine[];
   isUsageReading: boolean;
+  preloadUsage(machineId: string): Promise<void>;
   openUsage(): Promise<void>;
   closeUsage(): void;
   refreshUsage(): Promise<void>;
@@ -54,14 +55,15 @@ export const createUsageService: ServiceCreator<UsageService> = (set, get) => ({
   isUsageOpen: false,
   usageNow: 0,
   machineUsage: {},
-  async openUsage() {
-    const now = Date.now();
-    set({ isUsageOpen: true, usageNow: now });
+  async preloadUsage(machineId) {
     const { machines, machineUsage, readMachineUsage } = get();
-    const due = machines.filter((machine) => {
-      const usage = ownValue(machineUsage, machine.id);
-      return _canRead(machine) && (!usage || now - usage.readAt >= UsageFreshForMs);
-    });
+    const machine = machines.find((candidate) => candidate.id === machineId);
+    if (machine && _isDue(machine, machineUsage)) await readMachineUsage(machine);
+  },
+  async openUsage() {
+    set({ isUsageOpen: true, usageNow: Date.now() });
+    const { machines, machineUsage, readMachineUsage } = get();
+    const due = machines.filter((machine) => _isDue(machine, machineUsage));
     await Promise.all(due.map(readMachineUsage));
   },
   closeUsage() {
@@ -97,6 +99,11 @@ export const createUsageService: ServiceCreator<UsageService> = (set, get) => ({
 
 function _canRead(machine: Machine) {
   return machine.isOnline || machine.presence === MachinePresence.connecting;
+}
+
+function _isDue(machine: Machine, machineUsage: Record<string, MachineUsage>) {
+  const usage = ownValue(machineUsage, machine.id);
+  return _canRead(machine) && (!usage || Date.now() - usage.readAt >= UsageFreshForMs);
 }
 
 function _sameSeat(left: SeatUsageView, right: SeatUsageView) {

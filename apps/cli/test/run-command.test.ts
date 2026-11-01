@@ -61,8 +61,8 @@ describe('usage', () => {
     const output = mac.lines.join('\n');
     expect(output).toContain('Claude Code');
     expect(output).toContain('  Session    81% left  ↘   ↻ +16%');
-    expect(output).toMatch(/personal · macbook {2}[█│]+╱+ {2}68% {2}↻ 44m/);
-    expect(output).toMatch(/personal · devbox {3}[█│]+╱* {2}93% {2}↻ 54m/);
+    expect(output).toMatch(/personal · macbook {2}[▄█]+▂+ {2}68% {2}↻ 44m/);
+    expect(output).toMatch(/personal · devbox {3}[▄█]+▂* {2}93% {2}↻ 54m/);
   });
   it('does not repeat the percentage for a single seat', async () => {
     const mac = harness();
@@ -70,7 +70,7 @@ describe('usage', () => {
     await mac.run('usage');
     const output = mac.lines.join('\n');
     expect(output).toContain('68% left');
-    expect(output).not.toMatch(/╱ +68%/);
+    expect(output).not.toMatch(/▂ +68%/);
   });
   it('reads one machine when told to', async () => {
     const mac = harness();

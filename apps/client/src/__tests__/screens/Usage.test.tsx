@@ -32,6 +32,13 @@ describe('the usage screen', () => {
     expect(app.state.isUsageOpen).toBe(false);
     expect(captureCharFrame()).toContain('macbook · this machine');
   });
+  test('has its numbers ready the moment it opens', async () => {
+    const view = await open();
+    await view.waitFor(() => mockDb.usageReads.length === 2 && !view.app.state.isUsageReading);
+    await view.press('u');
+    expect(view.captureCharFrame()).toContain('81% left');
+    expect(mockDb.usageReads).toHaveLength(2);
+  });
   test('opens from the key bar', async () => {
     const { app, clickOn, waitFor } = await open();
     await clickOn('usage');
@@ -39,28 +46,35 @@ describe('the usage screen', () => {
   });
   test('shows the pooled headline, the pace and the next reset', async () => {
     const { captureCharFrame } = await openUsage();
-    expect(captureCharFrame()).toMatch(/Session\s+81% left\s+↘\s+↻ \+16%/);
-    expect(captureCharFrame()).toMatch(/Weekly\s+55% left/);
+    expect(captureCharFrame()).toMatch(/81% left\s+↘\s+↻ \+16%/);
+    expect(captureCharFrame()).toContain('55% left');
   });
-  test('draws one row per seat with what each has left and when it comes back', async () => {
+  test('gives each seat its own column on a wide screen', async () => {
     const { captureCharFrame } = await openUsage();
     const frame = captureCharFrame();
-    expect(frame).toMatch(/personal\s+█+│?█*╱+\s+68%\s+↻ 44m/);
-    expect(frame).toMatch(/work\s+[█│]+╱*\s+93%\s+↻ 54m/);
+    expect(frame).toMatch(/personal {2}68%\s+↻ 44m\s+work {2}93%\s+↻ 54m/);
+    expect(frame).toMatch(/personal {2}75%\s+↻ 2d 12h\s+work {2}35%\s+↻ 1d 11h/);
   });
-  test('keeps a seat in the same place in every window', async () => {
+  test('keeps a seat in the same column in every window', async () => {
     const { captureCharFrame } = await openUsage();
-    const rows = captureCharFrame()
-      .split('\n')
-      .filter((line) => /^\s+(personal|work)\s+[█░╱│]/.test(line));
-    const names = rows.map((line) => line.trim().split(/\s+/)[0]);
-    expect(names.slice(0, 6)).toEqual(['personal', 'work', 'personal', 'work', 'personal', 'work']);
+    const lines = captureCharFrame().split('\n');
+    const columnsOf = (name: string) => lines.filter((line) => line.includes(`${name}  `)).map((l) => l.indexOf(name));
+    expect(new Set(columnsOf('personal')).size).toBe(1);
+    expect(new Set(columnsOf('work')).size).toBe(1);
+    expect(columnsOf('personal').length).toBeGreaterThanOrEqual(3);
+  });
+  test('draws the bar under its seat, as wide as the column', async () => {
+    const { captureCharFrame } = await openUsage();
+    const lines = captureCharFrame().split('\n');
+    const label = lines.findIndex((line) => line.includes('personal  68%'));
+    const start = lines[label]!.indexOf('personal');
+    expect(lines[label + 1]!.slice(start)).toMatch(/^[▄█]+▂+ {3}[▄█]+▂+/);
   });
   test('does not repeat the percentage for a single seat', async () => {
     const { captureCharFrame } = await openUsage();
     const codex = captureCharFrame().split('Codex')[1]!;
-    expect(codex).toMatch(/Session\s+90% left/);
-    expect(codex).not.toMatch(/█\s+90%/);
+    expect(codex).toContain('90% left');
+    expect(codex).not.toMatch(/personal\s+90%/);
   });
   test('sums up a provider with no limits in one line', async () => {
     const { captureCharFrame } = await openUsage({ width: 130, height: 50 });
@@ -73,17 +87,32 @@ describe('the usage screen', () => {
     expect(frame).toContain('devbox read just now');
     expect(frame).toContain('studio offline');
   });
-  test('stays readable at 80 columns', async () => {
+  test('keeps two seats side by side at 80 columns', async () => {
     const { captureCharFrame } = await openUsage({ width: 80, height: 40 });
     const frame = captureCharFrame();
-    expect(frame).toMatch(/personal\s+[█│╱░]+\s+68%\s+↻ 44m/);
+    expect(frame).toMatch(/personal {2}68%\s+↻ 44m\s+work {2}93%\s+↻ 54m/);
     expect(frame).toContain('esc back');
   });
+  test('falls back to one row per seat when the columns would not fit', async () => {
+    const { captureCharFrame } = await openUsage({ width: 70, height: 50 });
+    const frame = captureCharFrame();
+    expect(frame).toMatch(/Session\s+81% left/);
+    expect(frame).toMatch(/personal\s+[▄█▂]+\s+68%\s+↻ 44m/);
+    expect(frame).toMatch(/work\s+[▄█▂]+\s+93%\s+↻ 54m/);
+  });
+  test('falls back sooner with more seats', async () => {
+    const view = await open({ width: 80, height: 50 });
+    const [personal] = mockDb.seatUsage.local!;
+    const seat = (name: string) => ({ ...personal!, account: name, displayName: name, identity: `${name}@bee.dev` });
+    mockDb.seatUsage.local = [personal!, seat('client'), seat('side'), seat('hive')];
+    await view.press('u', 'r');
+    await view.waitForFrame((frame) => /side\s+[▄█▂]+\s+68%/.test(frame));
+  });
   test('scrolls what does not fit', async () => {
-    const { captureCharFrame, press } = await openUsage({ width: 80, height: 16 });
+    const { captureCharFrame, press, waitForFrame } = await openUsage({ width: 80, height: 16 });
     expect(captureCharFrame()).not.toContain('Codex');
     await press('j', 'j', 'j', 'j', 'j', 'j', 'j', 'j', 'j', 'j', 'j', 'j', 'j', 'j', 'j', 'j');
-    expect(captureCharFrame()).toContain('Codex');
+    await waitForFrame((frame) => frame.includes('Codex'));
   });
   test('refreshes with r and with a click, past the wait', async () => {
     const { clickOn, press, waitFor } = await openUsage();
@@ -114,13 +143,14 @@ describe('the usage screen', () => {
   test('keeps the rest of the screen when a machine runs an older favo', async () => {
     const view = await open();
     mockDb.usageFailures.devbox = new DomainError(DomainErrorCode.unknownMethod, 'nope');
-    await view.press('u');
+    await view.press('u', 'r');
     await view.waitForFrame((frame) => frame.includes('devbox older favo') && frame.includes('Claude Code'));
   });
   test('says so when there is nothing to show', async () => {
     const view = await open();
+    await view.waitFor(() => mockDb.usageReads.length === 2 && !view.app.state.isUsageReading);
     mockDb.seatUsage = {};
-    await view.press('u');
+    await view.press('u', 'r');
     await view.waitForFrame((frame) => frame.includes('No signed in seat reports limits.'));
   });
 });

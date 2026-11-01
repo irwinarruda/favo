@@ -5,6 +5,7 @@ import type { IUsageRepository } from '@/modules/usage/app/repositories/IUsageRe
 export class TestUsageRepository implements IUsageRepository {
   async readMachine(machineId: string) {
     mockDb.usageReads.push(machineId);
+    await mockDb.usageHold;
     const failure = ownValue(mockDb.usageFailures, machineId);
     if (failure) throw failure;
     return ownValue(mockDb.seatUsage, machineId) ?? [];
