@@ -1,0 +1,73 @@
+name: Homebrew check
+
+# Installs favo from the public tap on every platform the formula covers, the
+# way a user would. The release workflow calls this after it updates the tap, and
+# it can be run by hand: gh workflow run homebrew-check.yml -f tag=v1.2.3
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version the tap should install, like v1.2.3
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  install:
+    name: Install on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
+
+    steps:
+      - name: Check out the guard script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Put Homebrew on the PATH
+        run: |
+          linuxbrew=/home/linuxbrew/.linuxbrew/bin
+          if ! command -v brew > /dev/null && [[ -x "${linuxbrew}/brew" ]]; then
+            echo "${linuxbrew}" >> "${GITHUB_PATH}"
+          fi
+
+      # The full name is what the README tells people to run. It trusts this one
+      # formula, so no `brew trust` step belongs here: one would hide a change in
+      # what users have to do.
+      - name: Install favo from the tap
+        run: brew install irwinarruda/tap/favo
+
+      - name: Check it is the expected version
+        env:
+          EXPECTED: ${{ inputs.tag }}
+        run: |
+          favo="$(brew --prefix)/bin/favo"
+          printed="$("${favo}" --version)"
+          echo "favo --version printed ${printed}"
+          if [[ "v${printed}" != "${EXPECTED}" ]]; then
+            echo "::error::favo --version printed ${printed}, expected ${EXPECTED}"
+            exit 1
+          fi
+
+      # Homebrew can rewrite a binary as it installs it, and these keep their
+      # program in the file, so the guard has to run on the installed copy.
+      - name: Check favo ignores the folder it starts in
+        run: bash .github/scripts/check-no-autoload.sh "$(brew --prefix)/bin/favo"

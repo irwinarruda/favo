@@ -378,3 +378,58 @@ jobs:
       - name: Publish the package
         if: steps.published.outputs.exists != 'true'
         run: npm publish ./apps/npm --access public --provenance --ignore-scripts
+
+  # Needs the smoke test rather than npm: the tap and npm are two separate ways to
+  # get the same release, so a failure in one shouldn't hold back the other. The
+  # binaries have already started on a real machine by now.
+  homebrew:
+    name: Update the Homebrew tap
+    needs: [verify, smoke]
+    runs-on: ubuntu-latest
+    environment: homebrew
+
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+
+      - name: Render the formula
+        run: ./.github/homebrew/render-formula.sh "${RELEASE_TAG#v}" > "${RUNNER_TEMP}/favo.rb"
+
+      # GITHUB_TOKEN can't push to a second repository. A deploy key can reach
+      # only the tap, so losing it costs less than losing a personal token. It
+      # comes after the render so no repo script runs with the key on disk, and
+      # the credentials stay because the push below needs them.
+      - name: Check out the tap
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: irwinarruda/homebrew-tap
+          ssh-key: ${{ secrets.TAP_DEPLOY_KEY }}
+          path: tap
+
+      # `git diff` sees nothing in a file Git is not yet tracking, so
+      # `status --porcelain` is what tells a new formula from an unchanged one,
+      # and an unchanged one is what a re-run of this job finds.
+      - name: Commit the formula
+        working-directory: tap
+        run: |
+          mkdir -p Formula
+          cp "${RUNNER_TEMP}/favo.rb" Formula/favo.rb
+          if [[ -z "$(git status --porcelain -- Formula/favo.rb)" ]]; then
+            echo "The tap already has ${RELEASE_TAG}"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/favo.rb
+          git commit --message "favo ${RELEASE_TAG#v}"
+          git push
+
+  homebrew-check:
+    name: Install from the tap
+    needs: homebrew
+    uses: ./.github/workflows/homebrew-check.yml
+    with:
+      tag: ${{ github.event.inputs.tag || github.ref_name }}
