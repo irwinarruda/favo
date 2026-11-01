@@ -4,10 +4,12 @@ import type { ThemeList } from '@favo/contracts/rpc/themes/list-themes';
 import type {
   AccountView,
   DesktopAppView,
+  HookView,
   SeatInspection,
   SeatStatus,
   SeatUsageView,
   SeatView,
+  ThreadView,
 } from '@favo/contracts/rpc/views';
 import type { Machine } from '@favo/domain/machines/machine';
 import { ProviderId, ProviderOrder, Providers } from '@favo/domain/providers/provider';
@@ -155,6 +157,53 @@ function seedSeatUsage(): Record<string, SeatUsageView[]> {
   };
 }
 
+function hookOf(provider: ProviderId, state: HookView['state'], overrides: Partial<HookView> = {}): HookView {
+  const { label, hook } = Providers[provider];
+  return {
+    provider,
+    label,
+    state,
+    isProviderInstalled: true,
+    needsTrust: hook.needsTrust === true,
+    file: `${MacHome}/${hook.file}`,
+    problems: [],
+    ...overrides,
+  };
+}
+
+function seedHooks(): Record<string, HookView[]> {
+  return {
+    local: [
+      hookOf(ProviderId.claude, 'current'),
+      hookOf(ProviderId.codex, 'absent'),
+      hookOf(ProviderId.antigravity, 'absent', { isProviderInstalled: false }),
+      hookOf(ProviderId.opencode, 'current'),
+    ],
+    devbox: ProviderOrder.map((provider) => hookOf(provider, 'absent')),
+  };
+}
+
+function seedThreads(): Record<string, ThreadView[]> {
+  const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+  const thread = (id: string, minutes: number, overrides: Partial<ThreadView> = {}) => ({
+    id,
+    directory: '/Users/bee/code/hive',
+    updatedAt: minutesAgo(minutes),
+    isGuess: false,
+    isDirectoryGone: false,
+    ...overrides,
+  });
+  return {
+    'seat:local/personal/claude': [
+      thread('11111111-2222-4333-8444-5555aaaa0001', 12),
+      thread('11111111-2222-4333-8444-5555aaaa0002', 180),
+      thread('11111111-2222-4333-8444-5555aaaa0003', 2880, { directory: '/Users/bee/old', isDirectoryGone: true }),
+    ],
+    'seat:local/work/claude': [thread('22222222-2222-4333-8444-5555bbbb0001', 44)],
+    'seat:local/personal/opencode': [thread('ses_cccc0001', 30, { isGuess: true })],
+  };
+}
+
 function seedInspection(): SeatInspection {
   return {
     items: [
@@ -224,6 +273,9 @@ export const mockDb = {
   usageFailures: {} as Record<string, Error>,
   usageReads: [] as string[],
   usageHold: undefined as Promise<void> | undefined,
+  threads: seedThreads(),
+  hooks: seedHooks(),
+  threadFailures: {} as Record<string, Error>,
   inspection: seedInspection(),
   themeList: seedThemeList(),
   directoryTrees: seedDirectoryTrees(),
@@ -249,6 +301,9 @@ export const mockDb = {
     this.usageFailures = {};
     this.usageReads = [];
     this.usageHold = undefined;
+    this.threads = seedThreads();
+    this.hooks = seedHooks();
+    this.threadFailures = {};
     this.inspection = seedInspection();
     this.themeList = seedThemeList();
     this.directoryTrees = seedDirectoryTrees();

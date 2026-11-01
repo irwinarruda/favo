@@ -3,6 +3,7 @@ import {
   link as hardLink,
   lstat,
   mkdir,
+  open,
   readdir,
   readFile,
   readlink,
@@ -17,9 +18,13 @@ import { basename, dirname } from 'node:path';
 import { DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { EntryKind } from '@favo/domain/sharing/shared-item';
 import { FileSystem } from '@/modules/system/gateways/file-system';
+import { renameOver } from '@/modules/system/utils/rename-over';
 
 const WindowsPlatform = 'win32';
 const PrivateDirectoryMode = 0o700;
+const PrivateFileMode = 0o600;
+const PermissionBits = 0o777;
+const NewFileOnly = 'wx';
 
 export class NodeFileSystem extends FileSystem {
   constructor(private readonly platform: string) {
@@ -94,6 +99,38 @@ export class NodeFileSystem extends FileSystem {
     await chmod(path, 0o600);
   }
 
+  async readHead(path: string, bytes: number) {
+    const file = await open(path, 'r').catch(() => undefined);
+    if (!file) return undefined;
+    try {
+      const { buffer, bytesRead } = await file.read(Buffer.alloc(bytes), 0, bytes, 0);
+      return buffer.toString('utf8', 0, bytesRead);
+    } finally {
+      await file.close();
+    }
+  }
+
+  async replaceText(path: string, text: string) {
+    const realPath = await this.realPath(path);
+    const temporary = `${realPath}.${crypto.randomUUID()}.tmp`;
+    try {
+      const existing = await stat(realPath).catch(() => undefined);
+      await mkdir(dirname(realPath), { recursive: true });
+      await writeFile(temporary, text, { flag: NewFileOnly, mode: PrivateFileMode });
+      if (existing && existing.nlink > 1) {
+        await writeFile(realPath, text);
+      } else {
+        await chmod(temporary, modeOf(existing));
+        await renameOver(temporary, realPath);
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new DomainError(DomainErrorCode.invalidConfig, `Could not write ${path}: ${reason}`);
+    } finally {
+      await unlink(temporary).catch(() => {});
+    }
+  }
+
   private async linkOnWindows(target: string, path: string) {
     if ((await stat(target)).isDirectory()) {
       await symlink(target, path, 'junction');
@@ -112,4 +149,8 @@ export class NodeFileSystem extends FileSystem {
       .replaceAll('\\', '/')
       .replace(/\/$/, '');
   }
+}
+
+function modeOf(existing: { mode: number } | undefined) {
+  return existing ? existing.mode & PermissionBits : PrivateFileMode;
 }

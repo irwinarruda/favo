@@ -1,12 +1,20 @@
 import { LoginState } from '@favo/contracts/rpc/views';
 import type { ProviderId } from '@favo/domain/providers/provider';
 import type { SeatUsage } from '@favo/domain/usage/seat-usage';
-import { ProviderCli, type ProviderLogin, type ProviderSession } from '@/modules/providers/gateways/provider-cli';
+import {
+  type FoundThread,
+  ProviderCli,
+  type ProviderLogin,
+  type ProviderSession,
+  type ThreadSearch,
+} from '@/modules/providers/gateways/provider-cli';
 
 export class ScriptedProviderCli extends ProviderCli {
   readonly sessions: ProviderSession[] = [];
   login: ProviderLogin = { login: LoginState.signedOut };
   isolation: string[] = [];
+  foundThreads: FoundThread[] = [];
+  readonly threadSearches: ThreadSearch[] = [];
   usageReading?: Omit<SeatUsage, 'checkedAt'> | Error;
   readonly usageSessions: ProviderSession[] = [];
   currentReads = 0;
@@ -32,6 +40,11 @@ export class ScriptedProviderCli extends ProviderCli {
     this.currentReads--;
     if (this.usageReading instanceof Error) throw this.usageReading;
     return this.usageReading ? { checkedAt, ...this.usageReading } : super.usage(session, checkedAt);
+  }
+
+  override async recentThreads(search: ThreadSearch) {
+    this.threadSearches.push(search);
+    return this.foundThreads;
   }
 
   override async isolationArguments() {

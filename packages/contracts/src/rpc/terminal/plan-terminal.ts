@@ -10,6 +10,7 @@ export const PlanTerminalParams = z.strictObject({
   provider: z.enum(ProviderId),
   args: z.array(z.string()),
   directory: z.string().optional(),
+  thread: z.string().optional(),
 });
 export type PlanTerminalParams = z.infer<typeof PlanTerminalParams>;
 

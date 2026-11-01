@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -18,6 +19,8 @@ import { arch, platform, tmpdir } from 'node:os';
 import { delimiter } from 'node:path';
 import { FavoVersion } from '@favo/contracts/version';
 import { installFakes } from './support/fake-bin/install-fakes';
+
+setDefaultTimeout(60_000);
 
 const Main = `${import.meta.dir}/../src/main.ts`;
 const isWindows = process.platform === 'win32';
@@ -135,6 +138,204 @@ describe('favo usage', () => {
     const [{ machine, seats }] = JSON.parse(stdout);
     expect(machine.id).toBe('local');
     expect(seats[0].usage.windows[0]).toMatchObject({ id: 'five_hour', usedPercent: 32 });
+  });
+});
+
+describe('favo and the provider hooks', () => {
+  const Session = '11111111-2222-4333-8444-555555555555';
+  const settingsPath = () => `${home}/.claude/settings.json`;
+
+  async function installed() {
+    await favo(['hooks', 'install']);
+    await favo(['add', 'work']);
+    mkdirSync(`${root}/project`, { recursive: true });
+    return realpathSync(`${root}/project`).replaceAll('\\', '/');
+  }
+
+  function threadsOf(stdout: string) {
+    const threads = JSON.parse(stdout) as { id: string; directory: string; isGuess: boolean }[];
+    return threads.map((thread) => ({ ...thread, directory: thread.directory.replaceAll('\\', '/') }));
+  }
+
+  function hookCommand() {
+    const { hooks } = JSON.parse(readFileSync(settingsPath(), 'utf8'));
+    return hooks.SessionStart[0].hooks[0].command as string;
+  }
+
+  function runHookLine(env: Record<string, string>, input = '{}') {
+    return spawnSync(hookCommand(), {
+      shell: true,
+      input,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, HOME: home, ...env },
+      cwd: root,
+    });
+  }
+
+  it('remembers a thread when the provider reports it through the real hook line', async () => {
+    const project = await installed();
+    const launched = await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
+    expect(launched.stdout).not.toContain('hook wrote to the conversation');
+    const { stdout } = await favo(['threads', 'work', 'claude', '--json'], {}, project);
+    expect(threadsOf(stdout)).toMatchObject([{ id: Session, directory: project, isGuess: false }]);
+  });
+  it('reads a report that starts with byte order marks, as Windows PowerShell sends it', async () => {
+    const project = await installed();
+    const payload = `\uFEFF\uFEFF${JSON.stringify({ session_id: Session, cwd: project, source: 'startup' })}`;
+    const child = Bun.spawn(['bun', Main, 'hook', 'claude'], {
+      cwd: project,
+      env: {
+        PATH: process.env.PATH,
+        HOME: home,
+        FAVO_ACCOUNT: 'work',
+        CLAUDE_CONFIG_DIR: `${home}/.favo/accounts/work/claude`,
+      },
+      stdin: new TextEncoder().encode(payload),
+    });
+    expect(await child.exited).toBe(0);
+    const { stdout } = await favo(['threads', 'work', 'claude', '--json'], {}, project);
+    expect(threadsOf(stdout)).toMatchObject([{ id: Session, directory: project }]);
+  });
+  it('keeps a folder with an accent in its name', async () => {
+    await installed();
+    mkdirSync(`${root}/projeção`);
+    const project = realpathSync(`${root}/projeção`).replaceAll('\\', '/');
+    await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
+    const { stdout } = await favo(['threads', 'work', 'claude', '--json'], {}, project);
+    expect(threadsOf(stdout)).toMatchObject([{ id: Session, directory: project }]);
+  });
+  it('goes back to it from anywhere, in its own folder, with what you pass after --', async () => {
+    const project = await installed();
+    await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
+    const { stdout } = await favo(['resume', 'work', 'claude', '--', '--model', 'x']);
+    expect(stdout).toContain(`args=--resume ${Session} --model x`);
+    expect(stdout).toContain(`cwd=${project}`);
+    expect(stdout).toContain(`home=${home}/.favo/accounts/work/claude`);
+  });
+  it('still finds it after a rename', async () => {
+    const project = await installed();
+    await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
+    await favo(['rename', 'work', 'side']);
+    const { stdout } = await favo(['resume', 'side', 'claude']);
+    expect(stdout).toContain(`args=--resume ${Session}`);
+  });
+  it('finds it by the old name too, which a saved Herdr pane still holds', async () => {
+    const project = await installed();
+    await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
+    await favo(['rename', 'work', 'side']);
+    const { stdout } = await favo(['resume', 'work', 'claude', Session]);
+    expect(stdout).toContain(`home=${home}/.favo/accounts/work/claude`);
+  });
+  it('does not show a session that never got a message', async () => {
+    const project = await installed();
+    await favo(['claude', 'work'], { FAKE_SESSION: Session, FAKE_EMPTY_SESSION: '1' }, project);
+    expect((await favo(['threads', 'work', 'claude'], {}, project)).stdout).toContain('No threads yet.');
+  });
+  it('explains itself when there is nothing to go back to', async () => {
+    await installed();
+    const { stderr, code } = await favo(['resume', 'work', 'claude']);
+    expect(code).toBe(1);
+    expect(stderr).toContain('favo has no thread for work on Claude Code');
+  });
+  it('keeps the user config and the seat link', async () => {
+    writeFileSync(settingsPath(), '{\n    "model": "opus"\n}\n');
+    await installed();
+    expect(readFileSync(settingsPath(), 'utf8')).toContain('\n    "model": "opus"');
+    await favo(['claude', 'work']);
+    const seat = `${home}/.favo/accounts/work/claude/settings.json`;
+    expect(lstatSync(seat).isFile()).toBe(false);
+  });
+  it('takes itself out and leaves the config as it found it', async () => {
+    writeFileSync(settingsPath(), '{\n    "model": "opus"\n}\n');
+    await installed();
+    await favo(['hooks', 'uninstall']);
+    expect(readFileSync(settingsPath(), 'utf8')).toBe('{\n    "model": "opus"\n}\n');
+    expect(existsSync(`${home}/.config/opencode/plugins/favo-threads.js`)).toBe(false);
+  });
+  it('tells Herdr the thread, and lets go of the pane when the provider exits', async () => {
+    const project = await installed();
+    const log = `${root}/herdr.log`;
+    const herdr = {
+      HERDR_ENV: '1',
+      HERDR_BIN_PATH: `${fakeBin}/herdr${isWindows ? '.cmd' : ''}`,
+      HERDR_PANE_ID: 'p1',
+      FAKE_HERDR_LOG: log,
+    };
+    await favo(['claude', 'work'], { FAKE_SESSION: Session, ...herdr }, project);
+    const [report, release] = readFileSync(log, 'utf8').trim().split('\n');
+    expect(report).toStartWith(
+      `pane report-agent-session p1 --source favo --agent claude --agent-session-id ${Session} --seq `
+    );
+    expect(report).toEndWith(`-- favo resume work claude ${Session}`);
+    expect(release).toStartWith('pane release-agent p1 --source favo --agent claude --seq ');
+  });
+  it('asks Herdr again while it is not ready for the report', async () => {
+    await installed();
+    const log = `${root}/herdr.log`;
+    const child = Bun.spawn(['bun', Main, 'hook', 'claude', '--report', Session], {
+      env: {
+        PATH: `${fakeBin}${delimiter}${process.env.PATH}`,
+        HOME: home,
+        FAVO_ACCOUNT: 'work',
+        HERDR_ENV: '1',
+        HERDR_BIN_PATH: `${fakeBin}/herdr${isWindows ? '.cmd' : ''}`,
+        HERDR_PANE_ID: 'p1',
+        FAKE_HERDR_LOG: log,
+        FAKE_HERDR_REFUSALS: '1',
+      },
+      stdin: 'ignore',
+    });
+    expect(await child.exited).toBe(0);
+    const calls = readFileSync(log, 'utf8').trim().split('\n');
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toEndWith(`-- favo resume work claude ${Session}`);
+  });
+  it('does nothing outside favo, quietly', async () => {
+    await installed();
+    const { status, stdout, stderr } = runHookLine({}, JSON.stringify({ session_id: Session, cwd: root }));
+    expect(status).toBe(0);
+    expect(stdout).toBe('');
+    expect(stderr).toBe('');
+    expect(existsSync(`${home}/.favo/threads`)).toBe(false);
+  });
+  it('stays silent when favo is gone, as it is after a brew uninstall', async () => {
+    await installed();
+    const { status, stdout, stderr } = runHookLine({ FAVO_ACCOUNT: 'work', FAVO_BIN: `${root}/no-such-favo` });
+    expect(status).toBe(0);
+    expect(stdout).toBe('');
+    expect(stderr).toBe('');
+  });
+  it('prints nothing and succeeds on input it cannot read', async () => {
+    const payloads = ['not json', '', '{"session_id":"../../evil"}'];
+    for (const payload of payloads) {
+      const child = Bun.spawn(['bun', Main, 'hook', 'claude', '1'], {
+        env: { PATH: process.env.PATH, HOME: home, FAVO_ACCOUNT: 'work' },
+        stdin: new TextEncoder().encode(payload),
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      const [stdout, stderr, code] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+      expect({ stdout, stderr, code }).toEqual({ stdout: '', stderr: '', code: 0 });
+    }
+  });
+  it('prints nothing and succeeds for a provider it does not know', async () => {
+    const child = Bun.spawn(['bun', Main, 'hook', 'gemini'], {
+      env: { PATH: process.env.PATH, HOME: home, FAVO_ACCOUNT: 'work' },
+      stdin: 'ignore',
+      stdout: 'pipe',
+    });
+    expect(await new Response(child.stdout).text()).toBe('');
+    expect(await child.exited).toBe(0);
+  });
+  it('shows the state of each hook', async () => {
+    await installed();
+    const { stdout } = await favo(['hooks']);
+    expect(stdout).toContain('Claude Code   on');
+    expect(stdout).toContain('asks each seat once');
   });
 });
 

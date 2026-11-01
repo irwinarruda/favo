@@ -23,6 +23,15 @@ Accounts
   favo adopt <account> <provider> <folder>
                                      move an existing config folder in
 
+Threads
+  favo resume <account> <provider> [thread]
+                                     go back to a thread, in its own folder
+                                     the newest one here, unless you pick one
+  favo threads <account> <provider>  the threads favo kept for a seat
+  favo hooks status                  whether each provider tells favo its thread
+  favo hooks install                 add favo's hook to your provider config
+  favo hooks uninstall               take it out again
+
 Machines
   favo machine list                  machines this one can reach
   favo machine discover              find machines on ssh and Tailscale

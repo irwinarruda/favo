@@ -6,6 +6,7 @@ import { ApiMachineRepository } from '@/modules/machines/app/repositories/ApiMac
 import { ApiDesktopRepository } from '@/modules/sessions/app/repositories/ApiDesktopRepository';
 import { ApiTerminalRepository } from '@/modules/sessions/app/repositories/ApiTerminalRepository';
 import { ApiThemeRepository } from '@/modules/themes/app/repositories/ApiThemeRepository';
+import { ApiThreadRepository } from '@/modules/threads/app/repositories/ApiThreadRepository';
 import { ApiUsageRepository } from '@/modules/usage/app/repositories/ApiUsageRepository';
 import type { IClipboardGateway } from '@/shared/app/gateways/IClipboardGateway';
 import type { ITerminalGateway } from '@/shared/app/gateways/ITerminalGateway';
@@ -22,6 +23,7 @@ export function bootstrapAppContainer(input: {
   container.register('ITerminalRepository', new ApiTerminalRepository(client));
   container.register('IDesktopRepository', new ApiDesktopRepository(client));
   container.register('IThemeRepository', new ApiThemeRepository(client));
+  container.register('IThreadRepository', new ApiThreadRepository(client));
   container.register('IUsageRepository', new ApiUsageRepository(client));
   container.register('IDirectoryRepository', new ApiDirectoryRepository(client));
   container.register('IClipboardGateway', input.clipboardGateway);

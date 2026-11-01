@@ -6,6 +6,7 @@ import { assertDomain, DomainErrorCode } from '@favo/domain/shared/domain-error'
 import { ownValue } from '@favo/domain/shared/own-value';
 import { EntryKind } from '@favo/domain/sharing/shared-item';
 import type { AccountRepository } from '@/modules/accounts/repositories/account.repository';
+import type { ThreadRepository } from '@/modules/accounts/repositories/thread.repository';
 import type { SeatsService } from '@/modules/accounts/services/seats.service';
 import type { ProvidersService } from '@/modules/providers/services/providers.service';
 import type { Clock } from '@/modules/system/gateways/clock';
@@ -17,6 +18,7 @@ export class AccountsService {
   constructor(
     private readonly fileSystem: FileSystem,
     private readonly accounts: AccountRepository,
+    private readonly threads: ThreadRepository,
     private readonly seats: SeatsService,
     private readonly providers: ProvidersService,
     private readonly config: ConfigRepository,
@@ -59,6 +61,7 @@ export class AccountsService {
     await this.assertExists(name);
     const stamp = this.clock.now().toISOString().replaceAll(/[:.]/g, '-');
     const trashedTo = await this.accounts.trash(name, stamp);
+    await this.threads.trash(name, trashedTo);
     await this.config.saveAccountName(name, undefined);
     return { trashedTo: nativePath(trashedTo, this.paths.isWindows) };
   }

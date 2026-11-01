@@ -8,4 +8,6 @@ export class FixedClock extends Clock {
   now() {
     return this.instant;
   }
+
+  async sleep() {}
 }

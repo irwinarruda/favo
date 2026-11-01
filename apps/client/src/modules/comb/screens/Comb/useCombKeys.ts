@@ -9,10 +9,11 @@ type CombKeys = {
   onRemoveAccount(): void;
   onForgetMachine(): void;
   onOpenDesktopApp(): Promise<void>;
+  onGoBackToThread(): Promise<void>;
 };
 
 export function useCombKeys(props: CombKeys) {
-  const { isEnabled, onHelp, onQuit, onRemoveAccount, onForgetMachine, onOpenDesktopApp } = props;
+  const { isEnabled, onHelp, onQuit, onRemoveAccount, onForgetMachine, onOpenDesktopApp, onGoBackToThread } = props;
   const moveRow = useApp((state) => state.moveRow);
   const moveAccount = useApp((state) => state.moveAccount);
   const moveMachine = useApp((state) => state.moveMachine);
@@ -52,6 +53,7 @@ export function useCombKeys(props: CombKeys) {
     else if (key.name === 'left' || key.name === 'h') moveAccount(-1);
     else if (key.name === 'tab') moveMachine(1);
     else if (key.name === 'return') void error.handle(openSelectedSeat)();
+    else if (key.name === 'b') void error.handle(onGoBackToThread)();
     else if (key.name === 's') void error.handle(signInSelectedSeat)();
     else if (key.name === 'o') void error.handle(signOutSelectedSeat)();
     else if (key.name === 'c') void error.handle(copySelectedPath)();

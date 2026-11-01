@@ -1,6 +1,7 @@
 import { createRpcClient } from '@favo/contracts/rpc/client';
 import { ProviderId } from '@favo/domain/providers/provider';
 import { ScriptedDesktopApps } from '@/modules/desktop/gateways/scripted.desktop-apps';
+import { ScriptedHerdr } from '@/modules/herdr/gateways/scripted.herdr';
 import { LoopbackRemoteBackends } from '@/modules/machines/gateways/loopback.remote-backends';
 import { ScriptedReleaseAssets } from '@/modules/machines/gateways/scripted.release-assets';
 import { ScriptedSsh } from '@/modules/machines/gateways/scripted.ssh';
@@ -23,6 +24,7 @@ type TestServerOptions = {
   peers?: TailscalePeer[];
   callerEnv?: Record<string, string | undefined>;
   installed?: string[];
+  binary?: string;
 };
 
 export function createTestServer(options: TestServerOptions = {}) {
@@ -39,6 +41,7 @@ export function createTestServer(options: TestServerOptions = {}) {
   const remotes = new LoopbackRemoteBackends();
   const releaseAssets = new ScriptedReleaseAssets(fileSystem);
   const desktopApps = new ScriptedDesktopApps();
+  const herdr = new ScriptedHerdr();
   const paths = favoPathsOf({ home: Home, isWindows: options.isWindows ?? false });
   const server = createServer(
     {
@@ -52,6 +55,7 @@ export function createTestServer(options: TestServerOptions = {}) {
       remotes,
       releaseAssets,
       desktopApps,
+      herdr,
     },
     {
       paths,
@@ -63,6 +67,7 @@ export function createTestServer(options: TestServerOptions = {}) {
         directory: options.directory ?? `${Home}/projects/hive`,
       },
       callerEnv: options.callerEnv ?? {},
+      binary: options.binary,
     }
   );
   return {
@@ -75,6 +80,7 @@ export function createTestServer(options: TestServerOptions = {}) {
     remotes,
     releaseAssets,
     desktopApps,
+    herdr,
     paths,
   };
 }

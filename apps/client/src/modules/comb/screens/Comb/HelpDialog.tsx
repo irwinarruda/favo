@@ -7,6 +7,7 @@ const Keys = [
   ['← → / h l', 'move between accounts'],
   ['tab', 'next machine'],
   ['enter', 'launch, or sign in'],
+  ['b', 'go back to a thread'],
   ['s / o', 'sign in / sign out'],
   ['c', 'copy the config path'],
   ['p', 'open the desktop app'],

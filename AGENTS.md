@@ -9,6 +9,7 @@ Use Bun `1.3.14` (`.bun-version`).
 - `bun install --os='*' --cpu='*'` installs everything, including the OpenTUI binaries for every target, which `build:all` needs.
 - `bun run dev` runs favo from source. Use `FAVO_HOME=/tmp/favo` to keep away from your real `~/.favo`.
 - `bun run dev:mock` runs the TUI on `mockDb`, with no backend at all.
+- From source, favo cannot tell a provider's hook where it lives, so the hook runs whatever `favo` is on your PATH, and an older one records no thread, silently. To try threads by hand, run the built binary, `dist/favo-<os>-<arch>`, which hands the hook its own path. A Herdr restart still runs the `favo` on your PATH.
 - `bun run lint` runs `biome ci .`; `bun run lint:fix` applies fixes.
 - `bun run typecheck` runs `tsc` over every project.
 - `bun test` runs everything. No test needs a network, a login or a real provider.

@@ -1,3 +1,4 @@
+import { HookState } from '@favo/domain/hooks/provider-hook';
 import { LoginScope, ProviderId } from '@favo/domain/providers/provider';
 import type { ValueOf } from '@favo/domain/shared/value-of';
 import { SharedItemState } from '@favo/domain/sharing/shared-item';
@@ -78,3 +79,23 @@ export const SeatRepair = z.strictObject({
   problems: z.array(SharedItemView),
 });
 export type SeatRepair = z.infer<typeof SeatRepair>;
+
+export const ThreadView = z.strictObject({
+  id: z.string(),
+  directory: z.string(),
+  updatedAt: z.string(),
+  isGuess: z.boolean(),
+  isDirectoryGone: z.boolean(),
+});
+export type ThreadView = z.infer<typeof ThreadView>;
+
+export const HookView = z.strictObject({
+  provider: z.enum(ProviderId),
+  label: z.string(),
+  state: z.enum(HookState),
+  isProviderInstalled: z.boolean(),
+  needsTrust: z.boolean(),
+  file: z.string(),
+  problems: z.array(z.string()),
+});
+export type HookView = z.infer<typeof HookView>;

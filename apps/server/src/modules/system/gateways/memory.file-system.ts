@@ -78,6 +78,14 @@ export class MemoryFileSystem extends FileSystem {
     return node?.kind === 'file' ? node.text : undefined;
   }
 
+  async readHead(path: string, bytes: number) {
+    return (await this.readText(path))?.slice(0, bytes);
+  }
+
+  async replaceText(path: string, text: string) {
+    await this.writePrivateText(await this.realPath(path), text);
+  }
+
   private resolve(path: string): string {
     const node = this.nodes.get(path);
     if (node?.kind === 'link') return this.resolve(normalize(node.target));

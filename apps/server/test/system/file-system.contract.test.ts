@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, linkSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { EntryKind, planSharedItem, SharedItemState } from '@favo/domain/sharing/shared-item';
 import type { FileSystem } from '@/modules/system/gateways/file-system';
@@ -13,6 +13,62 @@ const doubles: [string, FileSystem, string][] = [
   ['node', new NodeFileSystem(process.platform), realRoot],
   ['memory', new MemoryFileSystem(), '/root'],
 ];
+
+describe('replacing a file on disk', () => {
+  const fileSystem = new NodeFileSystem(process.platform);
+  const folder = `${realRoot}/replacing`;
+
+  it('leaves no temporary file behind', async () => {
+    await fileSystem.replaceText(`${folder}/clean/file.json`, 'one');
+    await fileSystem.replaceText(`${folder}/clean/file.json`, 'two');
+    expect(await fileSystem.list(`${folder}/clean`)).toEqual(['file.json']);
+  });
+  it('lets every writer of a different file finish, at the same moment', async () => {
+    const names = Array.from({ length: 30 }, (_, index) => `${index}.json`);
+    await Promise.all(names.map((name) => fileSystem.replaceText(`${folder}/many/${name}`, name)));
+    expect(await fileSystem.list(`${folder}/many`)).toHaveLength(30);
+  });
+  it('never shows a half written file to someone reading at the same moment', async () => {
+    const path = `${folder}/whole/file.json`;
+    const texts = ['a'.repeat(200_000), 'b'.repeat(200_000)];
+    await fileSystem.replaceText(path, texts[0]!);
+    const writes = Array.from({ length: 20 }, (_, index) => fileSystem.replaceText(path, texts[index % 2]!));
+    const reads = Array.from({ length: 20 }, () => fileSystem.readText(path));
+    await Promise.all(writes);
+    const seen = (await Promise.all(reads)).filter((text) => text !== undefined);
+    for (const text of seen) expect(texts).toContain(text);
+  });
+  it('writes in place over a hard link, so the other name still sees it', async () => {
+    const path = `${folder}/hard/base.json`;
+    await fileSystem.replaceText(path, 'one');
+    linkSync(path, `${folder}/hard/seat.json`);
+    await fileSystem.replaceText(path, 'two');
+    expect(await fileSystem.readText(`${folder}/hard/seat.json`)).toBe('two');
+  });
+  it.skipIf(process.platform === 'win32')('keeps the permissions of a file it replaces', async () => {
+    const path = `${folder}/mode/settings.json`;
+    await fileSystem.replaceText(path, 'one');
+    chmodSync(path, 0o664);
+    await fileSystem.replaceText(path, 'two');
+    expect(statSync(path).mode & 0o777).toBe(0o664);
+  });
+  it.skipIf(process.platform === 'win32')('says which file it could not write, and leaves nothing', async () => {
+    const closed = `${folder}/closed`;
+    await fileSystem.replaceText(`${closed}/file.json`, 'one');
+    chmodSync(closed, 0o555);
+    const writing = fileSystem.replaceText(`${closed}/file.json`, 'two');
+    await expect(writing).rejects.toMatchObject({ code: 'invalidConfig' });
+    await expect(writing).rejects.toThrow(`${closed}/file.json`);
+    chmodSync(closed, 0o755);
+    expect(await fileSystem.list(closed)).toEqual(['file.json']);
+    expect(await fileSystem.readText(`${closed}/file.json`)).toBe('one');
+  });
+  it.skipIf(process.platform === 'win32')('keeps a new file to its owner', async () => {
+    const path = `${folder}/mode/new.json`;
+    await fileSystem.replaceText(path, 'one');
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
+});
 
 describe.skipIf(process.platform === 'win32')('a private folder on disk', () => {
   const fileSystem = new NodeFileSystem(process.platform);
@@ -37,6 +93,24 @@ describe.skipIf(process.platform === 'win32')('a private folder on disk', () => 
 });
 
 describe.each(doubles)('%s file system', (_name, fileSystem, root) => {
+  it('reads only the start of a file', async () => {
+    await fileSystem.writePrivateText(`${root}/head/long`, 'abcdef');
+    expect(await fileSystem.readHead(`${root}/head/long`, 3)).toBe('abc');
+    expect(await fileSystem.readHead(`${root}/head/long`, 100)).toBe('abcdef');
+    expect(await fileSystem.readHead(`${root}/head/missing`, 3)).toBeUndefined();
+  });
+  it('replaces a file, creating its folder', async () => {
+    await fileSystem.replaceText(`${root}/replace/deep/file`, 'one');
+    await fileSystem.replaceText(`${root}/replace/deep/file`, 'two');
+    expect(await fileSystem.readText(`${root}/replace/deep/file`)).toBe('two');
+  });
+  it('replaces the target of a link and leaves the link standing', async () => {
+    await fileSystem.writePrivateText(`${root}/replace/base`, 'one');
+    await fileSystem.link(`${root}/replace/base`, `${root}/replace/seat`);
+    await fileSystem.replaceText(`${root}/replace/seat`, 'two');
+    expect((await fileSystem.entry(`${root}/replace/seat`)).kind).toBe(EntryKind.link);
+    expect(await fileSystem.readText(`${root}/replace/base`)).toBe('two');
+  });
   it('sees a missing path', async () => {
     expect((await fileSystem.entry(`${root}/nope`)).kind).toBe(EntryKind.missing);
     expect(await fileSystem.list(`${root}/nope`)).toEqual([]);

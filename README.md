@@ -91,6 +91,21 @@ When a machine falls behind, favo says so and keeps it working. Press `U` to upd
   <img src="docs/assets/favo-update.png" alt="favo marking two machines as running an older favo, with a key to update them all" width="760">
 </p>
 
+### Your place, kept
+
+Close a provider and the thread is still there. Press `b` on a seat, or run `favo resume work claude`, and you are back in it, in its own folder. Two sessions in one folder are both kept, and `b` lets you pick.
+
+```sh
+favo hooks install                     # let your providers tell favo their thread
+favo resume work claude                # the newest thread in this folder
+favo resume work claude -- --model x   # the same, with a one-off option
+favo threads work claude               # everything that seat kept
+```
+
+Your `launchArgs` come back by themselves. A one-off option does not, so pass it again after `--`.
+
+To know which thread you are in, favo adds one small hook to your provider config, and only once you ask. [The reference](#reference) spells out exactly what it does. Run Herdr? A restart brings each seat back on the right account, in the same thread.
+
 ### A TUI you will want to leave open
 
 See every machine, account and login, spot what needs signing in, and press `enter` to launch. Prefer scripts? Everything is a command too, and `favo list --json` gives you the same view as data.
@@ -169,7 +184,7 @@ No. favo starts the official CLI with the right folder set, then gets out of the
 favo never reads them. Logins run each provider's own command, and credentials stay wherever that provider keeps them. One thing to watch: settings are shared, so an API key you put in `settings.json` or `config.toml` is visible to every account.
 
 **What happens to my existing config?**
-It stays where it is and becomes your `personal` account. Shared items in other accounts are links to it, so editing one edits your original.
+It stays where it is and becomes your `personal` account. Shared items in other accounts are links to it, so editing one edits your original. favo changes it in one case, and only when you ask: `favo hooks install` adds its own hook, leaves yours alone, and `favo hooks uninstall` takes it out again.
 
 **Does favo phone home?**
 There is no telemetry. favo's own network use is downloading its release from GitHub: on the npm package's first run, and when it installs itself on another machine. Reaching your machines goes over your own ssh.
@@ -178,7 +193,7 @@ There is no telemetry. favo's own network use is downloading its release from Gi
 That gives you a second login, and it's how many of us started. The new folder starts empty, though, so you maintain your setup twice, and it stops at one machine and one provider. favo keeps the setup shared and does the same for all four providers, across your computers.
 
 **How do I uninstall it?**
-Run `npm uninstall --global favo-cli` or `brew uninstall favo-cli`, then delete `~/.favo`. That removes every account except `personal`, along with their logins and threads, and leaves your normal config folders alone.
+Run `favo hooks uninstall` first, so no hook stays behind in your provider config. Then run `npm uninstall --global favo-cli` or `brew uninstall favo-cli`, and delete `~/.favo`. If you forget the first step, nothing breaks: the hook stays silent with favo gone. That removes every account except `personal`, along with their logins and threads, and leaves your normal config folders alone.
 
 ## Reference
 
@@ -208,6 +223,12 @@ favo logout work claude      # sign out
 favo claude work             # run Claude Code as work
 favo claude work -- --resume # everything after -- goes to the provider
 favo claude work --dir ~/app # start it in that folder
+favo resume work claude      # back to the newest thread here
+favo resume work claude 2    # back to the second one in favo threads
+favo threads work claude     # the threads a seat kept
+favo hooks install           # let providers tell favo their thread
+favo hooks status            # is that working, seat by seat
+favo hooks uninstall         # take favo's hook out again
 favo list                    # every machine, account and login
 favo usage                   # what every seat has left, and when it comes back
 favo rename work client      # a new name, on this machine
@@ -232,6 +253,7 @@ Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--mac
 | ------------------- | ----------------------------------- |
 | arrows or `h j k l` | move around                         |
 | `enter`             | launch the selected seat            |
+| `b`                 | go back to a thread                 |
 | `s` / `o`           | sign in / sign out                  |
 | `c`                 | copy its config path                |
 | `u`                 | see what every seat has left        |
@@ -249,6 +271,37 @@ Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--mac
 | `q`                 | quit                                |
 
 The base cell can be renamed but never deleted. A rename only changes the name you see, so logins, threads and paths keep working.
+
+</details>
+
+<details>
+<summary><strong>Threads and hooks</strong></summary>
+
+A provider writes its thread ID straight to the terminal as it closes, so favo cannot read it there. Instead, each provider tells favo the ID while it runs, through a hook, and favo keeps it in `~/.favo/threads`.
+
+`favo hooks install` adds that hook to your base config, once per machine, so every account gets it:
+
+| Provider    | Where                                       |
+| ----------- | ------------------------------------------- |
+| Claude Code | a `SessionStart` entry in `settings.json`   |
+| Codex       | a `SessionStart` entry in `hooks.json`      |
+| OpenCode    | a plugin in `~/.config/opencode/plugins`    |
+| Antigravity | a `PreInvocation` entry in `.gemini/config` |
+
+- It does nothing outside favo. The hook only runs favo inside a provider favo started, so a plain `claude` never starts it.
+- It only handles thread IDs and folders. favo still never reads a token.
+- Your own hooks stay, and favo writes through a config that is a link, such as one in a dotfiles repository.
+- **Codex asks each seat once to trust the hook.** favo does not answer that for you, and if you skip it the hook never runs.
+- If favo is gone, the hook stays silent.
+- `favo sync` refreshes a hook an older favo wrote. Installing favo on another machine for the first time adds the hooks there too if you turned them on here. Updating favo there keeps the hooks that machine has, and does not put back hooks you took out with `favo hooks uninstall -m <machine>`.
+
+`favo resume` looks for the newest thread in this folder, then anywhere on that seat, and starts from the thread's own folder. Pass a number from `favo threads`, or any unique part of an ID, to choose another. A session you opened and closed without saying anything is not shown, because there is nothing to resume. Threads go to the trash with a cell when you `favo rm` it, and they live on the machine that ran them, so `--machine` works here too.
+
+Without the hook, favo still lists what Codex and OpenCode keep for this folder. That list can pick the wrong thread with two sessions in one folder, so favo marks it as a guess.
+
+`favo hooks status` tells you if a hook cannot work, such as `disableAllHooks` in your settings, or a seat with its own `settings.json` instead of the shared one.
+
+**Herdr.** Inside Herdr, favo also tells each pane how to bring its seat back, so a restart reopens the same thread as the same cell, for Claude Code and Codex on this machine. This needs Herdr 0.9.2 or newer and `favo` on your `PATH`. OpenCode and Antigravity are not covered yet, because Herdr's own integration holds those panes, and neither is a seat on another machine.
 
 </details>
 

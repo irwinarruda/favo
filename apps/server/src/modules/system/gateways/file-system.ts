@@ -11,5 +11,7 @@ export abstract class FileSystem {
   abstract unlink(path: string): Promise<void>;
   abstract move(from: string, to: string): Promise<void>;
   abstract readText(path: string): Promise<string | undefined>;
+  abstract readHead(path: string, bytes: number): Promise<string | undefined>;
+  abstract replaceText(path: string, text: string): Promise<void>;
   abstract writePrivateText(path: string, text: string): Promise<void>;
 }

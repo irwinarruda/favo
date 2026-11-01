@@ -38,6 +38,10 @@ export function pathsOverlap(left: string, right: string) {
   return first!.startsWith(second!) || second!.startsWith(first!);
 }
 
+export function isSameDirectory(left: string, right: string) {
+  return comparablePath(left) === comparablePath(right);
+}
+
 function comparablePath(path: string) {
   return `${path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase()}/`;
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { DomainError } from '@favo/domain/shared/domain-error';
+import { DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { mockDb } from '@/__tests__/db';
 import { renderApp } from '@/__tests__/utils/renderApp';
 
@@ -690,5 +690,113 @@ describe('opening a desktop app', () => {
     mockDb.desktopFailure = new DomainError('desktopAppStuck', 'Claude did not close.');
     await press('y');
     await waitForFrame((frame) => frame.includes('Claude did not close.'));
+  });
+});
+
+describe('going back to a thread', () => {
+  async function openOn(rowKey: string) {
+    const view = await open();
+    await view.select(rowKey);
+    return view;
+  }
+
+  test('shows the last thread of the seat, its age and its folder', async () => {
+    const { waitForFrame } = await open();
+    const frame = await waitForFrame((text) => text.includes('press b to go back'));
+    expect(frame).toContain('12m ago · aaaa0001 · 2 more');
+    expect(frame).toContain('~/code/hive');
+  });
+  test('shows the key in the bar', async () => {
+    const { waitForFrame } = await open();
+    expect(await waitForFrame((text) => text.includes('press b to go back'))).toContain('b go back');
+  });
+  test('lists every thread on b, and goes back to the one you pick', async () => {
+    const view = await open();
+    await view.waitForFrame((text) => text.includes('press b to go back'));
+    await view.press('b');
+    const frame = await view.waitForFrame((text) => text.includes('go back to a thread'));
+    expect(frame).toContain('aaaa0002');
+    expect(frame).toContain('folder gone');
+    await view.press('j', 'RETURN');
+    await view.waitFor(() => mockDb.terminalRuns.length === 1);
+    expect(mockDb.terminalRuns[0]?.args).toEqual(['resume', 'personal', '11111111-2222-4333-8444-5555aaaa0002']);
+  });
+  test('closes the list with escape', async () => {
+    const view = await open();
+    await view.waitForFrame((text) => text.includes('press b to go back'));
+    await view.press('b');
+    await view.waitForFrame((text) => text.includes('go back to a thread'));
+    await view.pressEscape();
+    expect(view.app.state.isThreadPickerOpen).toBe(false);
+    expect(mockDb.terminalRuns).toEqual([]);
+  });
+  test('disables the comb while the list is open', async () => {
+    const view = await open();
+    await view.waitForFrame((text) => text.includes('press b to go back'));
+    await view.press('b');
+    await view.waitForFrame((text) => text.includes('go back to a thread'));
+    await view.press('u');
+    expect(view.app.state.isUsageOpen).toBe(false);
+  });
+  test('goes straight back from a click on the key bar when there is one thread', async () => {
+    const view = await openOn('seat:local/work/claude');
+    await view.waitForFrame((text) => text.includes('44m ago'));
+    await view.clickOn('go back');
+    await view.waitFor(() => mockDb.terminalRuns.length === 1);
+    expect(mockDb.terminalRuns[0]?.args).toContain('22222222-2222-4333-8444-5555bbbb0001');
+  });
+  test('warns that a guess can be wrong', async () => {
+    const view = await openOn('seat:local/personal/opencode');
+    expect(await view.waitForFrame((text) => text.includes('a guess'))).toContain('two sessions here');
+  });
+  test('asks before changing your config, and changes nothing if you say no', async () => {
+    const view = await openOn('seat:local/work/codex');
+    await view.waitForFrame((text) => text.includes('press b to remember them'));
+    await view.press('b');
+    await view.waitForFrame((text) => text.includes('remember threads'));
+    await view.press('n');
+    expect(mockDb.hooks.local?.find(({ provider }) => provider === 'codex')?.state).toBe('absent');
+  });
+  test('installs the hook when you say yes', async () => {
+    const view = await openOn('seat:local/work/codex');
+    await view.waitForFrame((text) => text.includes('press b to remember them'));
+    await view.press('b');
+    await view.waitForFrame((text) => text.includes('remember threads'));
+    await view.press('y');
+    await view.waitForFrame((text) => text.includes('from now on'));
+    expect(mockDb.hooks.local?.find(({ provider }) => provider === 'codex')?.state).toBe('current');
+  });
+  test('hides threads on a machine with an older favo', async () => {
+    const view = await open();
+    mockDb.threadFailures.devbox = new DomainError(DomainErrorCode.unknownMethod, 'Unknown method.');
+    await view.select('seat:devbox/personal/claude');
+    await view.waitFor(() => view.app.state.machinesWithoutThreads.includes('devbox'));
+    await view.flush();
+    const frame = view.captureCharFrame();
+    expect(frame).not.toContain('LAST THREAD');
+    expect(frame).not.toContain('b go back');
+    expect(frame).toContain('CONFIG PATH');
+  });
+  test('ignores b on a machine with an older favo', async () => {
+    const view = await open();
+    mockDb.threadFailures.devbox = new DomainError(DomainErrorCode.unknownMethod, 'Unknown method.');
+    await view.select('seat:devbox/personal/claude');
+    await view.waitFor(() => view.app.state.machinesWithoutThreads.includes('devbox'));
+    await view.flush();
+    await view.press('b');
+    expect(view.app.state.toast).toBeUndefined();
+    expect(view.app.state.isThreadPickerOpen).toBe(false);
+  });
+  test('tells a problem from a guess by color', async () => {
+    const view = await openOn('seat:local/personal/claude');
+    await view.waitForFrame((text) => text.includes('press b to go back'));
+    await view.press('b');
+    const frame = await view.waitForFrame((text) => text.includes('folder gone'));
+    expect(frame).toContain('folder gone');
+  });
+  test('fits at 80 columns', async () => {
+    const view = await open({ width: 80, height: 40 });
+    const frame = await view.waitForFrame((text) => text.includes('press b to go back'));
+    expect(frame).toContain('b go back');
   });
 });

@@ -1,6 +1,7 @@
 import type { SharedItemView } from '@favo/contracts/rpc/views';
 import { SharedItemState } from '@favo/domain/sharing/shared-item';
 import type { ThemeColors } from '@favo/domain/themes/theme';
+import { shortThreadId, threadAgeOf } from '@favo/domain/threads/thread';
 import { useEffect } from 'react';
 import type { Machine } from '@/modules/comb/app/entities/Machine';
 import type { Seat } from '@/modules/comb/app/entities/Seat';
@@ -19,7 +20,8 @@ const ItemMarks: Record<SharedItemState, { mark: string; color: keyof ThemeColor
   ownLink: { mark: '~', color: 'accent' },
 };
 
-type SeatPanelProps = { seat: Seat; isCompact: boolean; onRemoveAccount(): void };
+type CellProps = { isCompact: boolean; onRemoveAccount(): void; onGoBackToThread(): Promise<void> };
+type SeatPanelProps = CellProps & { seat: Seat };
 
 function Heading({ children }: { children: string }) {
   const colors = useApp((state) => state.colors);
@@ -57,7 +59,40 @@ function LaunchDirectory() {
   );
 }
 
-function CellActions({ isCompact, onRemoveAccount }: Omit<SeatPanelProps, 'seat'>) {
+function LastThread({ onGoBackToThread }: Pick<CellProps, 'onGoBackToThread'>) {
+  const colors = useApp((state) => state.colors);
+  const selectedThreads = useApp((state) => state.selectedThreads);
+  const needsThreadHook = useApp((state) => state.needsThreadHook);
+  const error = useError();
+  const thread = selectedThreads[0];
+  const others = selectedThreads.length - 1;
+
+  if (!thread) {
+    return (
+      <box flexDirection="column" onMouseDown={error.handle(onGoBackToThread)}>
+        <Heading>{needsThreadHook ? 'THREADS · press b to remember them' : 'LAST THREAD'}</Heading>
+        <text fg={colors.faint}>{needsThreadHook ? 'favo is not keeping them yet' : 'none yet'}</text>
+      </box>
+    );
+  }
+
+  return (
+    <box flexDirection="column" onMouseDown={error.handle(onGoBackToThread)}>
+      <Heading>LAST THREAD · press b to go back</Heading>
+      <text fg={colors.text} wrapMode="none" truncate>
+        {threadAgeOf(thread.updatedAt, Date.now())}
+        <span fg={colors.faint}> · {shortThreadId(thread.id)}</span>
+        {others > 0 && <span fg={colors.faint}> · {others} more</span>}
+      </text>
+      <text fg={thread.isDirectoryGone ? colors.danger : colors.muted} wrapMode="char">
+        {thread.isDirectoryGone ? `gone: ${shortPath(thread.directory)}` : shortPath(thread.directory)}
+      </text>
+      {thread.isGuess && <text fg={colors.faint}>a guess: with two sessions here it can pick the wrong one</text>}
+    </box>
+  );
+}
+
+function CellActions({ isCompact, onRemoveAccount }: Omit<CellProps, 'onGoBackToThread'>) {
   const selectedAccount = useApp((state) => state.selectedAccount);
   const openRenameAccount = useApp((state) => state.openRenameAccount);
 
@@ -69,11 +104,14 @@ function CellActions({ isCompact, onRemoveAccount }: Omit<SeatPanelProps, 'seat'
   );
 }
 
-function SeatPanel({ seat, isCompact, onRemoveAccount }: SeatPanelProps) {
+function SeatPanel({ seat, isCompact, onRemoveAccount, onGoBackToThread }: SeatPanelProps) {
   const colors = useApp((state) => state.colors);
   const selectedAccount = useApp((state) => state.selectedAccount);
   const inspection = useApp((state) => state.inspection);
   const inspectSelectedSeat = useApp((state) => state.inspectSelectedSeat);
+  const loadSelectedThreads = useApp((state) => state.loadSelectedThreads);
+  const selectedDirectory = useApp((state) => state.selectedDirectory);
+  const canKeepThreads = useApp((state) => state.canKeepThreads);
   const copySelectedPath = useApp((state) => state.copySelectedPath);
   const error = useError();
   const items = inspection?.items.filter((item) => item.state !== SharedItemState.notInBase) ?? [];
@@ -82,6 +120,10 @@ function SeatPanel({ seat, isCompact, onRemoveAccount }: SeatPanelProps) {
   useEffect(() => {
     void error.handle(inspectSelectedSeat)();
   }, [seat.key]);
+
+  useEffect(() => {
+    void error.handle(loadSelectedThreads)();
+  }, [seat.key, selectedDirectory]);
 
   return (
     <box flexDirection="column">
@@ -97,6 +139,7 @@ function SeatPanel({ seat, isCompact, onRemoveAccount }: SeatPanelProps) {
       {!!seat.plan && <text fg={colors.muted}>{seat.plan}</text>}
       <CellActions isCompact={isCompact} onRemoveAccount={onRemoveAccount} />
       <LaunchDirectory />
+      {canKeepThreads && <LastThread onGoBackToThread={onGoBackToThread} />}
       <Heading>CONFIG PATH · press c to copy</Heading>
       <box onMouseDown={error.handle(copySelectedPath)}>
         <text fg={colors.accentBright} wrapMode="char">
@@ -147,9 +190,9 @@ function MachinePanel({ machine }: { machine: Machine }) {
   );
 }
 
-type SeatDetailProps = { width?: number; isCompact: boolean; onRemoveAccount(): void };
+type SeatDetailProps = CellProps & { width?: number };
 
-export function SeatDetail({ width, isCompact, onRemoveAccount }: SeatDetailProps) {
+export function SeatDetail({ width, isCompact, onRemoveAccount, onGoBackToThread }: SeatDetailProps) {
   const colors = useApp((state) => state.colors);
   const selectedSeat = useApp((state) => state.selectedSeat);
   const selectedMachine = useApp((state) => state.selectedMachine);
@@ -168,7 +211,12 @@ export function SeatDetail({ width, isCompact, onRemoveAccount }: SeatDetailProp
       title=" cell "
     >
       {selectedSeat ? (
-        <SeatPanel seat={selectedSeat} isCompact={isCompact} onRemoveAccount={onRemoveAccount} />
+        <SeatPanel
+          seat={selectedSeat}
+          isCompact={isCompact}
+          onRemoveAccount={onRemoveAccount}
+          onGoBackToThread={onGoBackToThread}
+        />
       ) : (
         !!selectedMachine && <MachinePanel machine={selectedMachine} />
       )}

@@ -13,6 +13,8 @@ export const CommandKind = {
   launch: 'launch',
   login: 'login',
   logout: 'logout',
+  resume: 'resume',
+  threads: 'threads',
   list: 'list',
   usage: 'usage',
   add: 'add',
@@ -24,6 +26,9 @@ export const CommandKind = {
   sync: 'sync',
   inspect: 'inspect',
   theme: 'theme',
+  hooksStatus: 'hooksStatus',
+  hooksInstall: 'hooksInstall',
+  hooksUninstall: 'hooksUninstall',
   machineList: 'machineList',
   machineAdd: 'machineAdd',
   machineRemove: 'machineRemove',
@@ -83,6 +88,17 @@ export function parseCommand(rawArgv: string[]): Command {
       return { ...base, kind: CommandKind.login, ...seatOf(second, third, 'favo login <account> <provider>') };
     case 'logout':
       return { ...base, kind: CommandKind.logout, ...seatOf(second, third, 'favo logout <account> <provider>') };
+    case 'resume':
+      return {
+        ...base,
+        kind: CommandKind.resume,
+        target: fourth,
+        ...seatOf(second, third, 'favo resume <account> <provider> [thread]'),
+      };
+    case 'threads':
+      return { ...base, kind: CommandKind.threads, ...seatOf(second, third, 'favo threads <account> <provider>') };
+    case 'hooks':
+      return parseHooks(base, second);
     case 'path':
       return { ...base, kind: CommandKind.path, ...seatOf(second, third, 'favo path <account> <provider>') };
     case 'app':
@@ -121,6 +137,20 @@ function decodedArgv(argv: string[]) {
   if (argv[0] !== EncodedArgumentsFlag) return argv;
   assertDomain(argv.length === 2, DomainErrorCode.invalidParams, `Usage: favo ${EncodedArgumentsFlag} <base64url>`);
   return decodeArguments(argv[1]!);
+}
+
+function parseHooks(base: Omit<Command, 'kind'>, action?: string): Command {
+  switch (action) {
+    case undefined:
+    case 'status':
+      return { ...base, kind: CommandKind.hooksStatus };
+    case 'install':
+      return { ...base, kind: CommandKind.hooksInstall };
+    case 'uninstall':
+      return { ...base, kind: CommandKind.hooksUninstall };
+    default:
+      throw new DomainError(DomainErrorCode.invalidParams, `Unknown hooks command "${action}".`);
+  }
 }
 
 function parseMachine(base: Omit<Command, 'kind'>, name: string | undefined, action?: string, value?: string): Command {

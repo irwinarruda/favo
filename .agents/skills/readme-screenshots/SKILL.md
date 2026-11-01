@@ -21,7 +21,7 @@ Each scene reports `changed` or `unchanged`, and only a changed picture is writt
 
 `apps/client/src/__tests__/scenes.ts` is the table of pictures: each scene names its theme, the keys to press, and any change to the demo data. The scene name is the file name in `docs/assets`.
 
-`bun run dev:mock <scene>` starts favo on `mockDb`, swaps in the demo data, and plays the keys through the renderer's real input. `scripts/screenshots.ts` opens that in a private Ghostty and shoots the window. A launch is the one thing that reliably takes focus, so `scripts/screenshot-tools.swift` checks the red traffic light in each shot, and a grey one means closing that Ghostty and launching a new one. The script then fails if the image is the wrong size, and replaces the picture only if it changed.
+`bun run dev:mock <scene>` starts favo on `mockDb`, swaps in the demo data, and plays the keys through the renderer's real input. `scripts/screenshots.ts` opens that in a private Ghostty and shoots the window. A launch is the one thing that reliably takes focus, and only a launch through `open`: Ghostty's binary started directly stays behind whichever app is in front. `scripts/screenshot-tools.swift` checks the red traffic light in each shot, and a grey one means closing that Ghostty and launching a new one. The script then fails if the image is the wrong size, and replaces the picture only if it changed.
 
 The demo data is not `mockDb`'s seed: tests depend on that seed, so the showcase lives in `scenes.ts` and never changes `db.ts`.
 
@@ -66,6 +66,6 @@ Read each changed image, and check:
 
 macOS on a Retina display, Ghostty in `/Applications`, Xcode Command Line Tools for `swift`, FiraCode Nerd Font (`brew install --cask font-fira-code-nerd-font`), and Screen Recording access for the terminal you run it from.
 
-A full run opens six windows in a row and takes over the screen for about 30 seconds. Warn whoever is at the computer, run it once, and never loop it. Anything typed or clicked during a run lands in the window and can change the shot, which shows up as an unexpected `changed`.
+A full run opens one window per scene and takes over the screen for about 30 seconds. Warn whoever is at the computer, run it once, and never loop it. Anything typed or clicked during a run lands in the window and can change the shot, which shows up as an unexpected `changed`.
 
 A Ghostty or macOS update can change the window chrome, and every picture with it. When that happens, retake all of them in one commit so the set stays the same.

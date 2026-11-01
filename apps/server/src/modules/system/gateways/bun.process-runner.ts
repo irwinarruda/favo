@@ -98,6 +98,14 @@ export class BunProcessRunner extends ProcessRunner {
     return Bun.which(command, { PATH: path }) ?? undefined;
   }
 
+  isAlive(pid: number) {
+    try {
+      return process.kill(pid, 0);
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'EPERM';
+    }
+  }
+
   private trackOpen(child: Bun.Subprocess) {
     this.openChildren.add(child);
     void child.exited.then(() => this.openChildren.delete(child));

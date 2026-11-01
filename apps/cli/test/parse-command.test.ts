@@ -2,6 +2,56 @@ import { describe, expect, it } from 'bun:test';
 import { encodeArguments } from '@favo/domain/terminal/terminal-plan';
 import { CommandKind, parseCommand } from '@/parse-command';
 
+describe('going back to a thread', () => {
+  it('parses a resume, with or without a thread', () => {
+    expect(parseCommand(['resume', 'work', 'claude'])).toMatchObject({
+      kind: 'resume',
+      account: 'work',
+      provider: 'claude',
+      target: undefined,
+    });
+    expect(parseCommand(['resume', 'work', 'codex', '2'])).toMatchObject({ provider: 'codex', target: '2' });
+  });
+  it('takes a folder and a machine', () => {
+    expect(parseCommand(['resume', 'work', 'claude', '--dir', '/srv', '-m', 'devbox'])).toMatchObject({
+      directory: '/srv',
+      machineId: 'devbox',
+    });
+  });
+  it('needs a seat', () => {
+    expect(() => parseCommand(['resume', 'work'])).toThrow('Usage: favo resume <account> <provider> [thread]');
+    expect(() => parseCommand(['threads'])).toThrow('Usage: favo threads <account> <provider>');
+  });
+  it('parses the list of threads', () => {
+    expect(parseCommand(['threads', 'work', 'agy', '--json'])).toMatchObject({
+      kind: 'threads',
+      provider: 'antigravity',
+      isJson: true,
+    });
+  });
+  it('runs a resume sent over ssh the same way', () => {
+    const parsed = parseCommand(['--argv-b64', encodeArguments(['resume', 'work', 'claude', 'abc'])]);
+    expect(parsed).toMatchObject({ kind: 'resume', target: 'abc' });
+  });
+});
+
+describe('favo hooks', () => {
+  it('shows the status by default', () => {
+    expect(parseCommand(['hooks']).kind).toBe('hooksStatus');
+    expect(parseCommand(['hooks', 'status']).kind).toBe('hooksStatus');
+  });
+  it('installs and uninstalls, here or on another machine', () => {
+    expect(parseCommand(['hooks', 'install', '-m', 'devbox'])).toMatchObject({
+      kind: 'hooksInstall',
+      machineId: 'devbox',
+    });
+    expect(parseCommand(['hooks', 'uninstall']).kind).toBe('hooksUninstall');
+  });
+  it('refuses anything else', () => {
+    expect(() => parseCommand(['hooks', 'enable'])).toThrow('Unknown hooks command "enable".');
+  });
+});
+
 describe('parseCommand', () => {
   it('opens the TUI with no arguments', () => {
     expect(parseCommand([]).kind).toBe(CommandKind.tui);

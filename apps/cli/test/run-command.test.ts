@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { createAccount } from '@favo/contracts/rpc/accounts/create-account';
+import { renameAccount } from '@favo/contracts/rpc/accounts/rename-account';
 import { Protocol, type RpcRequest } from '@favo/contracts/rpc/envelope';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
+import { provisionSeat } from '@favo/contracts/rpc/seats/provision-seat';
+import { recordThread } from '@favo/contracts/rpc/threads/record-thread';
 import { LoginState } from '@favo/contracts/rpc/views';
 import { installPlanFor } from '@favo/domain/machines/remote-commands';
 import type { TerminalPlan } from '@favo/domain/terminal/terminal-plan';
@@ -340,7 +343,10 @@ describe('commands', () => {
     await run('claude', 'bee');
     await run('claude');
     expect(plans).toHaveLength(2);
-    expect(plans[0]?.env).toEqual(plans[1]!.env);
+    const { FAVO_LAUNCH: firstLaunch, ...firstEnv } = plans[0]!.env;
+    const { FAVO_LAUNCH: secondLaunch, ...secondEnv } = plans[1]!.env;
+    expect(firstEnv).toEqual(secondEnv);
+    expect(firstLaunch).not.toBe(secondLaunch);
     await expect(run('rm', 'bee')).rejects.toMatchObject({ code: 'accountIsPersonal' });
   });
   it('prints a stable path and makes sure it exists', async () => {
@@ -402,5 +408,125 @@ describe('commands', () => {
     const output = lines.join('\n');
     expect(output).toContain('linked     skills');
     expect(output).toContain('private    .claude.json');
+  });
+});
+
+describe('threads', () => {
+  const WorkEnv = {
+    FAVO_ACCOUNT: 'work',
+    FAVO_LAUNCH: 'l1',
+    CLAUDE_CONFIG_DIR: `${Home}/.favo/accounts/work/claude`,
+  };
+  const Project = `${Home}/projects/hive`;
+
+  async function withThread() {
+    const server = harness(createTestServer({ callerEnv: WorkEnv }));
+    await seedClaudeBase(server.fileSystem);
+    await server.fileSystem.ensureDirectory(Project);
+    await server.client.call(createAccount, { name: 'work' });
+    const event = { provider: 'claude', directory: Project, isFresh: true } as const;
+    await server.client.call(recordThread, { ...event, id: '11111111-aaaa-bbbb-cccc-00000000abcd' });
+    return server;
+  }
+
+  it('lists what a seat kept, by position', async () => {
+    const { run, lines } = await withThread();
+    expect(await run('threads', 'work', 'claude')).toBe(0);
+    expect(lines.join('\n')).toMatch(new RegExp(`^ 1  .+ 0000abcd  ${Project}$`));
+  });
+  it('finds a cell by the name you gave it', async () => {
+    const { run, lines, client } = await withThread();
+    await client.call(renameAccount, { name: 'work', newName: 'side' });
+    await run('threads', 'side', 'claude');
+    expect(lines.at(-1)).toContain('0000abcd');
+  });
+  it('says when a seat has none', async () => {
+    const { run, lines } = await withThread();
+    await run('threads', 'personal', 'claude');
+    expect(lines).toEqual(['No threads yet.']);
+  });
+  it('warns about a guess and a folder that is gone', async () => {
+    const { run, lines, clis, client } = await withThread();
+    clis.codex.foundThreads = [{ id: 'found-1', directory: '/gone', updatedAt: '2026-10-30T12:00:00.000Z' }];
+    await client.call(provisionSeat, { account: 'work', provider: 'codex' });
+    await run('threads', 'work', 'codex');
+    expect(lines[0]).toContain('/gone · folder gone · a guess');
+    expect(lines[1]).toContain('With two sessions in one folder it can pick the wrong one.');
+  });
+  it('gives machine readable output', async () => {
+    const { run, lines } = await withThread();
+    await run('threads', 'work', 'claude', '--json');
+    expect(JSON.parse(lines[0]!)[0]).toMatchObject({ isGuess: false, directory: Project });
+  });
+  it('explains a machine on an older favo instead of printing a raw error', async () => {
+    const { run, lines, client, remotes } = await withThread();
+    await client.call(addMachine, { target: 'bee@old' });
+    const older = createTestServer({ hostname: 'old' });
+    remotes.connect('old', {
+      async send(request) {
+        if (!/^(?:threads|hooks)\./.test(request.method)) return older.router.send(request);
+        const error = { code: 'unknownMethod', message: `Unknown method "${request.method}".` };
+        return { id: request.id, ok: false, error };
+      },
+    });
+    expect(await run('threads', 'work', 'claude', '-m', 'old')).toBe(1);
+    expect(await run('hooks', '-m', 'old')).toBe(1);
+    expect(lines).toEqual(
+      Array(2).fill('old runs an older favo, which keeps no threads. To update it: favo machine install old')
+    );
+  });
+  it('resumes through a plan', async () => {
+    const { run, plans } = await withThread();
+    await run('resume', 'work', 'claude');
+    expect(plans[0]?.args.slice(0, 2)).toEqual(['--resume', '11111111-aaaa-bbbb-cccc-00000000abcd']);
+    expect(plans[0]?.cwd).toBe(Project);
+  });
+  it('passes what follows -- on to the resumed provider', async () => {
+    const { run, plans } = await withThread();
+    await run('resume', 'work', 'claude', '--', '--model', 'x');
+    expect(plans[0]?.args.slice(-2)).toEqual(['--model', 'x']);
+  });
+});
+
+describe('favo hooks', () => {
+  it('reports each provider', async () => {
+    const { run, lines } = harness(createTestServer({ installed: ['claude'] }));
+    await run('hooks');
+    expect(lines[0]).toContain('off');
+    expect(lines[1]).toBe('Codex         not installed');
+  });
+  it('installs, and warns about the trust Codex asks for', async () => {
+    const { run, lines, fileSystem } = harness();
+    await run('hooks', 'install');
+    expect(lines.join('\n')).toContain('Codex asks each seat once to trust the hook.');
+    expect(await fileSystem.readText(`${Home}/.claude/settings.json`)).toContain('favo-hook');
+  });
+  it('uninstalls', async () => {
+    const { run, lines, fileSystem } = harness();
+    await run('hooks', 'install');
+    lines.length = 0;
+    await run('hooks', 'uninstall');
+    expect(lines[0]).toContain('off');
+    expect(await fileSystem.readText(`${Home}/.claude/settings.json`)).not.toContain('favo-hook');
+  });
+  it('gives machine readable output', async () => {
+    const { run, lines } = harness();
+    await run('hooks', '--json');
+    expect(JSON.parse(lines[0]!)).toHaveLength(4);
+  });
+  it('explains a hook an older favo wrote', async () => {
+    const { run, lines, fileSystem } = harness();
+    await run('hooks', 'install');
+    const path = `${Home}/.claude/settings.json`;
+    await fileSystem.writePrivateText(path, (await fileSystem.readText(path))!.replace('claude:1', 'claude:0'));
+    lines.length = 0;
+    await run('hooks');
+    expect(lines[0]).toContain('out of date, run favo sync');
+  });
+  it('lists every problem of a seat under its provider', async () => {
+    const { run, lines, fileSystem } = harness();
+    await fileSystem.writePrivateText(`${Home}/.claude/settings.json`, '{"disableAllHooks":true}');
+    await run('hooks', 'install');
+    expect(lines.join('\n')).toContain('disableAllHooks is on in settings.json, so hooks never run.');
   });
 });

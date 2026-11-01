@@ -1,6 +1,7 @@
 import type { LoginState } from '@favo/contracts/rpc/views';
 import type { ProviderId } from '@favo/domain/providers/provider';
 import { type SeatUsage, UsageUnavailableReason, unavailableUsage } from '@favo/domain/usage/seat-usage';
+import type { FileSystem } from '@/modules/system/gateways/file-system';
 import type { PipedProcess } from '@/modules/system/gateways/process-runner';
 
 export type ProviderSession = { binary: string; env: Record<string, string | undefined>; cwd?: string };
@@ -8,6 +9,8 @@ export type ProviderLogin = { login: LoginState; identity?: string; plan?: strin
 export type LaunchEnvironment = { env: Record<string, string>; unsetEnv: string[] };
 
 export type LoginContext = { isOverSsh: boolean };
+export type ThreadSearch = { session: ProviderSession; seatHome: string; directory: string };
+export type FoundThread = { id: string; directory: string; updatedAt: string };
 
 export abstract class ProviderCli {
   abstract readonly id: ProviderId;
@@ -29,6 +32,10 @@ export abstract class ProviderCli {
 
   async usage(_session: ProviderSession, checkedAt: string): Promise<SeatUsage> {
     return unavailableUsage(checkedAt, UsageUnavailableReason.unsupported);
+  }
+
+  async recentThreads(_search: ThreadSearch, _fileSystem: FileSystem): Promise<FoundThread[]> {
+    return [];
   }
 
   protected async ask<Message, Answer>(

@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { setTimeout } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
 import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { ReleaseAssets } from '@/modules/machines/gateways/release-assets';
+import { renameOver } from '@/modules/system/utils/rename-over';
 
 const ReleaseBaseUrl = 'https://github.com/irwinarruda/favo-cli/releases/download';
 const ChecksumsFile = 'SHA256SUMS';
@@ -14,9 +14,6 @@ const ChecksumsTimeoutMs = 30_000;
 const AssetTimeoutMs = 300_000;
 const NotFoundStatus = 404;
 const ExecutableMode = 0o755;
-const RenameAttempts = 10;
-const RenameRetryMs = 100;
-const BusyRenameCodes = ['EPERM', 'EACCES', 'EBUSY'];
 
 export class GithubReleaseAssets extends ReleaseAssets {
   constructor(
@@ -91,18 +88,6 @@ async function writeExecutable(binary: Uint8Array, destination: string) {
   } catch (error) {
     await rm(temporary, { force: true });
     throw error;
-  }
-}
-
-async function renameOver(from: string, to: string) {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      return await rename(from, to);
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code ?? '';
-      if (attempt === RenameAttempts || !BusyRenameCodes.includes(code)) throw error;
-      await setTimeout(RenameRetryMs);
-    }
   }
 }
 

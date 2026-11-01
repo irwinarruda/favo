@@ -21,6 +21,26 @@ const Hostile = [
 ];
 
 describe('terminal plans', () => {
+  it('resumes on another machine through favo there, which holds the thread', () => {
+    const resume = { action: TerminalAction.resume, account: 'work', provider: 'claude', args: [] };
+    expect(favoArgumentsFor(resume)).toEqual(['resume', 'work', 'claude']);
+    expect(favoArgumentsFor({ ...resume, thread: 'abc', directory: '/srv' })).toEqual([
+      'resume',
+      'work',
+      'claude',
+      'abc',
+      '--dir',
+      '/srv',
+    ]);
+    expect(favoArgumentsFor({ ...resume, args: ['--model', 'x'] })).toEqual([
+      'resume',
+      'work',
+      'claude',
+      '--',
+      '--model',
+      'x',
+    ]);
+  });
   it('runs a remote action through favo on that machine', () => {
     const plan = remoteTerminalPlan('bee@devbox', undefined, ['claude', 'work']);
     expect(plan.command).toBe('ssh');
