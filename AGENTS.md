@@ -20,7 +20,7 @@ Use Bun `1.3.14` (`.bun-version`).
 
 ## Releasing
 
-Set the new version in both `packages/contracts/src/version.ts` and `apps/npm/package.json`, commit it to `main`, then push a `vX.Y.Z` tag. `.github/workflows/release.yml` tests on all three systems, builds, creates the GitHub Release, starts the binary on every platform, then publishes `favo-cli` to npm through trusted publishing and updates the formula in `irwinarruda/homebrew-tap`. Nothing is published by hand, and no npm token lives in CI. The tap is pushed with a deploy key limited to that repository, kept in the `homebrew` environment, which only release tags can reach.
+Set the new version in both `packages/contracts/src/version.ts` and `apps/npm/package.json`, turn `## [Unreleased]` in `CHANGELOG.md` into `## [X.Y.Z] - YYYY-MM-DD` under a new empty `## [Unreleased]`, update the compare links at its bottom, commit it to `main`, then push a `vX.Y.Z` tag. `check:release-version` fails the release when the changelog has no section for the tag. `.github/workflows/release.yml` tests on all three systems, builds, creates the GitHub Release, starts the binary on every platform, then publishes `favo-cli` to npm through trusted publishing and updates the formula in `irwinarruda/homebrew-tap`. Nothing is published by hand, and no npm token lives in CI. The tap is pushed with a deploy key limited to that repository, kept in the `homebrew` environment, which only release tags can reach.
 
 `gh workflow run homebrew-check.yml -f tag=vX.Y.Z` installs from the public tap on every platform, and each release does this by itself.
 
@@ -34,6 +34,7 @@ Releases are immutable, so a bad binary burns its version number; fix it in a ne
 - Shared is an allowlist. favo never reads a token.
 - No comments in production code. No `../`. No barrels. No TS `enum`. `undefined`, never `null`.
 - Commits follow Conventional Commits.
+- ALWAYS update `CHANGELOG.md` in the same commit as any change someone using favo would notice: a feature, a fix, a changed command, output or install step. Add one plain-language line under `## [Unreleased]`, in `Added`, `Changed`, `Fixed` or `Removed`, written for users, not about the code. Refactors, tests, CI and internal docs need no entry.
 
 ## Completion gate
 
