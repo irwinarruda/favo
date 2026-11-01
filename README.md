@@ -161,7 +161,7 @@ Run `npm uninstall --global favo-cli` or `brew uninstall favo-cli`, then delete 
 
 The npm package is a small launcher with no dependencies and no install scripts. The first run downloads the right binary, about 40 MB, from [GitHub Releases](https://github.com/irwinarruda/favo-cli/releases) and checks it against the hashes published in the npm package. After that, favo starts with no network. Homebrew installs the same binary directly, with no launcher and no Node.
 
-To update, run `npm install --global favo-cli@latest` or `brew upgrade favo-cli`, then `favo machine install <machine>` for each other machine.
+To update, run `npm install --global favo-cli@latest` or `brew upgrade favo-cli`, then `favo machine update` to bring every other machine along. favo marks a machine on an older version as `older favo` and keeps it working until you do.
 
 ### Use it with T3 Code
 
@@ -205,6 +205,7 @@ Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--mac
 | `x`                 | delete the selected cell            |
 | `m`                 | add a machine                       |
 | `i`                 | install or update favo on a machine |
+| `U`                 | update favo on every machine        |
 | `X`                 | forget a machine                    |
 | `r` / `R`           | refresh / repair shared links       |
 | `t`                 | pick a theme                        |
@@ -252,7 +253,7 @@ Add `launchArgs` to `~/.favo/config.json`:
 
 To install itself, favo downloads the binary for that machine from the GitHub Release of its own version, checks it, and uploads it over ssh, so the other machine only needs ssh and this one needs internet.
 
-If a machine shows as outdated, `favo machine install <machine>` updates it. Over ssh, Codex signs in with a device code, and Claude gives you a link and asks for the code back. The first ssh connection to a new machine trusts its host key, as ssh's `accept-new` does, and a changed key is refused.
+A machine on an older favo keeps working and shows `older favo` with its version. Press `i` on it, `U` for every machine, or run `favo machine update`. Over ssh, Codex signs in with a device code, and Claude gives you a link and asks for the code back. The first ssh connection to a new machine trusts its host key, as ssh's `accept-new` does, and a changed key is refused.
 
 </details>
 

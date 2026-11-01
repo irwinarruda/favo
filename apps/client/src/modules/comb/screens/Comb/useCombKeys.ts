@@ -20,6 +20,7 @@ export function useCombKeys({ isEnabled, onHelp, onQuit, onRemoveAccount, onForg
   const copySelectedPath = useApp((state) => state.copySelectedPath);
   const repairSelectedMachine = useApp((state) => state.repairSelectedMachine);
   const installSelectedMachine = useApp((state) => state.installSelectedMachine);
+  const updateAllMachines = useApp((state) => state.updateAllMachines);
   const openAddAccount = useApp((state) => state.openAddAccount);
   const openRenameAccount = useApp((state) => state.openRenameAccount);
   const openAddMachine = useApp((state) => state.openAddMachine);
@@ -39,6 +40,7 @@ export function useCombKeys({ isEnabled, onHelp, onQuit, onRemoveAccount, onForg
     if (key.sequence === '?') onHelp();
     else if (key.shift && key.name === 'x') onForgetMachine();
     else if (key.shift && key.name === 'r') void error.handle(repairSelectedMachine)();
+    else if (key.shift && key.name === 'u') void error.handle(updateAllMachines)();
     else if (key.shift && key.name === 'tab') moveMachine(-1);
     else if (key.name === 'q') onQuit();
     else if (key.name === 'down' || key.name === 'j') moveRow(1);

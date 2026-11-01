@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createAccount } from '@favo/contracts/rpc/accounts/create-account';
 import { listAccounts } from '@favo/contracts/rpc/accounts/list-accounts';
+import { Protocol } from '@favo/contracts/rpc/envelope';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
 import { discoverMachines } from '@favo/contracts/rpc/machines/discover-machines';
 import { getMachineStatus } from '@favo/contracts/rpc/machines/get-machine-status';
@@ -129,6 +130,7 @@ describe('machine status', () => {
     expect(status).toEqual({
       state: 'online',
       version: FavoVersion,
+      isBehind: false,
       hostname: 'devbox',
       directory: `${Home}/projects/hive`,
     });
@@ -156,6 +158,26 @@ describe('machine status', () => {
     const status = await mac.client.call(getMachineStatus, { id: 'devbox' });
     expect(status.state).toBe('offline');
     expect(status.message).toContain('devbox');
+  });
+  it('keeps a machine on an older favo online, and says it is behind', async () => {
+    const mac = createTestServer();
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', {
+      async send(request) {
+        const result = {
+          version: '0.0.1',
+          protocol: Protocol,
+          hostname: 'devbox',
+          platform: 'linux',
+          arch: 'x64',
+          home: '/h',
+          directory: '/h',
+        };
+        return { id: request.id, ok: true, result };
+      },
+    });
+    const status = await mac.client.call(getMachineStatus, { id: 'devbox' });
+    expect(status).toMatchObject({ state: 'online', version: '0.0.1', isBehind: true });
   });
   it('reports a machine on an older protocol', async () => {
     const mac = createTestServer();

@@ -6,6 +6,7 @@ import {
   assertMachineName,
   assertMachineTarget,
   DiscoverySource,
+  isOlderVersion,
   LocalMachineId,
   type Machine,
   MachineState,
@@ -34,7 +35,8 @@ export class MachinesService {
     private readonly tailscale: Tailscale,
     private readonly fileSystem: FileSystem,
     private readonly paths: FavoPaths,
-    private readonly host: HostFacts
+    private readonly host: HostFacts,
+    private readonly version: string
   ) {}
 
   async list() {
@@ -106,7 +108,8 @@ export class MachinesService {
         return { state: MachineState.outdated, message: `${machine.name} runs an older favo.` };
       }
       const { version, hostname, directory } = result.data;
-      return { state: MachineState.online, version, hostname, directory };
+      const isBehind = isOlderVersion(version, this.version);
+      return { state: MachineState.online, version, isBehind, hostname, directory };
     } catch (error) {
       if (!(error instanceof DomainError)) throw error;
       if (error.code === DomainErrorCode.machineNeedsInstall) {

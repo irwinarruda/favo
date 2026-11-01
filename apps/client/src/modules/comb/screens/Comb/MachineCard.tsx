@@ -13,6 +13,7 @@ export function MachineCard({ machine }: { machine: Machine }) {
   const isBusy = machine.presence === MachinePresence.connecting || machine.presence === MachinePresence.installing;
   const rowKey = `machine:${machine.id}`;
   const mark = machine.isOnline ? Hex.filled : Hex.hollow;
+  const version = machine.versionLabel ? ` · ${machine.versionLabel}` : '';
 
   return (
     <box
@@ -24,7 +25,7 @@ export function MachineCard({ machine }: { machine: Machine }) {
       border
       borderStyle="rounded"
       borderColor={isActive ? colors.accent : colors.border}
-      title={` ${mark} ${machine.name} · ${machine.where} `}
+      title={` ${mark} ${machine.name} · ${machine.where}${version} `}
       onMouseDown={() => accounts.length === 0 && selectRow(rowKey)}
     >
       {accounts.length > 0 ? (

@@ -4,6 +4,13 @@ Every change people using favo would notice, newest first. The format follows [K
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-31
+
+### Added
+
+- favo now notices when another machine runs an older version. It shows `older favo` and the version on that machine, and the machine keeps working until you update it.
+- Press `U` to update favo on every machine at once, or `i` on one machine. From the command line, `favo machine update` does the same for every machine, and `favo list` and `favo machine list` show which ones are behind.
+
 ## [0.1.2] - 2026-10-31
 
 ### Fixed
@@ -30,7 +37,8 @@ Every change people using favo would notice, newest first. The format follows [K
 - A TUI that shows every machine, account and login, plus a command for everything it does.
 - Native on macOS, Linux and Windows, installed with `npm install --global favo-cli`.
 
-[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/irwinarruda/favo-cli/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/irwinarruda/favo-cli/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/irwinarruda/favo-cli/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/irwinarruda/favo-cli/releases/tag/v0.1.0

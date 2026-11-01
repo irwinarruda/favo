@@ -23,6 +23,7 @@ Machines
   favo machine discover              find machines on ssh and Tailscale
   favo machine add <user@host>       add a machine and install favo there
   favo machine install <machine>     update favo on a machine
+  favo machine update                update every machine on an older favo
   favo machine rm <machine>          forget a machine
 
 Themes

@@ -15,6 +15,7 @@ export type FleetService = {
   isFleetLoading: boolean;
   combRows: CombRow[];
   fleetSummary: FleetSummary;
+  hasMachinesBehind: boolean;
   loadFleet(): Promise<void>;
   refreshMachine(machineId: string): Promise<void>;
   refreshSeat(seat: Seat): Promise<void>;
@@ -29,6 +30,7 @@ export const createFleetService: ServiceCreator<FleetService> = (set, get) => ({
     (state) => ({
       combRows: _rowsOf(state.machines, state.accounts),
       fleetSummary: _summaryOf(state.machines, state.accounts),
+      hasMachinesBehind: state.machines.some((machine) => machine.canUpdate),
     })
   ),
   machines: [],

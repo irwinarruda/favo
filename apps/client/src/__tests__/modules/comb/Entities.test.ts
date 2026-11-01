@@ -48,6 +48,16 @@ describe('Machine', () => {
     expect(machine.withPresence(MachinePresence.needsInstall).canInstall).toBe(true);
     expect(machine.withPresence(MachinePresence.outdated).canInstall).toBe(true);
   });
+  test('offers an update when it runs an older favo, and stays usable', () => {
+    const machine = new Machine('devbox', 'devbox', 'bee@devbox', false);
+    const behind = machine.withStatus({ state: 'online', version: '0.1.0', isBehind: true });
+    expect(behind.isOnline).toBe(true);
+    expect(behind.canUpdate).toBe(true);
+    expect(behind.installLabel).toBe('update');
+    expect(behind.versionLabel).toBe('older favo 0.1.0');
+    expect(machine.withStatus({ state: 'online', version: '0.1.0', isBehind: false }).canUpdate).toBe(false);
+    expect(machine.withPresence(MachinePresence.needsInstall).installLabel).toBe('install');
+  });
 });
 
 describe('shortPath', () => {

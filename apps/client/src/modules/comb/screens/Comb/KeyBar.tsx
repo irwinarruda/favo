@@ -11,6 +11,8 @@ export function KeyBar(props: { onHelp(): void; onQuit(): void }) {
   const openAddMachine = useApp((state) => state.openAddMachine);
   const refreshMachine = useApp((state) => state.refreshMachine);
   const installSelectedMachine = useApp((state) => state.installSelectedMachine);
+  const updateAllMachines = useApp((state) => state.updateAllMachines);
+  const hasMachinesBehind = useApp((state) => state.hasMachinesBehind);
   const openThemePicker = useApp((state) => state.openThemePicker);
   const openDirectoryPicker = useApp((state) => state.openDirectoryPicker);
   const error = useError();
@@ -30,8 +32,9 @@ export function KeyBar(props: { onHelp(): void; onQuit(): void }) {
       )}
       {!!selectedSeat && <KeyHint keys="c" label="copy path" onPress={error.handle(copySelectedPath)} />}
       {!!selectedMachine?.canInstall && (
-        <KeyHint keys="i" label="install" onPress={error.handle(installSelectedMachine)} />
+        <KeyHint keys="i" label={selectedMachine.installLabel} onPress={error.handle(installSelectedMachine)} />
       )}
+      {hasMachinesBehind && <KeyHint keys="U" label="update all" onPress={error.handle(updateAllMachines)} />}
       <KeyHint keys="d" label="folder" onPress={error.handle(openDirectoryPicker)} />
       <KeyHint keys="a" label="account" onPress={openAddAccount} />
       <KeyHint keys="m" label="machine" onPress={error.handle(openAddMachine)} />

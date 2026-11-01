@@ -10,7 +10,9 @@ export class Machine {
     readonly isLocal: boolean,
     readonly presence: MachinePresence = MachinePresence.connecting,
     readonly message?: string,
-    readonly directory?: string
+    readonly directory?: string,
+    readonly version?: string,
+    readonly isBehind = false
   ) {}
 
   static fromJSON(json: MachineJSON) {
@@ -25,8 +27,20 @@ export class Machine {
     return this.presence === MachinePresence.online;
   }
 
+  get canUpdate() {
+    return this.presence === MachinePresence.outdated || (this.isOnline && this.isBehind);
+  }
+
   get canInstall() {
-    return this.presence === MachinePresence.needsInstall || this.presence === MachinePresence.outdated;
+    return this.presence === MachinePresence.needsInstall || this.canUpdate;
+  }
+
+  get installLabel() {
+    return this.presence === MachinePresence.needsInstall ? 'install' : 'update';
+  }
+
+  get versionLabel() {
+    return this.isOnline && this.isBehind ? `older favo ${this.version}` : undefined;
   }
 
   get presenceLabel() {
@@ -36,11 +50,14 @@ export class Machine {
   }
 
   withPresence(presence: MachinePresence, message?: string) {
-    return new Machine(this.id, this.name, this.target, this.isLocal, presence, message, this.directory);
+    const { id, name, target, isLocal, directory, version, isBehind } = this;
+    return new Machine(id, name, target, isLocal, presence, message, directory, version, isBehind);
   }
 
   withStatus(status: MachineStatus) {
     const directory = status.directory ?? this.directory;
-    return new Machine(this.id, this.name, this.target, this.isLocal, status.state, status.message, directory);
+    const { id, name, target, isLocal } = this;
+    const isBehind = status.isBehind ?? false;
+    return new Machine(id, name, target, isLocal, status.state, status.message, directory, status.version, isBehind);
   }
 }

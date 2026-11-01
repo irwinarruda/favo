@@ -50,6 +50,7 @@ describe('parseCommand', () => {
       name: 'box',
     });
     expect(parseCommand(['machine', 'rm', 'box']).kind).toBe(CommandKind.machineRemove);
+    expect(parseCommand(['machine', 'update']).kind).toBe(CommandKind.machineUpdate);
     expect(parseCommand(['rename', 'work', 'side'])).toMatchObject({
       kind: CommandKind.rename,
       account: 'work',

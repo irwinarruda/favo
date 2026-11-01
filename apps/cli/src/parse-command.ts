@@ -25,6 +25,7 @@ export const CommandKind = {
   machineAdd: 'machineAdd',
   machineRemove: 'machineRemove',
   machineInstall: 'machineInstall',
+  machineUpdate: 'machineUpdate',
   machineDiscover: 'machineDiscover',
 } as const;
 export type CommandKind = ValueOf<typeof CommandKind>;
@@ -116,6 +117,8 @@ function parseMachine(base: Omit<Command, 'kind'>, name: string | undefined, act
       return { ...base, kind: CommandKind.machineRemove, target: required(value, 'favo machine rm <machine>') };
     case 'install':
       return { ...base, kind: CommandKind.machineInstall, target: required(value, 'favo machine install <machine>') };
+    case 'update':
+      return { ...base, kind: CommandKind.machineUpdate };
     case 'discover':
       return { ...base, kind: CommandKind.machineDiscover };
     default:

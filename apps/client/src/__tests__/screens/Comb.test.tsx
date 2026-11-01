@@ -574,6 +574,27 @@ describe('adding a machine', () => {
     await press('i');
     await waitFor(() => mockDb.installed.length === 1);
   });
+  test('flags a machine on an older favo and updates every one with U', async () => {
+    const { app, press, flush, renderOnce, captureCharFrame, waitFor } = await open();
+    mockDb.machineStatuses.devbox = { state: 'online', version: '0.0.1', isBehind: true };
+    await app.state.refreshMachine('devbox');
+    await flush();
+    await renderOnce();
+    expect(captureCharFrame()).toContain('devbox · bee@devbox · older favo 0.0.1');
+    expect(captureCharFrame()).toContain('U update all');
+    expect(captureCharFrame()).toContain('⬡ agy      sign in');
+    await press('U');
+    await waitFor(() => mockDb.installed.length === 1 && !app.state.hasMachinesBehind);
+  });
+  test('offers to update the selected machine with i', async () => {
+    const { app, press, select, captureCharFrame, waitFor } = await open();
+    mockDb.machineStatuses.devbox = { state: 'online', version: '0.0.1', isBehind: true };
+    await app.state.refreshMachine('devbox');
+    await select('seat:devbox/personal/antigravity');
+    expect(captureCharFrame()).toContain('i update');
+    await press('i');
+    await waitFor(() => mockDb.installed.includes('devbox'));
+  });
   test('forgets a machine after asking', async () => {
     const { app, select, press, captureCharFrame, waitFor } = await open();
     await select('machine:studio');

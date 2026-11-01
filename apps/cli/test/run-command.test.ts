@@ -196,6 +196,38 @@ describe('commands', () => {
     expect(ssh.uploads).toHaveLength(1);
     expect(lines.at(-1)).toContain('running on devbox');
   });
+  it('flags a machine on an older favo and updates every one that is behind', async () => {
+    const mac = harness();
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', {
+      async send(request: RpcRequest) {
+        const result = {
+          version: '0.0.1',
+          protocol: Protocol,
+          hostname: 'devbox',
+          platform: 'linux',
+          arch: 'x64',
+          home: '/h',
+          directory: '/h',
+        };
+        if (request.method === 'system.ping') return { id: request.id, ok: true, result };
+        return { id: request.id, ok: true, result: [] };
+      },
+    });
+    await mac.run('machine', 'list');
+    expect(mac.lines.join('\n')).toContain('online · older favo 0.0.1');
+    await mac.fileSystem.writePrivateText('/assets/favo-linux-x64', 'binary');
+    mac.ssh.reply('uname -sm', { stdout: 'Linux x86_64' });
+    mac.ssh.reply(installPlanFor('posix', 'Linux x86_64').activate, { stdout: '0.1.0' });
+    expect(await mac.run('machine', 'update')).toBe(0);
+    expect(mac.ssh.uploads).toHaveLength(1);
+    expect(mac.lines.at(-1)).toContain('favo 0.1.0 is running on devbox.');
+  });
+  it('says so when every machine is up to date', async () => {
+    const { run, lines } = harness();
+    expect(await run('machine', 'update')).toBe(0);
+    expect(lines.at(-1)).toMatch(/^Every machine runs favo \d+\.\d+\.\d+\.$/);
+  });
   it('explains shared and private for a seat', async () => {
     const { run, lines, client, fileSystem } = harness();
     await seedClaudeBase(fileSystem);

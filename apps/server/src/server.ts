@@ -59,7 +59,16 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
   const seats = new SeatsService(fileSystem, accountRepository, providers, paths);
   const accounts = new AccountsService(fileSystem, accountRepository, seats, providers, config, clock, paths);
   const machineRepository = new MachineRepository(fileSystem, paths);
-  const machines = new MachinesService(machineRepository, remotes, ssh, tailscale, fileSystem, paths, host);
+  const machines = new MachinesService(
+    machineRepository,
+    remotes,
+    ssh,
+    tailscale,
+    fileSystem,
+    paths,
+    host,
+    FavoVersion
+  );
   const installer = new InstallerService(machines, ssh, remotes, releaseAssets, fileSystem, paths, FavoVersion);
   const directories = new DirectoriesService(fileSystem, paths, host);
   const terminal = new TerminalService(providers, seats, machines, directories, config, callerEnv);

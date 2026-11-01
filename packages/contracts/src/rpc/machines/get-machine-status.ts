@@ -5,6 +5,7 @@ import { defineMethod, MethodRouting } from '#contracts/rpc/method';
 export const MachineStatus = z.strictObject({
   state: z.enum(MachineState),
   version: z.string().optional(),
+  isBehind: z.boolean().optional(),
   hostname: z.string().optional(),
   directory: z.string().optional(),
   message: z.string().optional(),

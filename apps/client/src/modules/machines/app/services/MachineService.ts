@@ -1,8 +1,9 @@
 import type { DiscoveredMachine } from '@favo/contracts/rpc/machines/discover-machines';
+import type { Machine } from '@/modules/comb/app/entities/Machine';
 import { MachinePresence } from '@/modules/comb/app/enums/MachinePresence';
 import { ToastKind } from '@/shared/app/services/ToastService';
 import { container } from '@/shared/container';
-import type { ServiceCreator } from '@/shared/stores/app';
+import type { AppService, ServiceCreator } from '@/shared/stores/app';
 
 export type MachineService = {
   isAddMachineOpen: boolean;
@@ -13,6 +14,7 @@ export type MachineService = {
   closeAddMachine(): void;
   submitAddMachine(target: string): Promise<void>;
   installSelectedMachine(): Promise<void>;
+  updateAllMachines(): Promise<void>;
   forgetSelectedMachine(): Promise<void>;
 };
 
@@ -40,23 +42,30 @@ export const createMachineService: ServiceCreator<MachineService> = (set, get) =
       closeAddMachine();
       showToast(`${machine.name} joined the comb.`);
     } catch (error) {
-      set({ addMachineError: error instanceof Error ? error.message : String(error) });
+      set({ addMachineError: _messageOf(error) });
     } finally {
       set({ isJoiningMachine: false });
     }
   },
   async installSelectedMachine() {
-    const { selectedMachine, setMachinePresence, refreshMachine, showToast } = get();
+    const { selectedMachine, showToast } = get();
     if (!selectedMachine?.canInstall) return;
     try {
-      setMachinePresence(selectedMachine.id, MachinePresence.installing);
-      const machineRepository = container.get('IMachineRepository');
-      const version = await machineRepository.install(selectedMachine.id);
+      const version = await _installMachine(get, selectedMachine);
       showToast(`favo ${version} is running on ${selectedMachine.name}.`);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), ToastKind.error);
-    } finally {
-      await refreshMachine(selectedMachine.id);
+      showToast(_messageOf(error), ToastKind.error);
+    }
+  },
+  async updateAllMachines() {
+    const { machines, showToast } = get();
+    const behind = machines.filter((machine) => machine.canUpdate);
+    if (behind.length === 0) return;
+    try {
+      const [version] = await Promise.all(behind.map((machine) => _installMachine(get, machine)));
+      showToast(`favo ${version} is running on ${behind.map((machine) => machine.name).join(', ')}.`);
+    } catch (error) {
+      showToast(_messageOf(error), ToastKind.error);
     }
   },
   async forgetSelectedMachine() {
@@ -68,3 +77,18 @@ export const createMachineService: ServiceCreator<MachineService> = (set, get) =
     showToast(`Forgot ${selectedMachine.name}. favo stays installed there.`);
   },
 });
+
+async function _installMachine(get: () => AppService, machine: Machine) {
+  const { setMachinePresence, refreshMachine } = get();
+  try {
+    setMachinePresence(machine.id, MachinePresence.installing);
+    const machineRepository = container.get('IMachineRepository');
+    return await machineRepository.install(machine.id);
+  } finally {
+    await refreshMachine(machine.id);
+  }
+}
+
+function _messageOf(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}

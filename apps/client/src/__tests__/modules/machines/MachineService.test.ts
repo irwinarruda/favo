@@ -34,6 +34,26 @@ describe('MachineService', () => {
     expect(mockDb.installed).toEqual(['studio']);
     expect(app.state.selectedMachine?.isOnline).toBe(true);
   });
+  test('updates a machine that runs an older favo', async () => {
+    const app = await getApp();
+    mockDb.machineStatuses.devbox = { state: 'online', version: '0.0.1', isBehind: true };
+    await app.state.refreshMachine('devbox');
+    expect(app.state.hasMachinesBehind).toBe(true);
+    app.state.selectRow('seat:devbox/personal/antigravity');
+    await app.state.installSelectedMachine();
+    expect(mockDb.installed).toEqual(['devbox']);
+    expect(app.state.hasMachinesBehind).toBe(false);
+  });
+  test('updates every machine that is behind, and leaves the rest alone', async () => {
+    const app = await getApp();
+    mockDb.machineStatuses.devbox = { state: 'online', version: '0.0.1', isBehind: true };
+    mockDb.machineStatuses.studio = { state: 'outdated' };
+    await app.state.loadFleet();
+    await app.state.updateAllMachines();
+    expect(mockDb.installed.toSorted()).toEqual(['devbox', 'studio']);
+    expect(app.state.toast?.message).toBe('favo 0.1.0 is running on devbox, studio.');
+    expect(app.state.hasMachinesBehind).toBe(false);
+  });
   test('does not install where it is not needed', async () => {
     const app = await getApp();
     await app.state.installSelectedMachine();

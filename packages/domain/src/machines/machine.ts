@@ -46,6 +46,13 @@ export function versionFrom(output: string) {
   return /\b\d+\.\d+\.\d+\b/.exec(output)?.[0];
 }
 
+export function isOlderVersion(version: string, than: string) {
+  const parts = version.split('.').map(Number);
+  const others = than.split('.').map(Number);
+  const index = parts.findIndex((part, position) => part !== others[position]);
+  return index !== -1 && parts[index]! < others[index]!;
+}
+
 export function assertMachineName(name: string) {
   assertDomain(
     MachineNamePattern.test(name),

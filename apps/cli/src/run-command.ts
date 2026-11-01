@@ -6,7 +6,7 @@ import { renameAccount } from '@favo/contracts/rpc/accounts/rename-account';
 import type { RpcClient } from '@favo/contracts/rpc/client';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
 import { discoverMachines } from '@favo/contracts/rpc/machines/discover-machines';
-import { getMachineStatus } from '@favo/contracts/rpc/machines/get-machine-status';
+import { getMachineStatus, type MachineStatus } from '@favo/contracts/rpc/machines/get-machine-status';
 import { installMachine } from '@favo/contracts/rpc/machines/install-machine';
 import { listMachines } from '@favo/contracts/rpc/machines/list-machines';
 import { removeMachine } from '@favo/contracts/rpc/machines/remove-machine';
@@ -126,7 +126,7 @@ export async function runCommand(parsed: Command, context: CommandContext) {
       else {
         machines.forEach((machine, index) => {
           print(
-            `${machine.name.padEnd(20)} ${(machine.target ?? 'this machine').padEnd(28)} ${statuses[index]!.state}`
+            `${machine.name.padEnd(20)} ${(machine.target ?? 'this machine').padEnd(28)} ${stateOf(statuses[index]!)}`
           );
         });
       }
@@ -156,9 +156,41 @@ export async function runCommand(parsed: Command, context: CommandContext) {
       print(`${context.paint.accent('⬢')} favo ${version} is running on ${command.target}.`);
       return 0;
     }
+    case CommandKind.machineUpdate:
+      return updateMachines(context);
     default:
       return 1;
   }
+}
+
+function stateOf(status: MachineStatus) {
+  return status.isBehind ? `${status.state} · older favo ${status.version}` : status.state;
+}
+
+async function updateMachines(context: CommandContext) {
+  const { client, print, paint } = context;
+  const machines = await client.call(listMachines, {});
+  const statuses = await Promise.all(machines.map(({ id }) => client.call(getMachineStatus, { id })));
+  const behind = machines.filter(
+    (_, index) => statuses[index]!.isBehind || statuses[index]!.state === MachineState.outdated
+  );
+  if (behind.length === 0) {
+    print(`Every machine runs favo ${FavoVersion}.`);
+    return 0;
+  }
+  let exitCode = 0;
+  for (const machine of behind) {
+    try {
+      print(`Updating favo on ${machine.name}...`);
+      const { version } = await client.call(installMachine, { id: machine.id });
+      print(`${paint.accent('⬢')} favo ${version} is running on ${machine.name}.`);
+    } catch (error) {
+      if (!(error instanceof DomainError)) throw error;
+      print(`${machine.name}: ${error.message}`);
+      exitCode = 1;
+    }
+  }
+  return exitCode;
 }
 
 function seatOf(command: Command) {
@@ -238,7 +270,7 @@ async function printFleet(context: CommandContext, isJson: boolean) {
   }
   for (const { machine, status, accounts, problem } of report) {
     const where = machine.isLocal ? 'this machine' : machine.target;
-    const facts = [where, status.state, status.directory].filter(Boolean).join(' · ');
+    const facts = [where, stateOf(status), status.directory].filter(Boolean).join(' · ');
     print(`${paint.bold(machine.name)} ${paint.dim(facts)}`);
     if (problem) print(`  ${problem}`);
     for (const account of accounts) {

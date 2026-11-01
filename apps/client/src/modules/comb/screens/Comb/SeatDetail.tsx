@@ -140,7 +140,7 @@ function MachinePanel({ machine }: { machine: Machine }) {
       {!!machine.directory && <LaunchDirectory />}
       {machine.canInstall && (
         <text fg={colors.text} marginTop={1}>
-          Press i to install favo there.
+          Press i to {machine.installLabel} favo there.
         </text>
       )}
     </box>
