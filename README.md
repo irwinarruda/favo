@@ -1,5 +1,6 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" alt="favo" width="300">
+  <img src="docs/assets/logo-dark.svg#gh-dark-mode-only" alt="favo" width="300">
+  <img src="docs/assets/logo-light.svg#gh-light-mode-only" alt="favo" width="300">
 </p>
 
 <h3 align="center">Every AI subscription you have, on every computer you own.<br>No more logging in and out.</h3>
@@ -20,10 +21,8 @@
 </p>
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/favo-honey.png">
-    <img src="docs/assets/favo-wax.png" alt="favo showing four machines, six accounts and their logins in one terminal view" width="900">
-  </picture>
+  <img src="docs/assets/favo-honey.png#gh-dark-mode-only" alt="favo showing four machines, six accounts and their logins in one terminal view" width="900">
+  <img src="docs/assets/favo-wax.png#gh-light-mode-only" alt="favo showing four machines, six accounts and their logins in one terminal view" width="900">
 </p>
 
 favo runs Claude Code, Codex, Antigravity CLI and OpenCode under as many accounts as you have, at the same time, on all your machines. Each account keeps its own login and threads. Your `CLAUDE.md`, skills and settings follow you into all of them.
