@@ -247,6 +247,24 @@ describe('readings that cannot be read as current', () => {
   });
 });
 
+describe('a reset that has already passed', () => {
+  const past = seatOf('a', [sessionOf(90, -Minute)]);
+  const current = seatOf('b', [sessionOf(20, 40 * Minute)]);
+
+  it('gives nothing back, because it already happened', () => {
+    const [column] = firstWindowOf([past, current]).columns;
+    expect(column?.seat.name).toBe('a');
+    expect(column?.member?.refillPercent).toBe(0);
+  });
+  it('is not the next reset of the pool', () => {
+    expect(firstWindowOf([past, current]).restoresPercent).toBe(10);
+  });
+  it('leaves no next reset when every reset has passed', () => {
+    const other = seatOf('b', [sessionOf(20, -Minute)]);
+    expect(firstWindowOf([past, other]).restoresPercent).toBeUndefined();
+  });
+});
+
 describe('seats with no bars', () => {
   const unsupported = (displayName: string, provider: ProviderId = ProviderId.opencode) =>
     seatOf(displayName, [], { provider, usage: unavailableUsage(at(0), 'unsupported') });

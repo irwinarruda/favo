@@ -103,6 +103,33 @@ describe('favo usage', () => {
     expect(stdout).toContain('Codex');
     expect(stdout).toContain('90% left');
   });
+  it('tells seats apart from inside a seat, whatever its shell inherited', async () => {
+    await favo(['add', 'work']);
+    const path = (await favo(['path', 'work', 'claude'])).stdout.trim();
+    writeFileSync(`${path}/identity`, 'work@bee.dev');
+    const { stdout } = await favo(['usage', '--json'], { CLAUDE_CONFIG_DIR: path });
+    const [{ seats }] = JSON.parse(stdout);
+    const identities = seats.map(({ account, identity }: { account: string; identity: string }) => [account, identity]);
+    expect(identities).toEqual([
+      ['personal', 'personal@bee.dev'],
+      ['work', 'work@bee.dev'],
+    ]);
+  });
+  it.skipIf(isWindows)('stops the read when the machine asking for it goes away', async () => {
+    const child = Bun.spawn(['bun', Main, 'serve', '--stdio'], {
+      env: { PATH: `${fakeBin}${delimiter}${process.env.PATH}`, HOME: home, FAKE_USAGE_HANG: '1' },
+      stdin: 'pipe',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const started = Date.now();
+    child.stdin.write(`${JSON.stringify({ id: 1, method: 'seats.usage', params: {} })}\n`);
+    await child.stdin.flush();
+    await Bun.sleep(1000);
+    await child.stdin.end();
+    await child.exited;
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
   it('gives machine readable output', async () => {
     const { stdout } = await favo(['usage', '--json']);
     const [{ machine, seats }] = JSON.parse(stdout);

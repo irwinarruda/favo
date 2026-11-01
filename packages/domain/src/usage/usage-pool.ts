@@ -147,7 +147,8 @@ function memberOf(seat: UsagePoolSeat, reported: UsageWindow, now: number): Usag
       reported.kind === UsageWindowKind.session && window.usedPercent >= 100 && isOverallWeek(seat.provider, window)
   );
   if (!spentWeek) {
-    const refillPercent = resetMillisOf(reported) === undefined ? 0 : reported.usedPercent;
+    const reset = resetMillisOf(reported);
+    const refillPercent = reset === undefined || reset <= now ? 0 : reported.usedPercent;
     return { seat, window: reported, refillPercent, isStale: isStale(seat, reported, now) };
   }
   const cutoff = Math.max(now, Date.parse(seat.usage.checkedAt));

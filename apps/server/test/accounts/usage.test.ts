@@ -83,6 +83,16 @@ describe('the environment of a read', () => {
     await client.call(readUsage, {});
     expect((await fileSystem.entry(`${Home}/.favo/empty`)).kind).toBe('directory');
   });
+  it('checks the login in the same clean environment as the read', async () => {
+    const { client, clis } = await serverWithWork({ callerEnv: { ANTHROPIC_API_KEY: 'key' } });
+    clis.claude.usageEnvironment = () => ({ env: {}, unsetEnv: ['ANTHROPIC_API_KEY', 'CLAUDE_CONFIG_DIR'] });
+    await client.call(readUsage, {});
+    const sessions = clis.claude.sessions.slice(-2);
+    expect(sessions).toEqual(clis.claude.usageSessions.slice(-2));
+    expect(sessions.every(({ env }) => Object.hasOwn(env, 'ANTHROPIC_API_KEY') && !env.ANTHROPIC_API_KEY)).toBe(true);
+    const folders = sessions.map(({ env }) => env.CLAUDE_CONFIG_DIR);
+    expect(folders.toSorted()).toEqual([`${Home}/.favo/accounts/work/claude`, undefined].toSorted());
+  });
   it('clears a variable the launch environment says to clear', async () => {
     const { client, clis } = await serverWithWork({ callerEnv: { TMUX: '/tmp/x' } });
     clis.claude.usageEnvironment = () => ({ env: { TERM: 'dumb' }, unsetEnv: ['TMUX', 'CLAUDE_CONFIG_DIR'] });
@@ -111,13 +121,40 @@ describe('a read that goes wrong', () => {
     });
     expect(seats.find(({ provider }) => provider === 'codex')?.usage.windows).toEqual([session]);
   });
-  it('does not lose the machine to a seat whose login cannot be read', async () => {
+  it('shows a seat whose login check crashed as a failed read, so its last bars can stay', async () => {
     const { client, clis, fileSystem } = await serverWithWork();
     clis.codex.status = async () => {
       throw new Error('boom');
     };
     await fileSystem.ensureDirectory(`${Home}/.codex`);
-    expect((await client.call(readUsage, {})).every(({ provider }) => provider === 'claude')).toBe(true);
+    const seats = await client.call(readUsage, {});
+    expect(seats.find(({ provider }) => provider === 'codex')?.usage.unavailable?.reason).toBe('probeFailed');
+    expect(seats.filter(({ provider }) => provider === 'claude')).toHaveLength(2);
+  });
+  it('shows a seat whose login cannot be told as a failed read, and never starts the read', async () => {
+    const { client, clis } = await serverWithWork();
+    clis.claude.login = { login: LoginState.unknown };
+    const seats = await client.call(readUsage, {});
+    expect(seats.map(({ usage }) => usage.unavailable?.reason)).toEqual(['probeFailed', 'probeFailed']);
+    expect(clis.claude.usageSessions).toEqual([]);
+  });
+  it('costs only that seat when a reading is one the wire would refuse', async () => {
+    const { client, clis, fileSystem } = await serverWithWork();
+    clis.codex.login = signedIn;
+    clis.codex.usageReading = { windows: [{ ...session, resetsAt: 'in a while' }] };
+    await fileSystem.ensureDirectory(`${Home}/.codex`);
+    const seats = await client.call(readUsage, {});
+    expect(seats.find(({ provider }) => provider === 'codex')?.usage.unavailable?.reason).toBe('probeFailed');
+    expect(seats.find(({ provider }) => provider === 'claude')?.usage.windows).toEqual([session]);
+  });
+  it('costs only that seat when its login has a value the wire would refuse', async () => {
+    const { client, clis, fileSystem } = await serverWithWork();
+    clis.codex.login = { login: LoginState.signedIn, plan: 7 as unknown as string };
+    clis.codex.usageReading = { windows: [session] };
+    await fileSystem.ensureDirectory(`${Home}/.codex`);
+    const seats = await client.call(readUsage, {});
+    expect(seats.find(({ provider }) => provider === 'codex')?.usage.unavailable?.reason).toBe('probeFailed');
+    expect(seats.filter(({ provider }) => provider === 'claude')).toHaveLength(2);
   });
 });
 
@@ -179,6 +216,17 @@ describe('another machine', () => {
 });
 
 describe('closing', () => {
+  it('starts no more seats once it closes', async () => {
+    const { client, clis, close } = await serverWithWork();
+    for (const name of ['one', 'two', 'three', 'four', 'five', 'six']) {
+      await client.call(createAccount, { name });
+      await client.call(provisionSeat, { account: name, provider: 'claude' });
+    }
+    const reading = client.call(readUsage, {});
+    close();
+    await reading;
+    expect(clis.claude.usageSessions.length).toBeLessThanOrEqual(4);
+  });
   it('stops every process still open, so a quit leaves no read behind', async () => {
     const { close, processes } = createTestServer();
     close();

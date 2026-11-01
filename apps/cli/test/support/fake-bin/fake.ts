@@ -13,6 +13,7 @@ async function claudeUsage() {
       console.log(JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id, response } }));
     if (request.subtype === 'initialize') answer({});
     if (request.subtype !== 'get_usage') continue;
+    if (process.env.FAKE_USAGE_HANG) await Bun.sleep(60_000);
     const isSubscription = process.env.ANTHROPIC_API_KEY === undefined && readdirSync('.').length === 0;
     const resets_at = new Date(Date.now() + UsageResetMs).toISOString().replace('Z', '000+00:00');
     answer({

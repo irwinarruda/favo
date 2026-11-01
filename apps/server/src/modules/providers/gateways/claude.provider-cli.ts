@@ -50,7 +50,7 @@ export class ClaudeProviderCli extends ProviderCli {
     const status = parseStatus(result.stdout);
     if (!status) return { login: LoginState.unknown };
     if (!status.loggedIn) return { login: LoginState.signedOut };
-    return { login: LoginState.signedIn, identity: status.email, plan: planOf(status) };
+    return { login: LoginState.signedIn, identity: status.email ?? undefined, plan: planOf(status) };
   }
 
   loginArguments() {
@@ -89,7 +89,7 @@ function usageAnswerOf(message: ControlMessage) {
   return isAnswer ? message.response : undefined;
 }
 
-type ClaudeStatus = { loggedIn?: boolean; email?: string; orgName?: string; subscriptionType?: string };
+type ClaudeStatus = { loggedIn?: boolean; email?: string | null; orgName?: string; subscriptionType?: string };
 
 function parseStatus(stdout: string) {
   try {

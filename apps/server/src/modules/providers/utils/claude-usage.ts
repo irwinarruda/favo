@@ -1,5 +1,6 @@
 import {
   clampPercent,
+  NoSubscriptionLimitsMessage,
   type SeatUsage,
   sortUsageWindows,
   UsageUnavailableReason,
@@ -31,8 +32,7 @@ export type ClaudeUsageResponse = { rate_limits_available?: unknown; rate_limits
 
 export function claudeUsageOf(response: ClaudeUsageResponse | undefined, checkedAt: string): SeatUsage {
   if (response?.rate_limits_available === false) {
-    const message = 'This account has no subscription limits.';
-    return unavailableUsage(checkedAt, UsageUnavailableReason.unsupported, message);
+    return unavailableUsage(checkedAt, UsageUnavailableReason.unsupported, NoSubscriptionLimitsMessage);
   }
   const limits = response?.rate_limits;
   if (response?.rate_limits_available !== true || typeof limits !== 'object' || limits === null) {

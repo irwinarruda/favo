@@ -116,6 +116,24 @@ describe('usage', () => {
     expect(output).toContain('68% left');
     expect(output).toContain('devbox: older favo');
   });
+  it('exits with an error when the one machine it was asked for gave nothing', async () => {
+    const mac = harness();
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    expect(await mac.run('usage', '--machine', 'devbox')).toBe(1);
+    expect(await mac.run('usage', '--machine', 'devbox', '--json')).toBe(1);
+  });
+  it('exits cleanly when another machine answered', async () => {
+    const mac = harness();
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    expect(await mac.run('usage')).toBe(0);
+  });
+  it('dims a headline it cannot present as current', async () => {
+    const mac = harness(createTestServer(), true);
+    await signedIn(mac, 'mac@bee.dev', 32, -2);
+    await mac.run('usage');
+    const headline = mac.lines.find((line) => line.includes('68% left'));
+    expect(headline).toContain(createPaint(true, BuiltInThemes[0]!.colors).dim('68% left'));
+  });
   it('sums up a provider with no limits', async () => {
     const mac = harness();
     await signedIn(mac, 'mac@bee.dev', 32);

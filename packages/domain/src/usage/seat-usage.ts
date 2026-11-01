@@ -7,6 +7,7 @@ const Day = 24 * Hour;
 const PaceTolerance = 5;
 
 export const UsageFreshForMs = 5 * Minute;
+export const NoSubscriptionLimitsMessage = 'This account has no subscription limits.';
 
 export const UsageWindowKind = {
   session: 'session',
