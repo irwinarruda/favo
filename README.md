@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo.svg">
-    <img src="docs/assets/logo-light.svg" alt="favo" width="300">
-  </picture>
+  <img src="docs/assets/logo.svg" alt="favo" width="300">
 </p>
 
 <h3 align="center">Every AI subscription you have, on every computer you own.<br>No more logging in and out.</h3>
