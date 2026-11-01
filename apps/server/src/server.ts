@@ -4,6 +4,7 @@ import { registerAccountsController } from '@/modules/accounts/controllers/accou
 import { AccountRepository } from '@/modules/accounts/repositories/account.repository';
 import { AccountsService } from '@/modules/accounts/services/accounts.service';
 import { SeatsService } from '@/modules/accounts/services/seats.service';
+import { UsageService } from '@/modules/accounts/services/usage.service';
 import { registerDesktopController } from '@/modules/desktop/controllers/desktop.controller';
 import type { DesktopApps } from '@/modules/desktop/gateways/desktop-apps';
 import { DesktopAppsService } from '@/modules/desktop/services/desktop-apps.service';
@@ -62,6 +63,7 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
   const accountRepository = new AccountRepository(fileSystem, paths);
   const seats = new SeatsService(fileSystem, accountRepository, providers, paths);
   const accounts = new AccountsService(fileSystem, accountRepository, seats, providers, config, clock, paths);
+  const usage = new UsageService(accounts, providers, fileSystem, clock, paths, callerEnv);
   const machineRepository = new MachineRepository(fileSystem, paths);
   const machines = new MachinesService(
     machineRepository,
@@ -79,7 +81,7 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
   const themes = new ThemesService(new ThemeRepository(fileSystem, paths), config);
   const desktop = new DesktopAppsService(desktopApps, seats, providers, fileSystem, paths);
   registerSystemController(router, host);
-  registerAccountsController(router, accounts, seats);
+  registerAccountsController(router, accounts, seats, usage);
   registerMachinesController(router, machines, installer);
   registerTerminalController(router, terminal);
   registerDesktopController(router, desktop);
@@ -89,6 +91,9 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
   return {
     router,
     prepare: () => fileSystem.ensurePrivateDirectory(paths.root),
-    close: () => remotes.closeAll(),
+    close() {
+      remotes.closeAll();
+      processes.killOpen();
+    },
   };
 }

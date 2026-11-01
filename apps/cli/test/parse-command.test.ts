@@ -41,6 +41,14 @@ describe('parseCommand', () => {
   it('needs an account and a provider to open an app', () => {
     expect(() => parseCommand(['app', 'work'])).toThrow('favo app <account> <provider>');
   });
+  it('reads usage, for every machine or for one', () => {
+    expect(parseCommand(['usage'])).toMatchObject({ kind: CommandKind.usage, isJson: false, machineId: undefined });
+    expect(parseCommand(['usage', '--machine', 'devbox', '--json'])).toMatchObject({
+      kind: CommandKind.usage,
+      isJson: true,
+      machineId: 'devbox',
+    });
+  });
   it('takes a machine anywhere', () => {
     expect(parseCommand(['list', '--json']).isJson).toBe(true);
     expect(parseCommand(['add', 'side', '-m', 'devbox']).machineId).toBe('devbox');

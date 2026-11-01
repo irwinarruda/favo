@@ -7,6 +7,8 @@ export const HelpText = `favo, a honeycomb for your AI subscriptions
 
 Accounts
   favo list [--json]                 every machine, account and login
+  favo usage [--json]                what every seat has left, and when it
+                                     comes back (Claude Code, Codex)
   favo add <account>                 add a cell
   favo rename <account> <new name>   rename a cell, its folder stays put
   favo rm <account>                  move a cell to the trash

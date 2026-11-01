@@ -1,9 +1,26 @@
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const [name, ...args] = process.argv.slice(2);
 const home = process.env.HOME ?? '';
 const isWindows = process.platform === 'win32';
+const UsageResetMs = 44.5 * 60_000;
+
+async function claudeUsage() {
+  for await (const line of console) {
+    const { request, request_id } = JSON.parse(line);
+    const answer = (response: unknown) =>
+      console.log(JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id, response } }));
+    if (request.subtype === 'initialize') answer({});
+    if (request.subtype !== 'get_usage') continue;
+    const isSubscription = process.env.ANTHROPIC_API_KEY === undefined && readdirSync('.').length === 0;
+    const resets_at = new Date(Date.now() + UsageResetMs).toISOString().replace('Z', '000+00:00');
+    answer({
+      rate_limits_available: isSubscription,
+      rate_limits: { five_hour: { utilization: 32, resets_at }, cinder_cove: null },
+    });
+  }
+}
 
 function claude() {
   const folder = process.env.CLAUDE_CONFIG_DIR ?? `${home}/.claude`;
@@ -16,6 +33,7 @@ function claude() {
     console.log(JSON.stringify({ loggedIn: true, email, subscriptionType: 'max' }));
     return;
   }
+  if (args.includes('--input-format')) return claudeUsage();
   if (args[0] === 'auth' && args[1] === 'login') {
     mkdirSync(folder, { recursive: true });
     writeFileSync(`${folder}/identity`, 'signed-in@bee.dev');
@@ -42,6 +60,11 @@ async function codex() {
         ? { type: 'chatgpt', email: readFileSync(`${folder}/identity`, 'utf8').trim(), planType: 'plus' }
         : null;
       console.log(JSON.stringify({ id: 2, result: { account } }));
+    }
+    if (line.includes('account/rateLimits/read')) {
+      const resetsAt = Math.floor((Date.now() + UsageResetMs) / 1000);
+      const primary = { usedPercent: 10, windowDurationMins: 300, resetsAt };
+      console.log(JSON.stringify({ id: 2, result: { rateLimits: { limitId: 'codex', primary } } }));
     }
   }
 }

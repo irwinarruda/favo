@@ -9,6 +9,8 @@ type Reply = Partial<ProcessResult>;
 
 export class ScriptedProcessRunner extends ProcessRunner {
   readonly calls: ProcessRequest[] = [];
+  readonly killed: ProcessRequest[] = [];
+  killOpenCount = 0;
   private readonly replies = new Map<string, Reply>();
   private readonly conversations = new Map<string, string[]>();
   private readonly installed = new Map<string, string>();
@@ -36,6 +38,7 @@ export class ScriptedProcessRunner extends ProcessRunner {
     this.calls.push(request);
     const lines = this.conversations.get(lineOf(request));
     const listeners: ((line: string) => void)[] = [];
+    const { killed } = this;
     return {
       write() {
         for (const line of lines ?? []) for (const listener of listeners) listener(line);
@@ -44,13 +47,19 @@ export class ScriptedProcessRunner extends ProcessRunner {
         listeners.push(listener);
       },
       exited: lines ? new Promise(() => {}) : Promise.resolve({ code: 127, stderr: 'not found' }),
-      kill() {},
+      kill() {
+        killed.push(request);
+      },
     };
   }
 
   detach(request: ProcessRequest) {
     this.calls.push(request);
     return !this.undetachable.has(request.command);
+  }
+
+  killOpen() {
+    this.killOpenCount++;
   }
 
   failToDetach(command: string) {

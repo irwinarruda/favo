@@ -2,6 +2,7 @@ export type ProcessRequest = {
   command: string;
   args: string[];
   env?: Record<string, string | undefined>;
+  cwd?: string;
   timeoutMs?: number;
   stdinFile?: string;
 };
@@ -19,5 +20,6 @@ export abstract class ProcessRunner {
   abstract run(request: ProcessRequest): Promise<ProcessResult>;
   abstract open(request: ProcessRequest): PipedProcess;
   abstract detach(request: ProcessRequest): boolean;
+  abstract killOpen(): void;
   abstract which(command: string, path: string): string | undefined;
 }

@@ -29,6 +29,7 @@ export function useCombKeys(props: CombKeys) {
   const refreshMachine = useApp((state) => state.refreshMachine);
   const openThemePicker = useApp((state) => state.openThemePicker);
   const openDirectoryPicker = useApp((state) => state.openDirectoryPicker);
+  const openUsage = useApp((state) => state.openUsage);
   const selectedMachine = useApp((state) => state.selectedMachine);
   const error = useError();
 
@@ -62,6 +63,7 @@ export function useCombKeys(props: CombKeys) {
     else if (key.name === 'r') void error.handle(onRefresh)();
     else if (key.name === 't') void error.handle(openThemePicker)();
     else if (key.name === 'd') void error.handle(openDirectoryPicker)();
+    else if (key.name === 'u') void error.handle(openUsage)();
     else if (key.name === 'x') onRemoveAccount();
   });
 }

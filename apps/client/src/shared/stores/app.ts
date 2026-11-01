@@ -7,6 +7,7 @@ import { createDirectoryService, type DirectoryService } from '@/modules/directo
 import { createMachineService, type MachineService } from '@/modules/machines/app/services/MachineService';
 import { createSessionService, type SessionService } from '@/modules/sessions/app/services/SessionService';
 import { createThemeService, type ThemeService } from '@/modules/themes/app/services/ThemeService';
+import { createUsageService, type UsageService } from '@/modules/usage/app/services/UsageService';
 import { createToastService, type ToastService } from '@/shared/app/services/ToastService';
 
 export type AppService = ThemeService &
@@ -16,6 +17,7 @@ export type AppService = ThemeService &
   SessionService &
   AccountService &
   MachineService &
+  UsageService &
   ToastService;
 
 export type ServiceCreator<T> = StateCreator<AppService, [], [], T>;
@@ -30,6 +32,7 @@ export const useApp = create<AppService>()(
       createSessionService(...args),
       createAccountService(...args),
       createMachineService(...args),
+      createUsageService(...args),
       createToastService(...args)
     )
   )

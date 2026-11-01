@@ -8,6 +8,8 @@ const FailedConnectionCode = 1;
 const MaximumStderrBytes = 64 * 1024;
 
 export class BunProcessRunner extends ProcessRunner {
+  private readonly openChildren = new Set<Bun.Subprocess>();
+
   constructor(
     private readonly baseEnv: Record<string, string | undefined>,
     private readonly isCaseInsensitive: boolean
@@ -18,11 +20,13 @@ export class BunProcessRunner extends ProcessRunner {
   async run(request: ProcessRequest) {
     try {
       const child = Bun.spawn(spawnCommandOf(request.command, request.args), {
+        cwd: request.cwd,
         env: this.environmentOf(request),
         stdin: request.stdinFile ? Bun.file(request.stdinFile) : 'ignore',
         stdout: 'pipe',
         stderr: 'pipe',
       });
+      this.trackOpen(child);
       const timer = request.timeoutMs ? setTimeout(() => child.kill(), request.timeoutMs) : undefined;
       const [stdout, stderr, code] = await Promise.all([
         readTail(child.stdout, MaximumLineBytes),
@@ -38,11 +42,13 @@ export class BunProcessRunner extends ProcessRunner {
 
   open(request: ProcessRequest): PipedProcess {
     const child = Bun.spawn(spawnCommandOf(request.command, request.args), {
+      cwd: request.cwd,
       env: this.environmentOf(request),
       stdin: 'pipe',
       stdout: 'pipe',
       stderr: 'pipe',
     });
+    this.trackOpen(child);
     const listeners: ((line: string) => void)[] = [];
     const failed = Promise.withResolvers<{ code: number; stderr: string; failure: string }>();
     function failWith(error: unknown) {
@@ -84,8 +90,17 @@ export class BunProcessRunner extends ProcessRunner {
     }
   }
 
+  killOpen() {
+    for (const child of this.openChildren) child.kill();
+  }
+
   which(command: string, path: string) {
     return Bun.which(command, { PATH: path }) ?? undefined;
+  }
+
+  private trackOpen(child: Bun.Subprocess) {
+    this.openChildren.add(child);
+    void child.exited.then(() => this.openChildren.delete(child));
   }
 
   private environmentOf(request: ProcessRequest) {

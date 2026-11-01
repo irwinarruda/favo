@@ -14,6 +14,7 @@ import { useCombKeys } from '@/modules/comb/screens/Comb/useCombKeys';
 import { DirectoryPicker } from '@/modules/directories/screens/DirectoryPicker';
 import { AddMachine } from '@/modules/machines/screens/AddMachine';
 import { ThemePicker } from '@/modules/themes/screens/ThemePicker';
+import { Usage } from '@/modules/usage/screens/Usage';
 import { type Confirmation, ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useError } from '@/shared/error/useError';
 import { useApp } from '@/shared/stores/app';
@@ -42,6 +43,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   const isAddMachineOpen = useApp((state) => state.isAddMachineOpen);
   const isThemePickerOpen = useApp((state) => state.isThemePickerOpen);
   const isDirectoryPickerOpen = useApp((state) => state.isDirectoryPickerOpen);
+  const isUsageOpen = useApp((state) => state.isUsageOpen);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const scrollRef = useRef<ScrollBoxRenderable>(null);
@@ -55,6 +57,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     isAddMachineOpen ||
     isThemePickerOpen ||
     isDirectoryPickerOpen ||
+    isUsageOpen ||
     confirmation !== undefined;
 
   function onRemoveAccount() {
@@ -132,6 +135,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
       </box>
       <ToastLine />
       <KeyBar onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} onOpenDesktopApp={onOpenDesktopApp} />
+      {isUsageOpen && <Usage isEnabled={!isHelpOpen} onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} />}
       {isHelpOpen && <HelpDialog onClose={() => setIsHelpOpen(false)} />}
       {isAddAccountOpen && <AddAccount />}
       {isRenameAccountOpen && <RenameAccount />}

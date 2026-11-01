@@ -5,6 +5,7 @@ import { TestMachineRepository } from '@/modules/machines/app/repositories/TestM
 import { TestDesktopRepository } from '@/modules/sessions/app/repositories/TestDesktopRepository';
 import { TestTerminalRepository } from '@/modules/sessions/app/repositories/TestTerminalRepository';
 import { TestThemeRepository } from '@/modules/themes/app/repositories/TestThemeRepository';
+import { TestUsageRepository } from '@/modules/usage/app/repositories/TestUsageRepository';
 import { TestClipboardGateway } from '@/shared/app/gateways/TestClipboardGateway';
 import { TestTerminalGateway } from '@/shared/app/gateways/TestTerminalGateway';
 import { container } from '@/shared/container';
@@ -16,6 +17,7 @@ export function bootstrapDevContainer() {
   container.register('ITerminalRepository', new TestTerminalRepository());
   container.register('IDesktopRepository', new TestDesktopRepository());
   container.register('IThemeRepository', new TestThemeRepository());
+  container.register('IUsageRepository', new TestUsageRepository());
   container.register('IDirectoryRepository', new TestDirectoryRepository());
   container.register('IClipboardGateway', new TestClipboardGateway());
   container.register('ITerminalGateway', new TestTerminalGateway());

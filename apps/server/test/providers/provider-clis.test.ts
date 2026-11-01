@@ -45,6 +45,253 @@ describe('Claude Code shim', () => {
   });
 });
 
+describe('Claude Code usage', () => {
+  const server =
+    'claude -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --setting-sources local';
+  const CheckedAt = '2026-11-01T12:00:00.000Z';
+  const session = { ...sessionOf('claude'), cwd: '/home/bee/.favo/empty' };
+  const answerLine = (response: unknown) =>
+    JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id: 'usage', response } });
+  const fiveHour = { utilization: 32, resets_at: '2026-11-01T22:40:00.766659+00:00' };
+
+  async function read(response: unknown) {
+    const processes = new ScriptedProcessRunner();
+    processes.converse(server, [answerLine(response)]);
+    return new ClaudeProviderCli(processes).usage(session, CheckedAt);
+  }
+
+  it('reads the session and the week, and ignores every codenamed field', async () => {
+    const usage = await read({
+      subscription_type: 'max',
+      rate_limits_available: true,
+      rate_limits: {
+        five_hour: { ...fiveHour, limit_dollars: null, locked_reason: null },
+        seven_day: { utilization: 75, resets_at: '2026-11-04T05:00:00+00:00' },
+        cinder_cove: null,
+        wattle_ember: { utilization: 99 },
+        limits: [{ kind: 'session', percent: 0 }],
+      },
+    });
+    expect(usage).toEqual({
+      checkedAt: CheckedAt,
+      windows: [
+        {
+          id: 'five_hour',
+          kind: 'session',
+          label: 'Session',
+          windowDurationMins: 300,
+          usedPercent: 32,
+          resetsAt: '2026-11-01T22:40:00.766Z',
+        },
+        {
+          id: 'seven_day',
+          kind: 'weekly',
+          label: 'Weekly',
+          windowDurationMins: 10080,
+          usedPercent: 75,
+          resetsAt: '2026-11-04T05:00:00.000Z',
+        },
+      ],
+    });
+  });
+  it('makes a weekly window of each model limit', async () => {
+    const scoped = { display_name: 'Fable 5', utilization: 10, resets_at: '2026-11-03T04:00:00+00:00' };
+    const { windows } = await read({ rate_limits_available: true, rate_limits: { model_scoped: [scoped] } });
+    expect(windows[0]).toMatchObject({ id: 'seven_day_fable_5', kind: 'weekly', label: 'Weekly · Fable 5' });
+  });
+  it('skips a window with no number, and a broken model entry', async () => {
+    const rate_limits = {
+      five_hour: { utilization: null, resets_at: null },
+      model_scoped: ['nonsense', null, { display_name: 'Fable', utilization: 'lots' }],
+    };
+    expect((await read({ rate_limits_available: true, rate_limits })).windows).toEqual([]);
+  });
+  it('reads monthly spend when the money compares', async () => {
+    const money = (amount_minor: number, currency = 'USD', exponent = 2) => ({ amount_minor, currency, exponent });
+    const spend = { enabled: true, used: money(2500), limit: money(10000) };
+    const { windows } = await read({ rate_limits_available: true, rate_limits: { spend } });
+    expect(windows).toEqual([{ id: 'monthly_spend', kind: 'monthly', label: 'Monthly spend', usedPercent: 25 }]);
+  });
+  it('falls back to extra usage when the currencies differ, and skips it when neither applies', async () => {
+    const money = (amount_minor: number, currency: string) => ({ amount_minor, currency, exponent: 2 });
+    const spend = { enabled: true, used: money(2500, 'USD'), limit: money(10000, 'BRL') };
+    const extra_usage = { is_enabled: true, used_credits: 10, monthly_limit: 40, utilization: 99 };
+    const withExtra = await read({ rate_limits_available: true, rate_limits: { spend, extra_usage } });
+    expect(withExtra.windows[0]?.usedPercent).toBe(25);
+    const without = { spend: { enabled: false }, extra_usage: { is_enabled: false } };
+    expect((await read({ rate_limits_available: true, rate_limits: without })).windows).toEqual([]);
+  });
+  it('says so when no plan limits apply', async () => {
+    expect((await read({ rate_limits_available: false })).unavailable).toEqual({
+      reason: 'unsupported',
+      message: 'This account has no subscription limits.',
+    });
+  });
+  it.each([
+    ['limits promised but missing', { rate_limits_available: true }],
+    ['limits that are not an object', { rate_limits_available: true, rate_limits: 'lots' }],
+    ['no flag at all', { rate_limits: {} }],
+    ['no response at all', undefined],
+  ])('fails softly on %s', async (_name, response) => {
+    const usage = await read(response);
+    expect(usage.unavailable?.reason).toBe('probeFailed');
+    expect(usage.windows).toEqual([]);
+  });
+  it('fails softly and kills a process that never answers', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.converse(server, []);
+    const usage = await new ClaudeProviderCli(processes, 5).usage(session, CheckedAt);
+    expect(usage.unavailable).toEqual({ reason: 'probeFailed', message: 'Claude Code did not answer.' });
+    expect(processes.killed).toHaveLength(1);
+  });
+  it('fails softly on a malformed reply, and does not take another answer for its own', async () => {
+    const processes = new ScriptedProcessRunner();
+    const otherAnswer = JSON.stringify({ type: 'control_response', response: { request_id: 'init' } });
+    processes.converse(server, ['not json', 'null', '7', otherAnswer]);
+    const usage = await new ClaudeProviderCli(processes, 5).usage(session, CheckedAt);
+    expect(usage.unavailable?.reason).toBe('probeFailed');
+  });
+  it('kills the process once it has its answer', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.converse(server, [answerLine({ rate_limits_available: true, rate_limits: {} })]);
+    await new ClaudeProviderCli(processes).usage(session, CheckedAt);
+    expect(processes.killed).toHaveLength(1);
+  });
+  it('fails softly when the process dies', async () => {
+    const usage = await new ClaudeProviderCli(new ScriptedProcessRunner()).usage(session, CheckedAt);
+    expect(usage.unavailable?.reason).toBe('probeFailed');
+  });
+  it('starts in the empty folder, so no project settings load', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.converse(server, [answerLine({ rate_limits_available: false })]);
+    await new ClaudeProviderCli(processes).usage(session, CheckedAt);
+    expect(processes.calls[0]?.cwd).toBe('/home/bee/.favo/empty');
+  });
+  it('clears what could make a subscription look like an API key, and what it launches with', () => {
+    const cli = new ClaudeProviderCli(new ScriptedProcessRunner());
+    const current = {
+      TMUX: '/tmp/x',
+      ANTHROPIC_API_KEY: 'key',
+      CLAUDE_CODE_ENTRYPOINT: 'cli',
+      HERDR_SESSION: 'x',
+      PATH: '/usr/bin',
+    };
+    const { env, unsetEnv } = cli.usageEnvironment(current);
+    expect(env).toEqual({ TERM: 'xterm-256color' });
+    expect(unsetEnv.toSorted()).toEqual(['ANTHROPIC_API_KEY', 'CLAUDE_CODE_ENTRYPOINT', 'HERDR_SESSION', 'TMUX']);
+  });
+});
+
+describe('Codex usage', () => {
+  const CheckedAt = '2026-11-01T12:00:00.000Z';
+  const Reset = 1793572973;
+  const ResetIso = new Date(Reset * 1000).toISOString();
+  const session = sessionOf('codex');
+  const answerLine = (result: unknown) => JSON.stringify({ id: 2, result });
+  const position = (usedPercent: number, windowDurationMins?: number) => ({
+    usedPercent,
+    windowDurationMins,
+    resetsAt: Reset,
+  });
+
+  async function read(result: unknown) {
+    const processes = new ScriptedProcessRunner();
+    processes.converse('codex app-server', [answerLine(result)]);
+    return new CodexProviderCli(processes).usage(session, CheckedAt);
+  }
+
+  it('turns epoch seconds into a date and the length into a kind', async () => {
+    const rateLimits = { primary: position(10, 300), secondary: position(75, 10080), planType: 'team', unknown: 1 };
+    expect((await read({ rateLimits })).windows).toEqual([
+      {
+        id: 'primary',
+        kind: 'session',
+        label: 'Session',
+        usedPercent: 10,
+        windowDurationMins: 300,
+        resetsAt: ResetIso,
+      },
+      {
+        id: 'secondary',
+        kind: 'weekly',
+        label: 'Weekly',
+        usedPercent: 75,
+        windowDurationMins: 10080,
+        resetsAt: ResetIso,
+      },
+    ]);
+  });
+  it('prefers the codex entry over the top level', async () => {
+    const rateLimits = { limitId: 'gpt-5-spark', primary: position(99, 300) };
+    const rateLimitsByLimitId = { codex: { limitId: 'codex', primary: position(10, 300) } };
+    const { windows } = await read({ rateLimits, rateLimitsByLimitId });
+    expect(windows[0]?.usedPercent).toBe(10);
+  });
+  it('ignores a snapshot for one model, so it cannot replace the main allowance', async () => {
+    const usage = await read({ rateLimits: { limitId: 'gpt-5-spark', primary: position(99, 300) } });
+    expect(usage.windows).toEqual([]);
+    expect(usage.unavailable).toBeUndefined();
+  });
+  it('reads a window by its length, not by its position', async () => {
+    const { windows } = await read({ rateLimits: { primary: position(10, 43200) } });
+    expect(windows[0]).toMatchObject({ kind: 'monthly', label: 'Monthly' });
+  });
+  it.each([
+    ['plus', 'session'],
+    ['free', 'monthly'],
+    ['go', 'monthly'],
+  ])('reads a first window with no length on a %s plan as %s', async (planType, kind) => {
+    const { windows } = await read({ rateLimits: { planType, primary: { usedPercent: 10 } } });
+    expect(windows[0]?.kind).toBe(kind as 'session');
+  });
+  it('reads a second window with no length as the week', async () => {
+    const { windows } = await read({ rateLimits: { secondary: { usedPercent: 10 } } });
+    expect(windows[0]).toMatchObject({ kind: 'weekly', windowDurationMins: 10080 });
+  });
+  it('turns what the individual limit has left into what is spent', async () => {
+    const { windows } = await read({ rateLimits: { individualLimit: { remainingPercent: 30, resetsAt: Reset } } });
+    expect(windows).toEqual([
+      {
+        id: 'individual',
+        kind: 'monthly',
+        label: 'Monthly credit limit',
+        usedPercent: 70,
+        resetsAt: ResetIso,
+      },
+    ]);
+  });
+  it('leaves banked credits out', async () => {
+    const usage = await read({ rateLimits: {}, rateLimitResetCredits: { availableCount: 1 } });
+    expect(usage).toEqual({ checkedAt: CheckedAt, windows: [] });
+  });
+  it.each([
+    ['nothing', undefined],
+    ['a number', 7],
+    ['no limits', {}],
+  ])('fails softly on %s', async (_name, result) => {
+    expect((await read(result)).unavailable?.reason).toBe('probeFailed');
+  });
+  it('fails softly when the app server refuses', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.converse('codex app-server', [JSON.stringify({ id: 2, error: { code: -32600, message: 'no' } })]);
+    const usage = await new CodexProviderCli(processes).usage(session, CheckedAt);
+    expect(usage.unavailable).toEqual({ reason: 'probeFailed', message: 'Codex could not read usage.' });
+  });
+  it('fails softly and kills a process that never answers', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.converse('codex app-server', []);
+    const usage = await new CodexProviderCli(processes, 5).usage(session, CheckedAt);
+    expect(usage.unavailable).toEqual({ reason: 'probeFailed', message: 'Codex did not answer.' });
+    expect(processes.killed).toHaveLength(1);
+  });
+  it('fails softly on a malformed reply', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.converse('codex app-server', ['not json', '{"method":"remoteControl/status/changed"}']);
+    const usage = await new CodexProviderCli(processes, 5).usage(session, CheckedAt);
+    expect(usage.unavailable?.reason).toBe('probeFailed');
+  });
+});
+
 describe('Codex shim', () => {
   const accountLine = (account: unknown) => JSON.stringify({ id: 2, result: { account } });
 
@@ -95,6 +342,14 @@ describe('Antigravity shim', () => {
     processes.reply('agy models', { stdout: 'gemini-3' });
     expect((await cli.status(sessionOf('agy'))).login).toBe('signedIn');
   });
+  it('reports no limits, because it has no source that needs no token', async () => {
+    const cli = new AntigravityProviderCli(new ScriptedProcessRunner());
+    expect(await cli.usage(sessionOf('agy'), 'now')).toEqual({
+      checkedAt: 'now',
+      windows: [],
+      unavailable: { reason: 'unsupported', message: undefined },
+    });
+  });
   it('signs in by launching and has no sign-out', () => {
     const cli = new AntigravityProviderCli(new ScriptedProcessRunner());
     expect(cli.loginArguments()).toEqual([]);
@@ -104,6 +359,11 @@ describe('Antigravity shim', () => {
 
 describe('OpenCode shim', () => {
   const help = 'opencode --help';
+
+  it('reports no limits, because it has no source that needs no token', async () => {
+    const usage = await new OpencodeProviderCli(new ScriptedProcessRunner()).usage(sessionOf('opencode'), 'now');
+    expect(usage.unavailable?.reason).toBe('unsupported');
+  });
 
   it('uses standalone when this version has it, and asks only once', async () => {
     const processes = new ScriptedProcessRunner();

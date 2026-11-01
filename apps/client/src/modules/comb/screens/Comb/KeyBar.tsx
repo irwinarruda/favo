@@ -16,6 +16,7 @@ export function KeyBar(props: { onHelp(): void; onQuit(): void; onOpenDesktopApp
   const hasMachinesBehind = useApp((state) => state.hasMachinesBehind);
   const openThemePicker = useApp((state) => state.openThemePicker);
   const openDirectoryPicker = useApp((state) => state.openDirectoryPicker);
+  const openUsage = useApp((state) => state.openUsage);
   const error = useError();
 
   async function onRefreshPress() {
@@ -39,6 +40,7 @@ export function KeyBar(props: { onHelp(): void; onQuit(): void; onOpenDesktopApp
         <KeyHint keys="i" label={selectedMachine.installLabel} onPress={error.handle(installSelectedMachine)} />
       )}
       {hasMachinesBehind && <KeyHint keys="U" label="update all" onPress={error.handle(updateAllMachines)} />}
+      <KeyHint keys="u" label="usage" onPress={error.handle(openUsage)} />
       <KeyHint keys="d" label="folder" onPress={error.handle(openDirectoryPicker)} />
       <KeyHint keys="a" label="account" onPress={openAddAccount} />
       <KeyHint keys="m" label="machine" onPress={error.handle(openAddMachine)} />
