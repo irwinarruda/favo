@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { setTimeout } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
 import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
@@ -13,6 +14,9 @@ const ChecksumsTimeoutMs = 30_000;
 const AssetTimeoutMs = 300_000;
 const NotFoundStatus = 404;
 const ExecutableMode = 0o755;
+const RenameAttempts = 10;
+const RenameRetryMs = 100;
+const BusyRenameCodes = ['EPERM', 'EACCES', 'EBUSY'];
 
 export class GithubReleaseAssets extends ReleaseAssets {
   constructor(
@@ -83,10 +87,22 @@ async function writeExecutable(binary: Uint8Array, destination: string) {
   try {
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(temporary, binary, { mode: ExecutableMode });
-    await rename(temporary, destination);
+    await renameOver(temporary, destination);
   } catch (error) {
     await rm(temporary, { force: true });
     throw error;
+  }
+}
+
+async function renameOver(from: string, to: string) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await rename(from, to);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? '';
+      if (attempt === RenameAttempts || !BusyRenameCodes.includes(code)) throw error;
+      await setTimeout(RenameRetryMs);
+    }
   }
 }
 
