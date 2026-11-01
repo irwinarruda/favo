@@ -20,7 +20,7 @@ const Keys = [
   ['t', 'change the theme'],
   ['q', 'quit'],
   ['↗ → ↘', 'ahead of, on or under pace'],
-  ['█ ╱ ░ │', 'left, next reset, rest, pace'],
+  ['▄ ▂ ▁ █', 'left, next reset, rest, pace'],
 ];
 
 export function HelpDialog({ onClose }: { onClose(): void }) {

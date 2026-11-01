@@ -15,7 +15,7 @@ export const UsageBarPart = {
 } as const;
 export type UsageBarPart = ValueOf<typeof UsageBarPart>;
 
-const Glyphs: Record<UsageBarPart, string> = { left: '█', refill: '╱', track: '░', tick: '│' };
+const Glyphs: Record<UsageBarPart, string> = { left: '▄', refill: '▂', track: '▁', tick: '█' };
 
 export function usageBarOf(input: {
   remainingPercent: number;

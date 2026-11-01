@@ -41,6 +41,11 @@ export const Scenes: Record<string, Scene> = {
       mockDb.runningDesktopApps = [ProviderId.claude];
     },
   },
+  'favo-usage': {
+    themeId: 'honey',
+    keys: ['u'],
+    stage: stageUsage,
+  },
   'favo-update': {
     themeId: 'honey',
     keys: [Key.tab],
@@ -101,6 +106,22 @@ function stageHive() {
     { provider: ProviderId.claude, label: 'Claude' },
     { provider: ProviderId.codex, label: 'ChatGPT' },
   ];
+}
+
+function stageUsage() {
+  const [personal, work, codex, opencode] = mockDb.seatUsage.local!;
+  const inMinutes = (minutes: number) => new Date(Date.now() + (minutes + 0.5) * 60_000).toISOString();
+  const session = { ...personal!.usage.windows[0]!, usedPercent: 12, resetsAt: inMinutes(272) };
+  const week = { ...personal!.usage.windows[1]!, usedPercent: 45, resetsAt: inMinutes(3480) };
+  const client = {
+    ...work!,
+    account: 'client',
+    displayName: 'client',
+    identity: 'bee@orchard.co',
+    plan: 'pro',
+    usage: { ...work!.usage, windows: [session, week] },
+  };
+  mockDb.seatUsage = { local: [personal!, work!, client, codex!, opencode!], devbox: [personal!], studio: [personal!] };
 }
 
 export function stageScene(name: string) {

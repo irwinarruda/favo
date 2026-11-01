@@ -9,10 +9,6 @@ import { useApp } from '@/shared/stores/app';
 import { Hex } from '@/shared/theme/glyphs';
 
 const TickMs = 15_000;
-const MaximumNameWidth = 20;
-const MinimumBarWidth = 8;
-const MaximumBarWidth = 30;
-const RowChrome = 30;
 
 type UsageProps = { isEnabled: boolean; onHelp(): void; onQuit(): void };
 
@@ -27,10 +23,6 @@ export function Usage({ isEnabled, onHelp, onQuit }: UsageProps) {
   const tickUsage = useApp((state) => state.tickUsage);
   const scrollRef = useRef<ScrollBoxRenderable>(null);
   const error = useError();
-  const names = pools.flatMap((pool) => pool.seats.map((seat) => seat.name.length));
-  const nameWidth = Math.min(Math.max(0, ...names), MaximumNameWidth);
-  const roomForBar = width - nameWidth - RowChrome;
-  const barWidth = Math.max(MinimumBarWidth, Math.min(MaximumBarWidth, roomForBar));
 
   useKeyboard((key) => {
     if (!isEnabled) return;
@@ -72,9 +64,9 @@ export function Usage({ isEnabled, onHelp, onQuit }: UsageProps) {
           </text>
         ))}
       </box>
-      <scrollbox ref={scrollRef} flexGrow={1} flexShrink={1} paddingX={2} minHeight={0}>
+      <scrollbox ref={scrollRef} flexGrow={1} flexShrink={1} paddingX={1} minHeight={0}>
         {pools.map((pool) => (
-          <PoolSection key={pool.provider} pool={pool} nameWidth={nameWidth} barWidth={barWidth} />
+          <PoolSection key={pool.provider} pool={pool} width={width} />
         ))}
         {pools.length === 0 && isReading && <Spinner label="reading every seat…" />}
         {pools.length === 0 && !isReading && <text fg={colors.muted}>No signed in seat reports limits.</text>}

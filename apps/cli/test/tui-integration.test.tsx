@@ -61,14 +61,16 @@ describe('usage on a real backend', () => {
   const session = { id: 'five_hour', kind: 'session' as const, label: 'Session', usedPercent: 32 };
 
   test('reads both machines through the contracts', async () => {
-    const { mac, devbox, mockInput, waitForFrame } = await openFleet();
+    const { mac, devbox, flush, mockInput, waitForFrame } = await openFleet();
     mac.clis.claude.usageReading = { windows: [session] };
     devbox.clis.claude.usageReading = { windows: [{ ...session, usedPercent: 7 }] };
     mockInput.pressKey('u');
+    await flush();
+    mockInput.pressKey('r');
     await waitForFrame((frame) => frame.includes('81% left') && frame.includes('devbox read'));
   });
   test('shows a machine with no such method as older favo, and keeps the rest', async () => {
-    const { mac, mockInput, waitForFrame } = await openFleet();
+    const { mac, flush, mockInput, waitForFrame } = await openFleet();
     mac.clis.claude.usageReading = { windows: [session] };
     mac.remotes.connect('devbox', {
       send: async ({ id, method }) => {
@@ -79,6 +81,8 @@ describe('usage on a real backend', () => {
       },
     });
     mockInput.pressKey('u');
+    await flush();
+    mockInput.pressKey('r');
     await waitForFrame((frame) => frame.includes('devbox older favo') && frame.includes('68% left'));
   });
 });

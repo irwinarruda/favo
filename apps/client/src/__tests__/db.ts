@@ -223,6 +223,7 @@ export const mockDb = {
   seatUsage: seedSeatUsage(),
   usageFailures: {} as Record<string, Error>,
   usageReads: [] as string[],
+  usageHold: undefined as Promise<void> | undefined,
   inspection: seedInspection(),
   themeList: seedThemeList(),
   directoryTrees: seedDirectoryTrees(),
@@ -247,6 +248,7 @@ export const mockDb = {
     this.seatUsage = seedSeatUsage();
     this.usageFailures = {};
     this.usageReads = [];
+    this.usageHold = undefined;
     this.inspection = seedInspection();
     this.themeList = seedThemeList();
     this.directoryTrees = seedDirectoryTrees();
