@@ -35,6 +35,7 @@ Releases are immutable, so a bad binary burns its version number; fix it in a ne
 - Shared is an allowlist. favo never reads a token.
 - No comments in production code. No `../`. No barrels. No TS `enum`. `undefined`, never `null`.
 - Commits follow Conventional Commits.
+- No merge commits. Bring a branch up to date with `git rebase`, then push it with `--force-with-lease`.
 - ALWAYS update `CHANGELOG.md` in the same commit as any change someone using favo would notice: a feature, a fix, a changed command, output or install step. Add one plain-language line under `## [Unreleased]`, in `Added`, `Changed`, `Fixed` or `Removed`, written for users, not about the code. Refactors, tests, CI and internal docs need no entry.
 
 ## Completion gate
