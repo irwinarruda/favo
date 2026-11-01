@@ -1,8 +1,28 @@
 version: 2
 updates:
+  # A package that gets hijacked is usually caught within days. Waiting a week
+  # lets the rest of the world find it first. GitHub's security updates skip
+  # this wait, so a real fix still arrives quickly.
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
