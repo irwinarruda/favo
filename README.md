@@ -1,28 +1,125 @@
-# ⬢ favo
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo.svg">
+    <img src="docs/assets/logo-light.svg" alt="favo" width="300">
+  </picture>
+</p>
 
-> [!IMPORTANT]
-> **favo takes a LOT of inspiration from [Ditto CLI](https://github.com/reyanshgupta/ditto-cli).** The core idea, one folder per account with a named allowlist of symlinks back to your own config, is Ditto's, and so is much of what we know about how each provider behaves. Go look at it. favo is a smaller take on the same idea, in TypeScript, for four providers, with a TUI and remote machines at its center.
+<h3 align="center">Every AI subscription you have, on every computer you own.<br>No more logging in and out.</h3>
 
-favo means honeycomb in Portuguese and Italian. Each account is a sealed cell with its own login and threads. The walls between cells are shared: your CLAUDE.md, skills and settings. It keeps every AI subscription you have on every computer you own, without logging in and out.
+<p align="center">
+  <a href="https://www.npmjs.com/package/favo-cli"><img src="https://img.shields.io/npm/v/favo-cli?color=F5A623&labelColor=14110B" alt="npm version"></a>
+  <a href="https://github.com/irwinarruda/favo/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/irwinarruda/favo/ci.yml?branch=main&labelColor=14110B" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F5A623?labelColor=14110B" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-F3E7CF?labelColor=14110B" alt="macOS, Linux and Windows">
+</p>
 
-```text
-  ⬢ favo                                               2 hives · 3 cells · 5 signed in
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#what-you-get">What you get</a> ·
+  <a href="#supported-providers">Providers</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#faq">FAQ</a>
+</p>
 
- ╭─ ⬢ macbook · this machine ───────────────────────╮ ╭─ cell ──────────────────────╮
- │ personal base            work                    │ │  ⬢ Claude Code as work      │
- │   ⬢ claude   me@gmail    ▸ ⬢ claude   me@work    │ │  me@work                    │
- │   ⬢ codex    me@gmail      ⬡ codex    sign in    │ │  team                       │
- ╰──────────────────────────────────────────────────╯ │                             │
- ╭─ ⬢ devbox · bee@devbox ──────────────────────────╮ │  CONFIG PATH · press c      │
- │ personal base                                    │ │  ~/.favo/accounts/work/...  │
- │   ⬢ claude   me@gmail                            │ │  T3 Code: CLAUDE_CONFIG_DIR │
- ╰──────────────────────────────────────────────────╯ ╰─────────────────────────────╯
-  enter launch  c copy path  a account  m machine  r refresh  ? help  q quit
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/favo-honey.png">
+    <img src="docs/assets/favo-wax.png" alt="favo showing four machines, six accounts and their logins in one terminal view" width="900">
+  </picture>
+</p>
+
+favo runs Claude Code, Codex, Antigravity CLI and OpenCode under as many accounts as you have, at the same time, on all your machines. Each account keeps its own login and threads. Your `CLAUDE.md`, skills and settings follow you into all of them.
+
+**Before**
+
+```sh
+claude auth logout
+claude auth login      # the browser again, the other account, and your place is gone
 ```
+
+**With favo**
+
+```sh
+favo claude work       # Claude Code as work
+favo claude personal   # and as personal, in the next tab
+favo codex client      # Codex as a client's account
+```
+
+## Install
+
+```sh
+npm install --global favo-cli
+favo
+```
+
+Or try it without installing, using `npx favo-cli`. The package is `favo-cli`, and the command is `favo`; plain `npx favo` runs an unrelated package. It runs on macOS, Linux and Windows and needs Node 20.11 or newer ([details](#install-details)).
+
+Your first account is already there: `personal` is the setup you have today. To add another:
+
+```sh
+favo add work            # a new cell
+favo login work claude   # sign in, with Claude's own login
+favo claude work         # go
+```
+
+## What you get
+
+### Every account, signed in, at once
+
+There is nothing to switch. Each account lives in its own cell, so a work session and a personal session can run side by side, and neither signs the other out.
+
+### Your setup, written once
+
+Skills, `CLAUDE.md`, `AGENTS.md`, hooks and settings are linked into every account from your normal config folders. Edit a skill once and every account sees it. Logins and threads stay private to their cell.
+
+### Your other computers, in the same view
+
+Add a machine once. favo installs itself there, and from then on that machine sits in the same view, and every action works on it: launch, sign in, add an account. It works over ssh or Tailscale, with no ports, tunnels or daemons.
+
+```sh
+favo machine discover         # what is on ssh and Tailscale
+favo machine add bee@devbox   # connect, and install favo there
+favo claude work --machine devbox
+```
+
+Choosing where a provider starts works remotely too. Here the Mac is browsing the real folders on a Linux box:
+
+<p align="center">
+  <img src="docs/assets/favo-remote.png" alt="favo's folder picker browsing folders on a remote machine called devbox" width="760">
+</p>
+
+### A TUI you will want to leave open
+
+See every machine, account and login, spot what needs signing in, and press `enter` to launch. Prefer scripts? Everything is a command too, and `favo list --json` gives you the same view as data.
+
+Twelve themes come built in, with a live preview, and your own is a small JSON file away:
+
+<p align="center">
+  <img src="docs/assets/favo-themes.png" alt="favo's theme picker previewing the Tokyo Night theme across the whole app" width="760">
+</p>
+
+### Works with what you already use
+
+Your `~/.claude`, `~/.codex` and the rest stay where they are, and an old config folder can move in with `favo adopt work claude ~/.claude-work`. Using [T3 Code](#use-it-with-t3-code)? Press `c` on any seat to copy the path it needs.
+
+## Supported providers
+
+| Provider        | Private to each account | Shared across accounts                                                     |
+| --------------- | ----------------------- | -------------------------------------------------------------------------- |
+| Claude Code     | login, threads, history | CLAUDE.md, settings, skills, agents, commands, hooks, plugins, keybindings |
+| Codex           | login, threads, history | AGENTS.md, config.toml, hooks.json, skills, agents, rules, prompts         |
+| OpenCode        | logins, threads         | all of its config                                                          |
+| Antigravity CLI | conversations           | GEMINI.md, settings, skills, plugins                                       |
+
+> [!WARNING]
+> **Antigravity is the exception.** Conversations are separate per account, but favo could not verify that its login is, and the TUI says so on that seat. It also runs in a private home folder that mirrors yours, so it can see your other files there, not only the shared list above.
 
 ## How it works
 
-`personal` is the labs' own `~/.claude`, `~/.codex` and so on. It is the base, and favo never moves it. Every other account lives here, and a provider's folder appears the first time you use it:
+_favo_ means honeycomb in Portuguese and Italian. Each account is a sealed cell, and the walls between cells are shared.
+
+Your `personal` account is the labs' own folders, untouched. Every other account gets its own folder, and favo starts the official CLI pointed at it:
 
 ```text
 ~/.favo/accounts/
@@ -33,137 +130,145 @@ favo means honeycomb in Portuguese and Italian. Each account is a sealed cell wi
     claude/
 ```
 
-Inside, an item is either **shared** or **private**. Shared is a named list per provider, linked back to your base, so you edit a skill once and every account sees it. Everything else is private, so a credential file can never leak between accounts, even one a provider adds next year.
+Inside a cell, an item is either shared or private. Shared items are a named list per provider, linked back to your own config. Everything else stays private to the cell, including anything a provider adds next year. Links are checked at launch and with `favo sync`, and a real file where a link belongs is reported and left alone.
 
-Two limits are worth knowing. Shared files really are shared, so an API key you keep in `settings.json` or `config.toml` reaches every account. And Antigravity runs in a private `HOME` that mirrors your real one: its own `.gemini` folder follows the list, but it can still see the rest of your home folder, including `~/.ssh`.
+## FAQ
 
-Links are checked at launch and with `favo sync`. There is no schedule, because a symlink cannot go stale. A real file where a link belongs is reported and left alone.
+**Is favo a proxy? Does it pool or rotate accounts?**
+No. favo starts the official CLI with the right folder set, then gets out of the way. Your requests go straight from that CLI to its provider, and you always choose which account runs.
 
-favo never reads a token. Logins run the official commands with the right folder set.
+**Can favo see my tokens?**
+favo never reads them. Logins run each provider's own command, and credentials stay wherever that provider keeps them. One thing to watch: settings are shared, so an API key you put in `settings.json` or `config.toml` is visible to every account.
 
-| Provider        | Separated by                                      | Shared                                                                     |
-| --------------- | ------------------------------------------------- | -------------------------------------------------------------------------- |
-| Claude Code     | `CLAUDE_CONFIG_DIR`                               | CLAUDE.md, settings, skills, agents, commands, hooks, plugins, keybindings |
-| Codex           | `CODEX_HOME`                                      | AGENTS.md, config.toml, hooks.json, skills, agents, rules, prompts         |
-| Antigravity CLI | a private `HOME` that mirrors yours               | GEMINI.md, settings, skills, plugins                                       |
-| OpenCode        | `XDG_DATA_HOME`, `XDG_STATE_HOME`, `--standalone` | all of its config, left where it is                                        |
+**What happens to my existing config?**
+It stays where it is and becomes your `personal` account. Shared items in other accounts are links to it, so editing one edits your original.
 
-> [!WARNING]
-> Antigravity keeps conversations separate per account, but favo could not verify that its login is separate too. The TUI says so on that seat.
+**Does favo phone home?**
+There is no telemetry. favo's own network use is downloading its release from GitHub: on first run, and when it installs itself on another machine. Reaching your machines goes over your own ssh.
 
-## Install
+**Why not a shell alias with `CLAUDE_CONFIG_DIR`?**
+That gives you a second login, and it's how many of us started. The new folder starts empty, though, so you maintain your setup twice, and it stops at one machine and one provider. favo keeps the setup shared and does the same for all four providers, across your computers.
 
-```sh
-npm install -g favo-cli
-```
+**How do I uninstall it?**
+Run `npm uninstall --global favo-cli`, then delete `~/.favo`. That removes every account except `personal`, along with their logins and threads, and leaves your normal config folders alone.
 
-The package is `favo-cli` and the command is `favo`. Use `npx favo-cli` to try it. Plain `npx favo` runs an unrelated package.
+## Reference
 
-favo needs Node 20.11 or newer. The first run downloads the binary for your platform, about 40 MB, from the GitHub Release, checks it against the hashes in the npm package, and keeps it in `~/.favo/runtime`. It runs on macOS, on Linux with glibc, and on x64 Windows. Alpine and Windows on ARM are not supported yet.
+### Install details
 
-To update, run `npm install -g favo-cli@latest`, then `favo machine install <machine>` for each other machine.
+| System  | Supported                                 |
+| ------- | ----------------------------------------- |
+| macOS   | Apple Silicon and Intel                   |
+| Linux   | x64 and arm64, glibc (not Alpine or musl) |
+| Windows | x64                                       |
 
-To build from source:
+The npm package is a small launcher with no dependencies and no install scripts. The first run downloads the right binary, about 40 MB, from [GitHub Releases](https://github.com/irwinarruda/favo/releases) and checks it against the hashes published in the npm package. After that, favo starts with no network.
 
-```sh
-bun install --os='*' --cpu='*'
-bun run build:all
-bun run install:local
-```
+To update, run `npm install --global favo-cli@latest`, then `favo machine install <machine>` for each other machine.
 
-## Use
+### Use it with T3 Code
+
+T3 Code starts providers itself, so it only needs the folder. Select a seat, press `c`, and paste into a Claude provider's **CLAUDE_CONFIG_DIR path** or a Codex provider's **CODEX_HOME path**.
+
+### Commands
 
 ```sh
 favo                         # open the comb
 favo add work                # a new cell
 favo login work claude       # sign in, with the official command
+favo logout work claude      # sign out
 favo claude work             # run Claude Code as work
 favo claude work -- --resume # everything after -- goes to the provider
-favo path work claude        # the path to paste into T3 Code
+favo claude work --dir ~/app # start it in that folder
 favo list                    # every machine, account and login
 favo rename work client      # a new name, on this machine
 favo rm work                 # move a cell to the trash
+favo sync                    # repair shared links
+favo inspect work claude     # what is shared and what is private
+favo path work claude        # print the config path
+favo theme tokyo-night       # pick a theme
 ```
 
-In the comb, press `n` to rename the selected cell and `x` to delete it. The base cell can be renamed but never deleted. A rename only changes the name you see: the folder stays where it is, so logins, threads and paths in T3 Code keep working, and the old name still works in commands. Names live in `accountNames` in `~/.favo/config.json`, per machine.
+Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--machine <machine>` to run on another computer. `favo --help` lists the rest.
 
-`favo rm` keeps the cell in `~/.favo/trash`, login included, until you delete that folder yourself.
+`favo rm` keeps the cell in `~/.favo/trash`, login included, until you delete that folder yourself. `favo adopt` refuses a folder inside `~/.favo` or a provider's base folder.
 
-To move an existing config folder in: `favo adopt work claude ~/.claude-work`. Claude's macOS login is tied to the folder path, so sign in once afterward. favo refuses a folder inside `~/.favo` or a provider's base folder.
+<details>
+<summary><strong>Keys in the TUI</strong></summary>
 
-To always pass arguments to a provider, add `launchArgs` to `~/.favo/config.json`, as in the example under [Themes](#themes).
+| Key                 | Does                                |
+| ------------------- | ----------------------------------- |
+| arrows or `h j k l` | move around                         |
+| `enter`             | launch the selected seat            |
+| `s` / `o`           | sign in / sign out                  |
+| `c`                 | copy its config path                |
+| `d`                 | choose the folder it launches in    |
+| `a`                 | add an account                      |
+| `n`                 | rename the selected cell            |
+| `x`                 | delete the selected cell            |
+| `m`                 | add a machine                       |
+| `i`                 | install or update favo on a machine |
+| `X`                 | forget a machine                    |
+| `r` / `R`           | refresh / repair shared links       |
+| `t`                 | pick a theme                        |
+| `?`                 | help                                |
+| `q`                 | quit                                |
 
-## Where a provider starts
+The base cell can be renamed but never deleted. A rename only changes the name you see, so logins, threads and paths keep working.
 
-A provider launches in the folder you opened favo from. On another machine, that is its home folder. The header always shows it for the selected machine, like `favo in ~/code/app` or `favo on devbox in ~`, the cell panel repeats it under **LAUNCHES IN**, and `favo list` prints it per machine.
+</details>
 
-To change it, press `d` or click the path. Type a path and folders autocomplete as you go, from the machine you selected, so this browses another computer's real folders over SSH:
+<details>
+<summary><strong>Themes and custom themes</strong></summary>
 
-| Key         | Does                                                   |
-| ----------- | ------------------------------------------------------ |
-| `↑` `↓`     | move through the folders                               |
-| `tab`       | complete the highlighted folder, or the first match    |
-| `enter`     | open the highlighted folder, or use the path you typed |
-| `backspace` | after a `/`, go up one level                           |
-| `esc`       | close without changing anything                        |
-
-Each machine keeps its own choice until you quit favo. From the command line, use `favo claude work --dir ~/code/app`, which also works with `--machine`.
-
-## Themes
-
-Press `t` to pick a theme with a live preview, or use `favo theme` and `favo theme <name>`. The choice is saved in `~/.favo/config.json`, next to anything else you keep there:
-
-```json
-{
-  "theme": "tokyo-night",
-  "providers": { "claude": { "launchArgs": ["--dangerously-skip-permissions"] } }
-}
-```
+Press `t` to pick a theme with a live preview, or use `favo theme <name>`.
 
 Built in: `honey`, `wax` (light), `catppuccin`, `catppuccin-latte` (light), `dracula`, `everforest`, `gruvbox`, `kanagawa`, `nord`, `one-dark`, `rose-pine`, `tokyo-night`.
 
-A custom theme is a JSON file in `~/.favo/themes`, and its file name is its id. Leave out any color you like and it comes from the theme it extends, `honey` by default:
+A custom theme is a JSON file in `~/.favo/themes`, and its file name is its id. Leave out any color and it comes from the theme it extends, `honey` by default:
 
 ```json
 {
   "name": "Midnight Hive",
   "extends": "tokyo-night",
-  "colors": {
-    "accent": "#7788FF",
-    "background": "#0D0E14"
-  }
+  "colors": { "accent": "#7788FF", "background": "#0D0E14" }
 }
 ```
 
-Colors are `background`, `panel`, `selection`, `border`, `accent`, `accentBright`, `text`, `muted`, `faint`, `success` and `danger`. A file that does not load is skipped, and favo tells you why.
+Colors are `background`, `panel`, `selection`, `border`, `accent`, `accentBright`, `text`, `muted`, `faint`, `success` and `danger`.
 
-## In T3 Code
+</details>
 
-T3 Code starts providers itself, so it only needs the folder. Select a seat, press `c`, and paste into a Claude provider's **CLAUDE_CONFIG_DIR path** or a Codex provider's **CODEX_HOME path**.
+<details>
+<summary><strong>Always pass arguments to a provider</strong></summary>
 
-## Other machines
+Add `launchArgs` to `~/.favo/config.json`:
 
-```sh
-favo machine discover            # what is on ssh and Tailscale
-favo machine add bee@devbox      # connect, and install favo there
-favo add side --machine devbox   # most commands take --machine
+```json
+{ "providers": { "claude": { "launchArgs": ["--dangerously-skip-permissions"] } } }
 ```
+
+</details>
+
+<details>
+<summary><strong>Other machines</strong></summary>
 
 To install itself, favo downloads the binary for that machine from the GitHub Release of its own version, checks it, and uploads it over ssh, so the other machine only needs ssh and this one needs internet.
 
-From then on, that machine is in the same view and every action works on it. Launching and signing in hand your terminal to `ssh -t`. There are no ports, tunnels or daemons: favo reaches the other machine's backend through `favo serve --stdio`, and ssh or Tailscale handles identity. Over ssh, Codex signs in with a device code, and Claude gives you a link and asks for the code back.
+If a machine shows as outdated, `favo machine install <machine>` updates it. Over ssh, Codex signs in with a device code, and Claude gives you a link and asks for the code back. The first ssh connection to a new machine trusts its host key, as ssh's `accept-new` does, and a changed key is refused.
 
-If a machine shows as outdated, `favo machine install <machine>` updates it. The first ssh connection to a new machine trusts its host key, as ssh's `accept-new` does; a changed key is refused.
+</details>
 
-## Windows
+<details>
+<summary><strong>Windows notes</strong></summary>
 
-favo runs natively on Windows, with the same TUI and commands. Install it with npm, or let another machine install it with `favo machine add`.
+favo runs natively on Windows, with the same TUI and commands.
 
-Windows has three differences worth knowing:
+Without Developer Mode, Windows refuses symlinks, so favo shares folders with junctions and files with hard links. A hard link is shared until a program replaces the file instead of writing to it; favo then reports a conflict and leaves both copies alone. Turn on Developer Mode to get real symlinks for new links.
 
-- **Linking.** Without Developer Mode, Windows refuses symlinks. favo shares folders with junctions, which need no permission, and files with hard links. A hard link is shared until a program replaces the file instead of writing to it; favo then reports a conflict and leaves both copies alone. Turn on Developer Mode to get real symlinks, and favo uses them for new links.
-- **Arguments.** A provider installed by npm is a `.cmd` file, which only runs through `cmd.exe`. That shell cannot pass some characters safely, so favo refuses an argument containing `"`, `&`, `|`, `<`, `>`, `^`, `%`, `!` or a line break for those providers, and says so.
-- **Reaching it.** Tailscale SSH has no server on Windows, so another machine needs the OpenSSH server that ships with it. Install Tailscale first, download [`enable-windows-ssh.ps1`](https://github.com/irwinarruda/favo/blob/main/scripts/enable-windows-ssh.ps1), and run it once in an administrator PowerShell, with the public key of the machine connecting:
+A provider installed by npm is a `.cmd` file, which only runs through `cmd.exe`. That shell cannot pass some characters safely, so favo refuses an argument containing `"`, `&`, `|`, `<`, `>`, `^`, `%`, `!` or a line break for those providers, and says so.
+
+Tailscale SSH has no server on Windows, so another machine needs the OpenSSH server that ships with it. Install Tailscale first, download [`enable-windows-ssh.ps1`](https://github.com/irwinarruda/favo/blob/main/scripts/enable-windows-ssh.ps1), and run it once in an administrator PowerShell, with the public key of the machine connecting:
 
 ```powershell
 .\enable-windows-ssh.ps1 -PublicKey "ssh-ed25519 AAAA... you@mac"
@@ -171,20 +276,25 @@ Windows has three differences worth knowing:
 
 It installs that key and limits SSH to your Tailscale connection. It does not change `sshd_config`, so password sign-in stays available to anyone on your tailnet unless you turn it off. Windows downloads about 250 MB for this, so it can sit on `Operation Running` for ten minutes; that is normal. Your SSH client may also warn that the connection is not post-quantum, because Windows ships an older server. It is safe to ignore.
 
-## Architecture
+</details>
 
-```text
-packages/domain     pure rules: providers, accounts, link reconciliation, machines
-packages/contracts  the RPC language between front ends and the backend
-apps/server         the backend: layered modules, a gateway for everything external
-apps/client         the TUI: MVVM, with a Zustand application layer and OpenTUI views
-apps/cli            the one binary
-apps/npm            the favo-cli package: a launcher that fetches the binary
+## Contributing
+
+Issues and pull requests are welcome. You need [Bun](https://bun.sh):
+
+```sh
+bun install --os='*' --cpu='*'
+bun run dev:mock    # the whole TUI, with no backend and no real accounts
+bun run verify      # lint, typecheck, test and build
+bun run build:all && bun run install:local   # your own build, as the favo command
 ```
 
-The client's application layer knows nothing about the terminal, and it talks to one backend through the contracts, so a web front end can reuse both. `bun run dev:mock` runs the whole TUI with no backend. `bun run verify` is lint, typecheck, test and build.
+`AGENTS.md` describes how the project is organized.
 
-`AGENTS.md` and `.agents/skills/` describe how to work here.
+## Credits
+
+> [!NOTE]
+> **favo takes a LOT of inspiration from [Ditto CLI](https://github.com/reyanshgupta/ditto-cli).** The core idea, one folder per account with a named allowlist of symlinks back to your own config, is Ditto's, and so is much of what we know about how each provider behaves. Go look at it. favo is a smaller take on the same idea, in TypeScript, for four providers, with a TUI and remote machines at its center.
 
 ## License
 
