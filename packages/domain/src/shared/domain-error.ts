@@ -24,6 +24,7 @@ export const DomainErrorCode = {
   unsupportedPlatform: 'unsupportedPlatform',
   assetMissing: 'assetMissing',
   directoryNotFound: 'directoryNotFound',
+  threadNotFound: 'threadNotFound',
   invalidConfig: 'invalidConfig',
   invalidTheme: 'invalidTheme',
   themeNotFound: 'themeNotFound',

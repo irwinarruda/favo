@@ -4,10 +4,11 @@ import type { Seat } from '@/modules/comb/app/entities/Seat';
 import type { ITerminalRepository } from '@/modules/sessions/app/repositories/ITerminalRepository';
 
 export class TestTerminalRepository implements ITerminalRepository {
-  async plan(seat: Seat, action: TerminalAction, directory?: string) {
+  async plan(seat: Seat, action: TerminalAction, directory?: string, thread?: string) {
     if (action === 'logout' && !seat.view.canLogout) {
       throw new DomainError(DomainErrorCode.logoutUnsupported, `${seat.label} has no sign-out command.`);
     }
-    return { command: seat.command, args: [action, seat.account], env: {}, unsetEnv: [], cwd: directory };
+    const args = [action, seat.account, ...(thread ? [thread] : [])];
+    return { command: seat.command, args, env: {}, unsetEnv: [], cwd: directory };
   }
 }

@@ -14,8 +14,16 @@ export const TerminalAction = {
   launch: 'launch',
   login: 'login',
   logout: 'logout',
+  resume: 'resume',
 } as const;
 export type TerminalAction = ValueOf<typeof TerminalAction>;
+
+export const TerminalStep = z.strictObject({
+  command: z.string(),
+  args: z.array(z.string()),
+  stampFlag: z.string().optional(),
+});
+export type TerminalStep = z.infer<typeof TerminalStep>;
 
 export const TerminalPlan = z.strictObject({
   command: z.string(),
@@ -23,6 +31,7 @@ export const TerminalPlan = z.strictObject({
   env: z.record(z.string(), z.string()),
   unsetEnv: z.array(z.string()),
   cwd: z.string().optional(),
+  afterExit: TerminalStep.optional(),
 });
 export type TerminalPlan = z.infer<typeof TerminalPlan>;
 
@@ -80,10 +89,15 @@ export function favoArgumentsFor(input: {
   provider: string;
   args: string[];
   directory?: string;
+  thread?: string;
 }) {
-  const { action, account, provider, args, directory } = input;
+  const { action, account, provider, args, directory, thread } = input;
   if (action === TerminalAction.login) return ['login', account, provider];
   if (action === TerminalAction.logout) return ['logout', account, provider];
   const directoryFlag = directory ? ['--dir', directory] : [];
-  return [provider, account, ...directoryFlag, ...(args.length > 0 ? ['--', ...args] : [])];
+  const providerArguments = args.length > 0 ? ['--', ...args] : [];
+  if (action === TerminalAction.resume) {
+    return ['resume', account, provider, ...(thread ? [thread] : []), ...directoryFlag, ...providerArguments];
+  }
+  return [provider, account, ...directoryFlag, ...providerArguments];
 }

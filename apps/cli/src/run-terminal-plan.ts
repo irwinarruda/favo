@@ -1,5 +1,8 @@
 import { mergeEnvironment } from '@favo/domain/shared/environment';
-import { spawnCommandOf, type TerminalPlan } from '@favo/domain/terminal/terminal-plan';
+import { herdrSequenceOf } from '@favo/domain/terminal/herdr';
+import { spawnCommandOf, type TerminalPlan, type TerminalStep } from '@favo/domain/terminal/terminal-plan';
+
+const AfterExitTimeoutMs = 1_000;
 
 export async function runTerminalPlan(plan: TerminalPlan, baseEnv: Record<string, string | undefined>) {
   const isCaseInsensitive = process.platform === 'win32';
@@ -14,5 +17,16 @@ export async function runTerminalPlan(plan: TerminalPlan, baseEnv: Record<string
   process.on('SIGINT', ignoreSignal);
   const code = await child.exited;
   process.off('SIGINT', ignoreSignal);
+  if (plan.afterExit) await runAfterExit(plan.afterExit);
   return code;
+}
+
+async function runAfterExit({ command, args, stampFlag }: TerminalStep) {
+  try {
+    const stamp = stampFlag ? [stampFlag, String(herdrSequenceOf(Date.now()))] : [];
+    const step = Bun.spawn([command, ...args, ...stamp], { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' });
+    const timer = setTimeout(() => step.kill(), AfterExitTimeoutMs);
+    await step.exited;
+    clearTimeout(timer);
+  } catch {}
 }

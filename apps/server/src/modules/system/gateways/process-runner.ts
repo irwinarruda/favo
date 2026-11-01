@@ -22,4 +22,5 @@ export abstract class ProcessRunner {
   abstract detach(request: ProcessRequest): boolean;
   abstract killOpen(): void;
   abstract which(command: string, path: string): string | undefined;
+  abstract isAlive(pid: number): boolean;
 }

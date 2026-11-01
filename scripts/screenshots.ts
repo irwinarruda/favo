@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { Scenes, windowColorsOf } from '@favo/client/scenes';
 import { $ } from 'bun';
 
-const GhosttyApp = '/Applications/Ghostty.app/Contents/MacOS/ghostty';
+const GhosttyApp = '/Applications/Ghostty.app';
+const GhosttyBinary = 'MacOS/ghostty';
 const Tools = 'scripts/screenshot-tools.swift';
 const ImageWidth = 2240;
 const ImageHeight = 1572;
@@ -39,7 +40,12 @@ async function waitFor<T>(what: string, read: () => Promise<T | undefined> | T |
   throw new Error(`Timed out waiting for ${what}.`);
 }
 
-async function windowIdOf(pid: number) {
+async function ghosttyPidOf(readyFile: string) {
+  const pid = await $`pgrep -f ${`${GhosttyBinary} .*${readyFile}`}`.nothrow().text();
+  return pid.trim() || undefined;
+}
+
+async function windowIdOf(pid: string) {
   const id = await $`swift ${Tools} window-id ${pid}`.text();
   return id.trim() || undefined;
 }
@@ -70,9 +76,13 @@ async function capture(name: string, shot: string, readyFile: string) {
   if (!scene) throw new Error(`No scene called ${name}. Scenes: ${Object.keys(Scenes).join(', ')}`);
   const colors = windowColorsOf(scene);
   rmSync(readyFile, { force: true });
-  const ghostty = Bun.spawn(
+  const launch = Bun.spawn(
     [
+      'open',
+      '-n',
+      '-a',
       GhosttyApp,
+      '--args',
       ...StandardConfig,
       `--background=${colors.background}`,
       `--foreground=${colors.text}`,
@@ -81,14 +91,16 @@ async function capture(name: string, shot: string, readyFile: string) {
     ],
     { stdout: 'ignore', stderr: 'ignore' }
   );
+  await launch.exited;
+  const pid = await waitFor(`the ${name} Ghostty`, () => ghosttyPidOf(readyFile));
   try {
     await waitFor(`${name} to reach its screen`, () => existsSync(readyFile));
-    const windowId = await waitFor(`the ${name} window`, () => windowIdOf(ghostty.pid));
+    const windowId = await waitFor(`the ${name} window`, () => windowIdOf(pid));
     await Bun.sleep(WindowSettleMs);
     await $`screencapture -l ${windowId} -o -x ${shot}`;
   } finally {
-    ghostty.kill();
-    await ghostty.exited;
+    process.kill(Number(pid));
+    await waitFor(`the ${name} Ghostty to close`, async () => !(await ghosttyPidOf(readyFile)));
   }
 }
 
@@ -98,10 +110,10 @@ async function shoot(name: string, outputFolder: string, workFolder: string) {
   let isFocused = false;
   for (let attempt = 0; attempt < FocusAttempts && !isFocused; attempt++) {
     await capture(name, shot, readyFile);
+    assertImageSize(shot);
     isFocused = await hasFocusedChrome(shot);
   }
   if (!isFocused) throw new Error(`${name} never had focus. Leave the keyboard and mouse alone during the run.`);
-  assertImageSize(shot);
   const file = join(outputFolder, `${name}.png`);
   if (await isSameImage(file, shot)) {
     console.log(`unchanged ${file}`);

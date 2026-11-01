@@ -5,6 +5,9 @@
 ### Added
 
 - See how much limit every seat has left and when it comes back, on every machine, in one screen. Press `u` in the comb, or run `favo usage`, which also takes `--machine <machine>` and `--json`. favo reads every machine once when the TUI opens, so the numbers are ready when you press `u`. It covers Claude Code and Codex, and reads them through their own commands. OpenCode and Antigravity show no limits for now, because favo never reads a token.
+- favo can now keep your place. Closing a provider no longer loses the thread: press `b` on a seat, or run `favo resume work claude`, to go back to it in its own folder. Anything after `--` goes to the provider, as it does on a launch. `favo threads work claude` lists what a seat kept, and two sessions in one folder are both kept.
+- To know which thread you are in, favo adds a small hook to your provider config, but only once you ask: run `favo hooks install`, or say yes when you press `b`. Your own hooks stay as they are, `favo hooks status` shows where things stand, `favo hooks uninstall` takes it out, and `favo sync` keeps it current. Codex asks each seat once to trust the hook. Without the hook, favo falls back to what Codex and OpenCode list themselves, and says that this is a guess.
+- Restarting Herdr now brings a favo seat back on the right account. Claude Code and Codex reopen in the same thread, as the same cell, instead of landing in your personal account. This covers seats on this machine; a seat on another machine does not come back yet.
 
 ## [0.3.0] - 2026-11-01
 

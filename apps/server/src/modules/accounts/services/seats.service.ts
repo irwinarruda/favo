@@ -42,12 +42,34 @@ export class SeatsService {
     return entry.kind !== EntryKind.missing;
   }
 
+  async sharedItemState(account: string, provider: ProviderId, name: string) {
+    const basePath = this.basePathOf(provider, name);
+    const base = await this.fileSystem.entry(basePath);
+    if (isPersonalAccount(account)) {
+      return base.kind === EntryKind.missing ? SharedItemState.notInBase : SharedItemState.linked;
+    }
+    const seatHome = this.providers.seatHome(account, provider);
+    if (await this.hasLinkedParent(seatHome, name)) return SharedItemState.conflict;
+    const seat = await this.fileSystem.entry(`${seatHome}/${name}`);
+    return planSharedItem({ base, seat, basePath }).state;
+  }
+
+  async assertAccount(account: string) {
+    if (isPersonalAccount(account)) return;
+    assertAccountName(account);
+    assertDomain(
+      await this.accounts.exists(account),
+      DomainErrorCode.accountNotFound,
+      `No account named "${account}".`
+    );
+  }
+
   async inspect(account: string, provider: ProviderId) {
     await this.assertAccount(account);
     const spec = Providers[provider];
     const seatHome = this.providers.seatHome(account, provider);
     const items = await Promise.all(
-      spec.shared.map(async (name) => ({ name, state: await this.stateOf(account, provider, name) }))
+      spec.shared.map(async (name) => ({ name, state: await this.sharedItemState(account, provider, name) }))
     );
     const baseEntries = await this.fileSystem.list(`${this.paths.home}/${spec.personalHome}`);
     const prefix = spec.mirrorsHome ? `${spec.personalHome}/` : '';
@@ -114,18 +136,6 @@ export class SeatsService {
     }
   }
 
-  private async stateOf(account: string, provider: ProviderId, name: string) {
-    const basePath = this.basePathOf(provider, name);
-    const base = await this.fileSystem.entry(basePath);
-    if (isPersonalAccount(account)) {
-      return base.kind === EntryKind.missing ? SharedItemState.notInBase : SharedItemState.linked;
-    }
-    const seatHome = this.providers.seatHome(account, provider);
-    if (await this.hasLinkedParent(seatHome, name)) return SharedItemState.conflict;
-    const seat = await this.fileSystem.entry(`${seatHome}/${name}`);
-    return planSharedItem({ base, seat, basePath }).state;
-  }
-
   private async hasLinkedParent(seatHome: string, name: string) {
     const folders = name.split('/').slice(0, -1);
     for (let depth = 1; depth <= folders.length; depth++) {
@@ -138,15 +148,5 @@ export class SeatsService {
   private basePathOf(provider: ProviderId, name: string) {
     const spec = Providers[provider];
     return spec.mirrorsHome ? `${this.paths.home}/${name}` : `${this.paths.home}/${spec.personalHome}/${name}`;
-  }
-
-  private async assertAccount(account: string) {
-    if (isPersonalAccount(account)) return;
-    assertAccountName(account);
-    assertDomain(
-      await this.accounts.exists(account),
-      DomainErrorCode.accountNotFound,
-      `No account named "${account}".`
-    );
   }
 }

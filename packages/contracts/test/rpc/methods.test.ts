@@ -7,6 +7,9 @@ import { listDesktopApps } from '#contracts/rpc/desktop/list-desktop-apps';
 import { openDesktopApp } from '#contracts/rpc/desktop/open-desktop-app';
 import type { RpcResponse } from '#contracts/rpc/envelope';
 import { Protocol, RpcRequest, RpcResponse as RpcResponseSchema } from '#contracts/rpc/envelope';
+import { installHooks } from '#contracts/rpc/hooks/install-hooks';
+import { listHooks } from '#contracts/rpc/hooks/list-hooks';
+import { uninstallHooks } from '#contracts/rpc/hooks/uninstall-hooks';
 import { addMachine } from '#contracts/rpc/machines/add-machine';
 import { getSeatStatus } from '#contracts/rpc/seats/get-seat-status';
 import { readUsage } from '#contracts/rpc/seats/read-usage';
@@ -14,6 +17,9 @@ import { ping } from '#contracts/rpc/system/ping';
 import { planTerminal } from '#contracts/rpc/terminal/plan-terminal';
 import { listThemes } from '#contracts/rpc/themes/list-themes';
 import { selectTheme } from '#contracts/rpc/themes/select-theme';
+import { listThreads } from '#contracts/rpc/threads/list-threads';
+import { recordThread } from '#contracts/rpc/threads/record-thread';
+import { reportThread } from '#contracts/rpc/threads/report-thread';
 
 const seat = {
   account: 'work',
@@ -26,6 +32,54 @@ const seat = {
   isProvisioned: true,
   canLogout: true,
 };
+
+describe('threads', () => {
+  const thread = { id: 'a', directory: '/code', updatedAt: 'now', isGuess: false, isDirectoryGone: false };
+
+  it('lives on the machine that ran it', () => {
+    expect(listThreads.routing).toBe('machine');
+    expect(listThreads.params.safeParse({ account: 'work', provider: 'claude' }).success).toBe(true);
+    expect(listThreads.params.safeParse({ account: 'work', provider: 'gemini' }).success).toBe(false);
+    expect(listThreads.result.safeParse([thread]).success).toBe(true);
+    expect(listThreads.result.safeParse([{ ...thread, id: 1 }]).success).toBe(false);
+  });
+  it('is recorded and reported by the favo inside the provider, never forwarded', () => {
+    expect(recordThread.routing).toBe('hub');
+    expect(reportThread.routing).toBe('hub');
+    const event = { provider: 'claude', id: 'a', directory: '/code', isFresh: true };
+    expect(recordThread.params.safeParse(event).success).toBe(true);
+    expect(recordThread.params.safeParse({ ...event, isFresh: 'yes' }).success).toBe(false);
+    expect(reportThread.params.safeParse({ provider: 'claude', id: 'a' }).success).toBe(true);
+    expect(reportThread.params.safeParse({ id: 'a' }).success).toBe(false);
+  });
+  it('can be picked when planning a terminal', () => {
+    const plan = { action: 'resume', account: 'work', provider: 'claude', args: [], thread: 'a' };
+    expect(planTerminal.params.safeParse(plan).success).toBe(true);
+    expect(planTerminal.params.safeParse({ ...plan, action: 'continue' }).success).toBe(false);
+  });
+});
+
+describe('hooks', () => {
+  const hook = {
+    provider: 'claude',
+    label: 'Claude Code',
+    state: 'current',
+    isProviderInstalled: true,
+    needsTrust: false,
+    file: '/h/.claude/settings.json',
+    problems: [],
+  };
+
+  it('are changed on the machine asked for', () => {
+    for (const method of [listHooks, installHooks, uninstallHooks]) {
+      expect(method.routing).toBe('machine');
+      expect(method.params.safeParse({}).success).toBe(true);
+      expect(method.params.safeParse({ force: true }).success).toBe(false);
+      expect(method.result.safeParse([hook]).success).toBe(true);
+      expect(method.result.safeParse([{ ...hook, state: 'maybe' }]).success).toBe(false);
+    }
+  });
+});
 
 describe('method descriptors', () => {
   it('accepts a valid seat status request and refuses an unknown provider', () => {

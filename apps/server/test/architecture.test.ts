@@ -8,6 +8,7 @@ const ModuleLevels: Record<string, number> = {
   providers: 2,
   themes: 2,
   directories: 2,
+  herdr: 2,
   accounts: 3,
   machines: 4,
   desktop: 4,

@@ -7,10 +7,12 @@ import { serveStdio } from '@favo/server/shared/rpc/stdio-server';
 import { createPaint } from '@/paint';
 import { CommandKind, parseCommand } from '@/parse-command';
 import { runCommand } from '@/run-command';
+import { HookCommand, runHook } from '@/run-hook';
 import { runTerminalPlan } from '@/run-terminal-plan';
 
 async function main() {
   try {
+    if (process.argv[2] === HookCommand) return await runHook(process.argv.slice(3), process.env);
     const command = parseCommand(process.argv.slice(2));
     const server = createProductionServer(process.env);
     await server.prepare();

@@ -11,6 +11,7 @@ export class ScriptedProcessRunner extends ProcessRunner {
   readonly calls: ProcessRequest[] = [];
   readonly killed: ProcessRequest[] = [];
   killOpenCount = 0;
+  readonly gone = new Set<number>();
   private readonly replies = new Map<string, Reply>();
   private readonly conversations = new Map<string, string[]>();
   private readonly conversationsInTurn = new Map<string, string[][]>();
@@ -73,6 +74,10 @@ export class ScriptedProcessRunner extends ProcessRunner {
 
   which(command: string) {
     return this.installed.get(command);
+  }
+
+  isAlive(pid: number) {
+    return !this.gone.has(pid);
   }
 }
 

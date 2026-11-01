@@ -1,0 +1,43 @@
+// favo-hook:opencode:1
+import { spawn } from "node:child_process";
+
+let reported;
+
+function report(id, directory) {
+  if (!process.env.FAVO_ACCOUNT || !id || id === reported) return;
+  reported = id;
+  try {
+    const favo = spawn(process.env.FAVO_BIN || "favo", ["hook", "opencode", String(process.pid)], {
+      stdio: ["pipe", "ignore", "ignore"],
+      windowsHide: true,
+    });
+    favo.on("error", () => {});
+    favo.stdin.on("error", () => {});
+    favo.stdin.end(JSON.stringify({ session_id: id, cwd: directory }));
+  } catch {}
+}
+
+export default {
+  id: "favo.threads",
+  server: async ({ client }) => ({
+    "chat.message": async ({ sessionID }) => {
+      const session = (await client.session.get({ path: { id: sessionID } })).data;
+      if (session && !session.parentID) report(session.id, session.directory);
+    },
+  }),
+  setup(context) {
+    const controller = new AbortController();
+    async function watch() {
+      const events = context.event.subscribe({
+        types: ["session.execution.started"],
+        signal: controller.signal,
+      });
+      for await (const event of events) {
+        const session = await context.session.get({ sessionID: event.data.sessionID });
+        if (!session.parentID) report(event.data.sessionID, session.location?.directory ?? context.location?.directory);
+      }
+    }
+    watch().catch(() => {});
+    return () => controller.abort();
+  },
+};

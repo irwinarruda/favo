@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const [name, ...args] = process.argv.slice(2);
@@ -44,7 +44,31 @@ function claude() {
   console.log(
     `fake claude cwd=${process.cwd().replaceAll('\\', '/')} home=${folder} args=${args.join(' ')} tmux=${process.env.TMUX ?? 'none'} term=${process.env.TERM ?? 'none'}`
   );
+  runSessionHooks(folder);
   process.exit(3);
+}
+
+function runSessionHooks(folder: string) {
+  const id = process.env.FAKE_SESSION;
+  if (!id || !existsSync(`${folder}/settings.json`)) return;
+  const transcript = `${folder}/projects/${id}.jsonl`;
+  if (!process.env.FAKE_EMPTY_SESSION) {
+    mkdirSync(`${folder}/projects`, { recursive: true });
+    writeFileSync(transcript, '{}');
+  }
+  const payload = JSON.stringify({
+    session_id: id,
+    transcript_path: transcript,
+    cwd: process.cwd(),
+    source: process.env.FAKE_SESSION_SOURCE ?? 'startup',
+  });
+  const { hooks } = JSON.parse(readFileSync(`${folder}/settings.json`, 'utf8'));
+  for (const group of hooks?.SessionStart ?? []) {
+    for (const hook of group.hooks) {
+      const stdout = execSync(hook.command, { input: payload, stdio: ['pipe', 'pipe', 'pipe'] }).toString();
+      if (stdout !== '') console.log(`hook wrote to the conversation: ${stdout}`);
+    }
+  }
 }
 
 async function codex() {
@@ -123,6 +147,16 @@ function scp() {
   copyFileSync(source!, `${process.env.FAKE_REMOTE_HOME}/${destination!.split(':').at(-1)}`);
 }
 
-const fakes: Record<string, () => unknown> = { claude, codex, agy, opencode, ssh, scp };
+function herdr() {
+  const log = process.env.FAKE_HERDR_LOG!;
+  const earlier = existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).length : 0;
+  appendFileSync(log, `${args.join(' ')}\n`);
+  if (earlier < Number(process.env.FAKE_HERDR_REFUSALS ?? 0)) {
+    console.error('error: resume_not_accepted');
+    process.exit(1);
+  }
+}
+
+const fakes: Record<string, () => unknown> = { claude, codex, agy, opencode, ssh, scp, herdr };
 await fakes[name!]!();
 if (isWindows) process.exitCode ??= 0;

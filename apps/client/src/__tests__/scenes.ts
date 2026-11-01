@@ -46,6 +46,11 @@ export const Scenes: Record<string, Scene> = {
     keys: ['u'],
     stage: stageUsage,
   },
+  'favo-threads': {
+    themeId: 'honey',
+    keys: ['b'],
+    stage: stageThreads,
+  },
   'favo-update': {
     themeId: 'honey',
     keys: [Key.tab],
@@ -105,6 +110,22 @@ function stageHive() {
   mockDb.desktopApps = [
     { provider: ProviderId.claude, label: 'Claude' },
     { provider: ProviderId.codex, label: 'ChatGPT' },
+  ];
+}
+
+function stageThreads() {
+  const thread = (id: string, minutes: number, folder: string) => ({
+    id,
+    directory: `${MacHome}/code/${folder}`,
+    updatedAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    isGuess: false,
+    isDirectoryGone: false,
+  });
+  mockDb.threads['seat:local/personal/claude'] = [
+    thread('b7e4c1a0-3f62-4d18-9a55-1c0e7d2f4a86', 12, 'hive'),
+    thread('5d20f9be-81c7-4e3a-b6f4-72a9c3e1d05f', 180, 'hive'),
+    thread('e1c37a94-6b0d-42f5-8c19-d4f86b2a7e31', 1560, 'web'),
+    thread('29fa6d13-c4e8-4b70-a3d2-0b97e5c8f164', 4380, 'api'),
   ];
 }
 

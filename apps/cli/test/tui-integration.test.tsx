@@ -5,6 +5,7 @@ import { useApp } from '@favo/client/shared/stores/app';
 import { createAccount } from '@favo/contracts/rpc/accounts/create-account';
 import { listAccounts } from '@favo/contracts/rpc/accounts/list-accounts';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
+import { recordThread } from '@favo/contracts/rpc/threads/record-thread';
 import { LoginState } from '@favo/contracts/rpc/views';
 import { encodeArguments, type TerminalPlan } from '@favo/domain/terminal/terminal-plan';
 import { createTestServer, Home, seedClaudeBase } from '@favo/server/test/support/test-server';
@@ -17,8 +18,8 @@ console.error = (...args: unknown[]) => {
 
 let dispose: (() => Promise<void>) | undefined;
 
-async function openFleet() {
-  const mac = createTestServer();
+async function openFleet(callerEnv?: Record<string, string>) {
+  const mac = createTestServer({ callerEnv });
   const devbox = createTestServer({ hostname: 'devbox' });
   await seedClaudeBase(mac.fileSystem);
   await seedClaudeBase(devbox.fileSystem);
@@ -55,6 +56,57 @@ async function openFleet() {
 afterEach(async () => {
   await dispose?.();
   dispose = undefined;
+});
+
+describe('threads on a real backend', () => {
+  test('shows the thread of a seat and goes back to it, in its folder', async () => {
+    const view = await openFleet({
+      FAVO_ACCOUNT: 'personal',
+      FAVO_LAUNCH: 'l1',
+    });
+    await view.mac.fileSystem.ensureDirectory(`${Home}/projects/hive`);
+    await view.mac.client.call(recordThread, {
+      provider: 'claude',
+      id: '11111111-2222-4333-8444-00000000abcd',
+      directory: `${Home}/projects/hive`,
+      isFresh: true,
+    });
+    await useApp.getState().loadSelectedThreads();
+    await view.waitForFrame((frame) => frame.includes('0000abcd'));
+    view.mockInput.pressKey('b');
+    await view.waitFor(() => view.plans.length === 1);
+    expect(view.plans[0]?.args).toContain('11111111-2222-4333-8444-00000000abcd');
+    expect(view.plans[0]?.cwd).toBe(`${Home}/projects/hive`);
+  });
+  test('offers to install the hook, and writes it to the machine you are on', async () => {
+    const view = await openFleet();
+    await view.waitForFrame((frame) => frame.includes('press b to remember them'));
+    view.mockInput.pressKey('b');
+    await view.flush();
+    await view.renderOnce();
+    expect(view.captureCharFrame()).toContain('remember threads');
+    expect(await view.mac.fileSystem.readText(`${Home}/.claude/settings.json`)).toBe('{}');
+    view.mockInput.pressKey('y');
+    await view.waitFor(() => useApp.getState().toast !== undefined);
+    expect(await view.mac.fileSystem.readText(`${Home}/.claude/settings.json`)).toContain('favo-hook:claude');
+  });
+  test('resumes on the other machine through favo there', async () => {
+    const view = await openFleet();
+    await view.devbox.fileSystem.ensureDirectory(`${Home}/srv`);
+    useApp.getState().selectRow('seat:devbox/personal/claude');
+    await view.flush();
+    const seat = useApp.getState().selectedSeat!;
+    const thread = {
+      id: 'abc',
+      directory: `${Home}/srv`,
+      updatedAt: '2026-10-31T12:00:00.000Z',
+      isGuess: false,
+      isDirectoryGone: false,
+    };
+    await useApp.getState().resumeSeatThread(seat, thread);
+    const encoded = encodeArguments(['resume', 'personal', 'claude', 'abc', '--dir', `${Home}/srv`]);
+    expect(view.plans[0]?.args.at(-1)).toBe(`~/.favo/bin/favo --argv-b64 ${encoded}`);
+  });
 });
 
 describe('usage on a real backend', () => {

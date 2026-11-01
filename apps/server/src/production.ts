@@ -1,10 +1,11 @@
 import { arch, homedir, hostname, platform } from 'node:os';
-import { delimiter } from 'node:path';
+import { basename, delimiter } from 'node:path';
 import { ProviderId } from '@favo/domain/providers/provider';
 import { HeadlessDesktopApps } from '@/modules/desktop/gateways/headless.desktop-apps';
 import { LinuxDesktopApps } from '@/modules/desktop/gateways/linux.desktop-apps';
 import { MacDesktopApps } from '@/modules/desktop/gateways/mac.desktop-apps';
 import { WindowsDesktopApps } from '@/modules/desktop/gateways/windows.desktop-apps';
+import { CliHerdr } from '@/modules/herdr/gateways/cli.herdr';
 import { CliTailscale } from '@/modules/machines/gateways/cli.tailscale';
 import { GithubReleaseAssets } from '@/modules/machines/gateways/github.release-assets';
 import { OpenSsh } from '@/modules/machines/gateways/open.ssh';
@@ -21,10 +22,17 @@ import { SystemClock } from '@/modules/system/gateways/system.clock';
 import { createServer } from '@/server';
 import { favoPathsOf } from '@/shared/config/favo-paths';
 
+const FavoBinaryName = 'favo';
+
 export function createProductionServer(env: Record<string, string | undefined>) {
   const isWindows = platform() === 'win32';
   const home = forwardSlashes(env.HOME ?? homedir());
-  const paths = favoPathsOf({ home, favoHome: env.FAVO_HOME ? forwardSlashes(env.FAVO_HOME) : undefined, isWindows });
+  const paths = favoPathsOf({
+    home,
+    favoHome: env.FAVO_HOME ? forwardSlashes(env.FAVO_HOME) : undefined,
+    configHome: env.XDG_CONFIG_HOME ? forwardSlashes(env.XDG_CONFIG_HOME) : undefined,
+    isWindows,
+  });
   const processes = new BunProcessRunner(env, isWindows);
   const inheritedPath = [env.PATH ?? '', `${home}/.local/bin`].join(delimiter);
   const isInSshSession = env.SSH_CONNECTION !== undefined || env.FAVO_LOGIN_SHELL !== undefined;
@@ -52,11 +60,13 @@ export function createProductionServer(env: Record<string, string | undefined>) 
       remotes: new SshRemoteBackends(ssh),
       releaseAssets: new GithubReleaseAssets(),
       desktopApps: desktopAppsFor(isInSshSession),
+      herdr: new CliHerdr(processes),
     },
     {
       paths,
       host: { hostname: name, platform: platform(), arch: arch(), home, directory: process.cwd() },
       callerEnv: env,
+      binary: basename(process.execPath).startsWith(FavoBinaryName) ? process.execPath : undefined,
     }
   );
 

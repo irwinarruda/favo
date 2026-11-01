@@ -29,6 +29,10 @@ export class ProvidersService {
     return this.processes.which(Providers[provider].executable, await this.shell.path());
   }
 
+  async isOnPath(command: string) {
+    return this.processes.which(command, await this.shell.path()) !== undefined;
+  }
+
   async requireBinary(provider: ProviderId) {
     const binary = await this.binaryOf(provider);
     if (binary) return binary;

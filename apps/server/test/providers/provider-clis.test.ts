@@ -3,6 +3,7 @@ import { AntigravityProviderCli } from '@/modules/providers/gateways/antigravity
 import { ClaudeProviderCli } from '@/modules/providers/gateways/claude.provider-cli';
 import { CodexProviderCli } from '@/modules/providers/gateways/codex.provider-cli';
 import { OpencodeProviderCli } from '@/modules/providers/gateways/opencode.provider-cli';
+import { MemoryFileSystem } from '@/modules/system/gateways/memory.file-system';
 import { ScriptedProcessRunner } from '@/modules/system/gateways/scripted.process-runner';
 
 function sessionOf(binary: string) {
@@ -424,5 +425,95 @@ describe('OpenCode shim', () => {
     expect((await new OpencodeProviderCli(processes).status(sessionOf('opencode'))).login).toBe('signedOut');
     processes.reply('opencode auth list', { stdout: '0 credentials' });
     expect((await new OpencodeProviderCli(processes).status(sessionOf('opencode'))).login).toBe('signedOut');
+  });
+});
+
+describe('finding threads with no hook', () => {
+  const Sessions = '/seat/sessions';
+  const Id = (tail: string) => `01a198ab-c6e8-7962-bebd-a5735000${tail}`;
+  const search = { session: sessionOf('codex'), seatHome: '/seat', directory: '/code/hive' };
+
+  function rolloutOf(id: string, cwd: string, extra = '"thread_source":"user"') {
+    const meta = { id, cwd };
+    return `{"timestamp":"2026-11-01T19:52:40.944Z","ordinal":0,"type":"session_meta","payload":{"session_id":"${meta.id}","id":"${meta.id}","cwd":${JSON.stringify(cwd)},${extra},"base_instructions":{"text":"${'x'.repeat(50_000)}`;
+  }
+
+  async function write(fileSystem: MemoryFileSystem, day: string, time: string, id: string, text: string) {
+    await fileSystem.writePrivateText(`${Sessions}/${day}/rollout-2026-11-01T${time}-${id}.jsonl`, text);
+  }
+
+  it('reads Codex rollouts for this folder, from the start of each file', async () => {
+    const fileSystem = new MemoryFileSystem();
+    await write(fileSystem, '2026/11/01', '10-00-00', Id('0001'), rolloutOf(Id('0001'), '/code/hive'));
+    await write(fileSystem, '2026/11/01', '11-00-00', Id('0002'), rolloutOf(Id('0002'), '/code/other'));
+    const threads = await new CodexProviderCli(new ScriptedProcessRunner()).recentThreads(search, fileSystem);
+    expect(threads).toEqual([{ id: Id('0001'), directory: '/code/hive', updatedAt: '2026-11-01T19:52:40.944Z' }]);
+  });
+  it('reads a folder name with an escape in it', async () => {
+    const fileSystem = new MemoryFileSystem();
+    const directory = 'C:\\code\\"quoted"';
+    await write(fileSystem, '2026/11/01', '10-00-00', Id('0001'), rolloutOf(Id('0001'), directory));
+    const cli = new CodexProviderCli(new ScriptedProcessRunner());
+    const threads = await cli.recentThreads({ ...search, directory }, fileSystem);
+    expect(threads[0]?.directory).toBe(directory);
+  });
+  it('leaves out a subagent', async () => {
+    const fileSystem = new MemoryFileSystem();
+    const text = rolloutOf(Id('0001'), '/code/hive', '"source":{"subagent":{"thread_spawn":{}}}');
+    await write(fileSystem, '2026/11/01', '10-00-00', Id('0001'), text);
+    const cli = new CodexProviderCli(new ScriptedProcessRunner());
+    expect(await cli.recentThreads(search, fileSystem)).toEqual([]);
+  });
+  it('skips a file that is not a rollout it can read', async () => {
+    const fileSystem = new MemoryFileSystem();
+    await fileSystem.writePrivateText(`${Sessions}/2026/11/01/notes.txt`, 'hello');
+    await write(fileSystem, '2026/11/01', '10-00-00', Id('0001'), 'garbage');
+    const cli = new CodexProviderCli(new ScriptedProcessRunner());
+    expect(await cli.recentThreads(search, fileSystem)).toEqual([]);
+  });
+  it('finds nothing in a seat that never ran', async () => {
+    const cli = new CodexProviderCli(new ScriptedProcessRunner());
+    expect(await cli.recentThreads(search, new MemoryFileSystem())).toEqual([]);
+  });
+  it('looks at the newest rollouts only, across days', async () => {
+    const fileSystem = new MemoryFileSystem();
+    for (let index = 0; index < 45; index++) {
+      const id = Id(String(index).padStart(4, '0'));
+      const day = index < 30 ? '2026/10/31' : '2026/11/01';
+      await write(fileSystem, day, `10-00-${String(index).padStart(2, '0')}`, id, rolloutOf(id, '/code/hive'));
+    }
+    const threads = await new CodexProviderCli(new ScriptedProcessRunner()).recentThreads(search, fileSystem);
+    expect(threads).toHaveLength(40);
+    expect(threads[0]?.id).toBe(Id('0044'));
+    expect(threads.at(-1)?.id).toBe(Id('0005'));
+  });
+
+  describe('on OpenCode', () => {
+    const list = 'opencode session list --format json --standalone';
+    const opencodeSearch = { ...search, session: sessionOf('opencode') };
+
+    function scripted() {
+      const processes = new ScriptedProcessRunner();
+      processes.reply('opencode --help', { stdout: '--standalone' });
+      return processes;
+    }
+
+    it('asks its own list, from the folder, on a private server', async () => {
+      const processes = scripted();
+      const session = { id: 'ses_1', title: 'hi', updated: 1793562844915, created: 1, directory: '/code/hive' };
+      processes.reply(list, { stdout: JSON.stringify([session]) });
+      const threads = await new OpencodeProviderCli(processes).recentThreads(opencodeSearch);
+      expect(threads).toEqual([{ id: 'ses_1', directory: '/code/hive', updatedAt: '2026-11-01T19:54:04.915Z' }]);
+      expect(processes.calls.at(-1)?.cwd).toBe('/code/hive');
+    });
+    it('finds nothing when the answer is not a list', async () => {
+      const processes = scripted();
+      processes.reply(list, { stdout: 'Error: not a project' });
+      expect(await new OpencodeProviderCli(processes).recentThreads(opencodeSearch)).toEqual([]);
+    });
+  });
+  it('is nothing for a provider with no list of its own', async () => {
+    const cli = new ClaudeProviderCli(new ScriptedProcessRunner());
+    expect(await cli.recentThreads(search, new MemoryFileSystem())).toEqual([]);
   });
 });

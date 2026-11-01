@@ -22,6 +22,22 @@ export const LoginScope = {
 } as const;
 export type LoginScope = ValueOf<typeof LoginScope>;
 
+export const HookKind = {
+  eventGroups: 'eventGroups',
+  namedBlock: 'namedBlock',
+  plugin: 'plugin',
+} as const;
+export type HookKind = ValueOf<typeof HookKind>;
+
+export type ProviderHook = {
+  kind: HookKind;
+  file: string;
+  sharedItem?: string;
+  event?: string;
+  matcher?: string;
+  needsTrust?: boolean;
+};
+
 export type ProviderSpec = {
   id: ProviderId;
   label: string;
@@ -35,6 +51,9 @@ export type ProviderSpec = {
   mirrorsHome: boolean;
   loginScope: LoginScope;
   pathHint: string;
+  resumeArguments: string[];
+  hook: ProviderHook;
+  herdrAgent?: string;
 };
 
 export const Providers: Record<ProviderId, ProviderSpec> = {
@@ -63,6 +82,15 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
     mirrorsHome: false,
     loginScope: LoginScope.perAccount,
     pathHint: 'CLAUDE_CONFIG_DIR path',
+    resumeArguments: ['--resume'],
+    hook: {
+      kind: HookKind.eventGroups,
+      file: '.claude/settings.json',
+      sharedItem: 'settings.json',
+      event: 'SessionStart',
+      matcher: '^(startup|resume|clear|compact|fork)$',
+    },
+    herdrAgent: 'claude',
   },
   codex: {
     id: ProviderId.codex,
@@ -77,6 +105,15 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
     mirrorsHome: false,
     loginScope: LoginScope.perAccount,
     pathHint: 'CODEX_HOME path',
+    resumeArguments: ['resume'],
+    hook: {
+      kind: HookKind.eventGroups,
+      file: '.codex/hooks.json',
+      sharedItem: 'hooks.json',
+      event: 'SessionStart',
+      needsTrust: true,
+    },
+    herdrAgent: 'codex',
   },
   antigravity: {
     id: ProviderId.antigravity,
@@ -97,6 +134,13 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
     mirrorsHome: true,
     loginScope: LoginScope.unverified,
     pathHint: 'HOME for agy',
+    resumeArguments: ['--conversation'],
+    hook: {
+      kind: HookKind.namedBlock,
+      file: '.gemini/config/hooks.json',
+      sharedItem: '.gemini/config',
+      event: 'PreInvocation',
+    },
   },
   opencode: {
     id: ProviderId.opencode,
@@ -110,6 +154,8 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
     mirrorsHome: false,
     loginScope: LoginScope.perAccount,
     pathHint: 'XDG_DATA_HOME for opencode',
+    resumeArguments: ['--session'],
+    hook: { kind: HookKind.plugin, file: 'opencode/plugins/favo-threads.js' },
   },
 };
 

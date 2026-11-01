@@ -5,6 +5,9 @@ import { removeAccount } from '@favo/contracts/rpc/accounts/remove-account';
 import { renameAccount } from '@favo/contracts/rpc/accounts/rename-account';
 import type { RpcClient } from '@favo/contracts/rpc/client';
 import { openDesktopApp } from '@favo/contracts/rpc/desktop/open-desktop-app';
+import { installHooks } from '@favo/contracts/rpc/hooks/install-hooks';
+import { listHooks } from '@favo/contracts/rpc/hooks/list-hooks';
+import { uninstallHooks } from '@favo/contracts/rpc/hooks/uninstall-hooks';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
 import { discoverMachines } from '@favo/contracts/rpc/machines/discover-machines';
 import { getMachineStatus, type MachineStatus } from '@favo/contracts/rpc/machines/get-machine-status';
@@ -19,15 +22,18 @@ import { repairSeats } from '@favo/contracts/rpc/seats/repair-seats';
 import { planTerminal } from '@favo/contracts/rpc/terminal/plan-terminal';
 import { listThemes } from '@favo/contracts/rpc/themes/list-themes';
 import { selectTheme } from '@favo/contracts/rpc/themes/select-theme';
-import { LoginState } from '@favo/contracts/rpc/views';
+import { listThreads } from '@favo/contracts/rpc/threads/list-threads';
+import { type HookView, LoginState, type ThreadView } from '@favo/contracts/rpc/views';
 import { FavoVersion } from '@favo/contracts/version';
 import { PersonalAccount } from '@favo/domain/accounts/account';
 import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
+import { HookState } from '@favo/domain/hooks/provider-hook';
 import { isOlderFavoError, type Machine, MachineState } from '@favo/domain/machines/machine';
 import { Providers } from '@favo/domain/providers/provider';
 import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { TerminalAction, type TerminalPlan } from '@favo/domain/terminal/terminal-plan';
 import { ThemeSource } from '@favo/domain/themes/theme';
+import { shortThreadId, threadAgeOf } from '@favo/domain/threads/thread';
 import { UsageBarPart, usageHeadlineOf, usageRowOf } from '@favo/domain/usage/usage-bar';
 import { collectUsagePools, type UsagePool, type UsagePoolColumn } from '@favo/domain/usage/usage-pool';
 import { HelpText } from '@/help-text';
@@ -36,6 +42,15 @@ import { type Command, CommandKind } from '@/parse-command';
 
 const UsageBarWidth = 20;
 const UsageLabelWidth = 16;
+const HookLabelWidth = 13;
+const ThreadAgeWidth = 9;
+const GuessNotice =
+  "A guess comes from the provider's own list. With two sessions in one folder it can pick the wrong one.";
+const HookStateLabels: Record<HookState, string> = {
+  [HookState.current]: 'on',
+  [HookState.outdated]: 'out of date, run favo sync',
+  [HookState.absent]: 'off',
+};
 
 export type CommandContext = {
   client: RpcClient;
@@ -68,6 +83,29 @@ export async function runCommand(parsed: Command, context: CommandContext) {
       return runPlanned(context, { ...seatOf(command), action: TerminalAction.login, args: [], machineId });
     case CommandKind.logout:
       return runPlanned(context, { ...seatOf(command), action: TerminalAction.logout, args: [], machineId });
+    case CommandKind.resume:
+      return runPlanned(context, {
+        ...seatOf(command),
+        action: TerminalAction.resume,
+        args,
+        machineId,
+        directory: command.directory,
+        thread: command.target,
+      });
+    case CommandKind.threads:
+      return onCurrentFavo(context, machineId, () => printThreads(context, command));
+    case CommandKind.hooksStatus:
+      return onCurrentFavo(context, machineId, async () => {
+        printHooks(context, await client.call(listHooks, {}, options), isJson);
+      });
+    case CommandKind.hooksInstall:
+      return onCurrentFavo(context, machineId, async () => {
+        printHooks(context, await client.call(installHooks, {}, options), isJson);
+      });
+    case CommandKind.hooksUninstall:
+      return onCurrentFavo(context, machineId, async () => {
+        printHooks(context, await client.call(uninstallHooks, {}, options), isJson);
+      });
     case CommandKind.list:
       await printFleet(context, isJson);
       return 0;
@@ -243,9 +281,71 @@ function planFor(
     args: string[];
     machineId?: string;
     directory?: string;
+    thread?: string;
   }
 ) {
   return client.call(planTerminal, params);
+}
+
+async function onCurrentFavo(context: CommandContext, machineId: string | undefined, action: () => Promise<void>) {
+  try {
+    await action();
+    return 0;
+  } catch (error) {
+    if (!isOlderFavoError(error)) throw error;
+    context.print(
+      `${machineId} runs an older favo, which keeps no threads. To update it: favo machine install ${machineId}`
+    );
+    return 1;
+  }
+}
+
+async function printThreads(context: CommandContext, command: Command) {
+  const { client, print, paint } = context;
+  const params = { ...seatOf(command), directory: command.directory };
+  const threads = await client.call(listThreads, params, { machineId: command.machineId });
+  if (command.isJson) {
+    print(JSON.stringify(threads, undefined, 2));
+    return;
+  }
+  const now = Date.now();
+  for (const [index, thread] of threads.entries()) print(threadLine(context, thread, index + 1, now));
+  if (threads.some(({ isGuess }) => isGuess)) print(paint.dim(GuessNotice));
+  if (threads.length === 0) print('No threads yet.');
+}
+
+function threadLine({ paint }: CommandContext, thread: ThreadView, position: number, now: number) {
+  const age = threadAgeOf(thread.updatedAt, now).padEnd(ThreadAgeWidth);
+  const facts = [
+    thread.directory,
+    thread.isDirectoryGone ? 'folder gone' : undefined,
+    thread.isGuess ? 'a guess' : undefined,
+  ];
+  return `${String(position).padStart(2)}  ${age} ${paint.accent(shortThreadId(thread.id))}  ${facts.filter(Boolean).join(' · ')}`;
+}
+
+function printHooks(context: CommandContext, hooks: HookView[], isJson: boolean) {
+  const { print, paint } = context;
+  if (isJson) {
+    print(JSON.stringify(hooks, undefined, 2));
+    return;
+  }
+  for (const hook of hooks) {
+    const label = hook.label.padEnd(HookLabelWidth);
+    if (!hook.isProviderInstalled && hook.state === HookState.absent) {
+      print(paint.dim(`${label} not installed`));
+      continue;
+    }
+    print(`${hookMark(context, hook)} ${label} ${HookStateLabels[hook.state]}  ${paint.dim(hook.file)}`);
+    if (hook.needsTrust && hook.state !== HookState.absent) {
+      print(paint.dim(`  ${hook.label} asks each seat once to trust the hook. If you skip that, it never runs.`));
+    }
+    for (const problem of hook.problems) print(`  ${problem}`);
+  }
+}
+
+function hookMark({ paint }: CommandContext, hook: HookView) {
+  return hook.state === HookState.absent ? paint.dim('⬡') : paint.accent('⬢');
 }
 
 function printRepair(

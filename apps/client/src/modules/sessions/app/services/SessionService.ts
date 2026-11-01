@@ -1,4 +1,4 @@
-import type { DesktopAppView } from '@favo/contracts/rpc/views';
+import type { DesktopAppView, ThreadView } from '@favo/contracts/rpc/views';
 import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
 import { ownValue } from '@favo/domain/shared/own-value';
 import { TerminalAction } from '@favo/domain/terminal/terminal-plan';
@@ -16,6 +16,7 @@ export type SessionService = {
   openDesktopApp(seat: Seat, canClose?: boolean): Promise<DesktopOpening | undefined>;
   openSelectedSeat(): Promise<void>;
   launchSelectedSeat(): Promise<void>;
+  resumeSeatThread(seat: Seat, thread: ThreadView): Promise<void>;
   signInSelectedSeat(): Promise<void>;
   signOutSelectedSeat(): Promise<void>;
   copySelectedPath(): Promise<void>;
@@ -57,10 +58,16 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
     else await signInSelectedSeat();
   },
   async launchSelectedSeat() {
-    const { selectedSeat, launchDirectories, refreshSeat } = get();
+    const { selectedSeat, launchDirectories, refreshSeat, loadSelectedThreads } = get();
     if (!selectedSeat) return;
     const directory = ownValue(launchDirectories, selectedSeat.machineId);
     await _runInTerminal(selectedSeat, TerminalAction.launch, refreshSeat, directory);
+    await loadSelectedThreads();
+  },
+  async resumeSeatThread(seat, thread) {
+    const { refreshSeat, loadSelectedThreads } = get();
+    await _runInTerminal(seat, TerminalAction.resume, refreshSeat, thread.directory, thread.id);
+    await loadSelectedThreads();
   },
   async signInSelectedSeat() {
     const { selectedSeat } = get();
@@ -95,11 +102,12 @@ async function _runInTerminal(
   seat: Seat,
   action: TerminalAction,
   refreshSeat: (seat: Seat) => Promise<void>,
-  directory?: string
+  directory?: string,
+  thread?: string
 ) {
   const terminalRepository = container.get('ITerminalRepository');
   const terminalGateway = container.get('ITerminalGateway');
-  const plan = await terminalRepository.plan(seat, action, directory);
+  const plan = await terminalRepository.plan(seat, action, directory, thread);
   await terminalGateway.run(plan);
   await refreshSeat(seat);
 }

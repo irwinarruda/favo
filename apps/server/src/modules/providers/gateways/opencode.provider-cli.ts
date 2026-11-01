@@ -1,11 +1,14 @@
 import { LoginState } from '@favo/contracts/rpc/views';
 import { ProviderId } from '@favo/domain/providers/provider';
-import { ProviderCli, type ProviderSession } from '@/modules/providers/gateways/provider-cli';
+import { parseJson } from '@favo/domain/shared/parse-json';
+import { z } from 'zod';
+import { ProviderCli, type ProviderSession, type ThreadSearch } from '@/modules/providers/gateways/provider-cli';
 import { stripAnsi } from '@/modules/providers/utils/strip-ansi';
 import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 
 const StatusTimeoutMs = 15_000;
 const StandaloneFlag = '--standalone';
+const OpencodeSession = z.object({ id: z.string(), directory: z.string(), updated: z.number() });
 
 export class OpencodeProviderCli extends ProviderCli {
   readonly id = ProviderId.opencode;
@@ -38,6 +41,23 @@ export class OpencodeProviderCli extends ProviderCli {
 
   override async isolationArguments(session: ProviderSession) {
     return (await this.supportsStandalone(session)) ? [StandaloneFlag] : [];
+  }
+
+  override async recentThreads({ session, directory }: ThreadSearch) {
+    const result = await this.processes.run({
+      command: session.binary,
+      args: ['session', 'list', '--format', 'json', ...(await this.isolationArguments(session))],
+      env: session.env,
+      cwd: directory,
+      timeoutMs: StatusTimeoutMs,
+    });
+    const sessions = z.array(OpencodeSession).safeParse(parseJson(result.stdout));
+    if (!sessions.success) return [];
+    return sessions.data.map(({ id, directory, updated }) => ({
+      id,
+      directory,
+      updatedAt: new Date(updated).toISOString(),
+    }));
   }
 
   private supportsStandalone(session: ProviderSession) {

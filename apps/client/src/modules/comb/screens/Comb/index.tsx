@@ -14,6 +14,7 @@ import { useCombKeys } from '@/modules/comb/screens/Comb/useCombKeys';
 import { DirectoryPicker } from '@/modules/directories/screens/DirectoryPicker';
 import { AddMachine } from '@/modules/machines/screens/AddMachine';
 import { ThemePicker } from '@/modules/themes/screens/ThemePicker';
+import { ThreadPicker } from '@/modules/threads/screens/ThreadPicker';
 import { Usage } from '@/modules/usage/screens/Usage';
 import { type Confirmation, ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useError } from '@/shared/error/useError';
@@ -43,6 +44,11 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   const isAddMachineOpen = useApp((state) => state.isAddMachineOpen);
   const isThemePickerOpen = useApp((state) => state.isThemePickerOpen);
   const isDirectoryPickerOpen = useApp((state) => state.isDirectoryPickerOpen);
+  const isThreadPickerOpen = useApp((state) => state.isThreadPickerOpen);
+  const needsThreadHook = useApp((state) => state.needsThreadHook);
+  const canKeepThreads = useApp((state) => state.canKeepThreads);
+  const goBackToThread = useApp((state) => state.goBackToThread);
+  const installThreadHooks = useApp((state) => state.installThreadHooks);
   const isUsageOpen = useApp((state) => state.isUsageOpen);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation>();
@@ -57,6 +63,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     isAddMachineOpen ||
     isThemePickerOpen ||
     isDirectoryPickerOpen ||
+    isThreadPickerOpen ||
     isUsageOpen ||
     confirmation !== undefined;
 
@@ -99,6 +106,19 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     });
   }
 
+  async function onGoBackToThread() {
+    if (!canKeepThreads) return;
+    if (!needsThreadHook) {
+      await goBackToThread();
+      return;
+    }
+    setConfirmation({
+      title: 'remember threads',
+      message: `Add favo's hook to your provider config on ${selectedMachine?.name}, so each seat remembers its threads? Your own hooks stay as they are, and favo hooks uninstall takes it out. Codex asks each seat once to trust it.`,
+      onAccept: () => void error.handle(installThreadHooks)(),
+    });
+  }
+
   useCombKeys({
     isEnabled: !isDialogOpen && !isDesktopAppBusy,
     onHelp: () => setIsHelpOpen(true),
@@ -106,6 +126,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     onRemoveAccount,
     onForgetMachine,
     onOpenDesktopApp,
+    onGoBackToThread,
   });
 
   useEffect(() => {
@@ -131,10 +152,20 @@ export function Comb({ onQuit }: { onQuit(): void }) {
             <MachineCard key={machine.id} machine={machine} />
           ))}
         </scrollbox>
-        <SeatDetail width={isWide ? DetailWidth : undefined} isCompact={isCompact} onRemoveAccount={onRemoveAccount} />
+        <SeatDetail
+          width={isWide ? DetailWidth : undefined}
+          isCompact={isCompact}
+          onRemoveAccount={onRemoveAccount}
+          onGoBackToThread={onGoBackToThread}
+        />
       </box>
       <ToastLine />
-      <KeyBar onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} onOpenDesktopApp={onOpenDesktopApp} />
+      <KeyBar
+        onHelp={() => setIsHelpOpen(true)}
+        onQuit={onQuit}
+        onOpenDesktopApp={onOpenDesktopApp}
+        onGoBackToThread={onGoBackToThread}
+      />
       {isUsageOpen && <Usage isEnabled={!isHelpOpen} onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} />}
       {isHelpOpen && <HelpDialog onClose={() => setIsHelpOpen(false)} />}
       {isAddAccountOpen && <AddAccount />}
@@ -142,6 +173,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
       {isAddMachineOpen && <AddMachine />}
       {isThemePickerOpen && <ThemePicker />}
       {isDirectoryPickerOpen && <DirectoryPicker />}
+      {isThreadPickerOpen && <ThreadPicker />}
       {!!confirmation && <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(undefined)} />}
     </box>
   );

@@ -5,11 +5,16 @@ import { RemoteBackends } from '@/modules/machines/gateways/remote-backends';
 
 export class LoopbackRemoteBackends extends RemoteBackends {
   private readonly backends = new Map<string, RpcTransport>();
+  private readonly installed = new Map<string, RpcTransport>();
   readonly closed: string[] = [];
   failure?: DomainErrorCode;
 
   connect(machineId: string, backend: RpcTransport) {
     this.backends.set(machineId, backend);
+  }
+
+  connectWhenInstalled(machineId: string, backend: RpcTransport) {
+    this.installed.set(machineId, backend);
   }
 
   async request(machine: Machine, request: RpcRequest): Promise<RpcResponse> {
@@ -21,6 +26,8 @@ export class LoopbackRemoteBackends extends RemoteBackends {
 
   close(machineId: string) {
     this.closed.push(machineId);
+    const installed = this.installed.get(machineId);
+    if (installed) this.backends.set(machineId, installed);
   }
 
   closeAll() {}
