@@ -74,6 +74,18 @@ jobs:
       - name: Verify the tag matches both versions
         run: bun run check:release-version "${RELEASE_TAG}"
 
+      # Written here because the job that creates the release has no checkout, and
+      # no repo script should run next to its write token.
+      - name: Write the release notes from the changelog
+        run: bun run release:notes "${RELEASE_TAG}" > "${RUNNER_TEMP}/release-notes.md"
+
+      - name: Upload the release notes
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/release-notes.md
+          if-no-files-found: error
+
   # The release ships a binary for each platform, so the suite has to pass on
   # each platform before any of them is built.
   test:
@@ -168,6 +180,13 @@ jobs:
           name: release
           path: dist/release
 
+      # Outside dist/release, because everything in there becomes a release file.
+      - name: Download the release notes
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+          path: dist/notes
+
       # This job has no checkout and `gh release create` goes by the tag's name,
       # and an immutable release then locks that tag for good. So this is the last
       # moment the tag can disagree with the commit everything above tested.
@@ -199,7 +218,7 @@ jobs:
             exit 0
           fi
           gh release create "${RELEASE_TAG}" dist/release/* \
-            --generate-notes \
+            --notes-file dist/notes/release-notes.md \
             --title "${RELEASE_TAG}" \
             --verify-tag \
             --repo "${GITHUB_REPOSITORY}"

@@ -19,6 +19,7 @@
     "build:all": "bun scripts/build.ts --all",
     "package:release": "bun scripts/package-release.ts",
     "check:release-version": "bun scripts/check-release-version.ts",
+    "release:notes": "bun scripts/release-notes.ts",
     "verify": "bun run lint && bun run typecheck && bun run test && bun run build",
     "install:local": "bun scripts/install.ts"
   },
