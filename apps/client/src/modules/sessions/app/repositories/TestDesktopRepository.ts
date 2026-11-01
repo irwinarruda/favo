@@ -9,11 +9,12 @@ export class TestDesktopRepository implements IDesktopRepository {
     return mockDb.desktopApps;
   }
 
-  async open(seat: Seat, shouldClose: boolean) {
+  async open(seat: Seat, canClose: boolean) {
     const app = mockDb.desktopApps.find(({ provider }) => provider === seat.provider);
     if (!app) throw new DomainError(DomainErrorCode.desktopAppMissing, `${seat.label} has no desktop app here.`);
+    if (mockDb.desktopFailure) throw mockDb.desktopFailure;
     const isRunning = mockDb.runningDesktopApps.includes(seat.provider);
-    if (isRunning && !shouldClose) return { opening: DesktopOpening.stillOpen, label: app.label };
+    if (isRunning && !canClose) return { opening: DesktopOpening.stillOpen, label: app.label };
     mockDb.runningDesktopApps = [...mockDb.runningDesktopApps.filter((name) => name !== seat.provider), seat.provider];
     mockDb.desktopOpenings.push(seat.key);
     return { opening: DesktopOpening.opened, label: app.label };

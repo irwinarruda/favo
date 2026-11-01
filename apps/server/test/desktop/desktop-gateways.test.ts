@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { DesktopApps } from '@favo/domain/desktop/desktop-app';
+import { DesktopAppSpecs } from '@favo/domain/desktop/desktop-app';
 import type { InstalledDesktopApp } from '@/modules/desktop/gateways/desktop-apps';
 import { HeadlessDesktopApps } from '@/modules/desktop/gateways/headless.desktop-apps';
 import { LinuxDesktopApps } from '@/modules/desktop/gateways/linux.desktop-apps';
@@ -10,9 +10,9 @@ import { MemoryFileSystem } from '@/modules/system/gateways/memory.file-system';
 import type { ProcessRequest } from '@/modules/system/gateways/process-runner';
 import { ScriptedProcessRunner } from '@/modules/system/gateways/scripted.process-runner';
 
-const claude = DesktopApps.claude!;
-const chatgpt = DesktopApps.codex!;
-const ProcessList = 'ps -eo pid=,args=';
+const claude = DesktopAppSpecs.claude!;
+const chatgpt = DesktopAppSpecs.codex!;
+const ProcessList = 'ps x -o pid=,args=';
 const PowerShell = 'powershell.exe -NoProfile -NonInteractive -Command';
 const ClaudeBundle = '/Applications/Claude.app';
 const ClaudeMain = `${ClaudeBundle}/Contents/MacOS/Claude`;
@@ -90,6 +90,17 @@ describe('on macOS', () => {
     const gateway = new MacDesktopApps(processes, '/Users/bee');
     await expect(gateway.open(macApp(), { args: [], env: {} })).rejects.toMatchObject({ code: 'desktopAppFailed' });
   });
+  it('does not take a failed process list for a closed app', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.reply(ProcessList, { code: 1 });
+    const gateway = new MacDesktopApps(processes, '/Users/bee');
+    await expect(gateway.isRunning(macApp())).rejects.toMatchObject({ code: 'desktopAppFailed' });
+  });
+  it('gives up on a command that hangs', async () => {
+    const processes = new ScriptedProcessRunner();
+    await new MacDesktopApps(processes, '/Users/bee').isRunning(macApp());
+    expect(processes.calls[0]?.timeoutMs).toBeGreaterThan(0);
+  });
   it('tells a running app from a stopped one', async () => {
     const processes = new ScriptedProcessRunner();
     const gateway = new MacDesktopApps(processes, '/Users/bee');
@@ -122,7 +133,7 @@ describe('on Linux', () => {
     expect(app).toEqual({
       spec: claude,
       launcher: executable,
-      executables: [executable, '/usr/bin/claude-desktop', 'claude-desktop'],
+      executables: claude.linux.processNames,
     });
   });
   it('finds nothing without it, even with the same command on the PATH', async () => {
@@ -133,11 +144,20 @@ describe('on Linux', () => {
   it('sees an app started from the menu, under its short name', async () => {
     const processes = new ScriptedProcessRunner();
     const fileSystem = new MemoryFileSystem();
+    await fileSystem.writePrivateText(executable, '');
+    const gateway = new LinuxDesktopApps(processes, fileSystem);
+    const app = await gateway.find(claude);
+    processes.reply(ProcessList, { stdout: ' 40 claude-desktop\n' });
+    expect(await gateway.isRunning(app!)).toBe(true);
+  });
+  it('leaves another program called chatgpt alone', async () => {
+    const processes = new ScriptedProcessRunner();
+    const fileSystem = new MemoryFileSystem();
     await fileSystem.writePrivateText(chatgpt.linux.executable, '');
     const gateway = new LinuxDesktopApps(processes, fileSystem);
     const app = await gateway.find(chatgpt);
-    processes.reply(ProcessList, { stdout: ' 40 chatgpt\n' });
-    expect(await gateway.isRunning(app!)).toBe(true);
+    processes.reply(ProcessList, { stdout: ' 40 chatgpt ask hello\n 41 /home/bee/.local/bin/chatgpt\n' });
+    expect(await gateway.isRunning(app!)).toBe(false);
   });
   it('starts the app apart from favo, so it outlives it', async () => {
     const processes = new ScriptedProcessRunner();
@@ -183,6 +203,17 @@ describe('on Windows', () => {
     processes.reply(countLine, { stdout: '15\r\n' });
     expect(await new WindowsDesktopApps(processes, localAppData).isRunning(app)).toBe(true);
     expect(commandsOf(processes).every((line) => !line.includes('-Name'))).toBe(true);
+  });
+  it('does not take a failed PowerShell for a closed app', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.reply(countLine, { code: 1 });
+    const gateway = new WindowsDesktopApps(processes, localAppData);
+    await expect(gateway.isRunning(app)).rejects.toMatchObject({ code: 'desktopAppFailed' });
+  });
+  it('gives up on a PowerShell that hangs', async () => {
+    const processes = new ScriptedProcessRunner();
+    await new WindowsDesktopApps(processes, localAppData).find(claude);
+    expect(processes.calls[0]?.timeoutMs).toBeGreaterThan(0);
   });
   it('asks the windows to close, and stops only what stayed behind', async () => {
     const processes = new ScriptedProcessRunner();

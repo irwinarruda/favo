@@ -120,7 +120,7 @@ The first time, sign in inside the app. It remembers each account after that, an
 - Opening the app from the Dock or Start menu uses your default account, not the last one favo opened.
 - A login stays on the computer where you signed in. It does not travel to your other machines.
 - On Windows, Cowork may not work outside your default account, and a sign-in that bounces to your browser can get lost. Use the emailed code if it does.
-- macOS, Windows, and the official Linux packages (Claude on Ubuntu and Debian, ChatGPT on Ubuntu, Debian and Fedora). In WSL, run favo on Windows instead.
+- macOS, Windows, and the official Linux packages for Ubuntu and Debian. In WSL, run favo on Windows instead.
 
 ## Supported providers
 

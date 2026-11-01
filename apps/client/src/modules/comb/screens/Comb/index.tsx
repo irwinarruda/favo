@@ -33,8 +33,10 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   const selectedMachine = useApp((state) => state.selectedMachine);
   const removeSelectedAccount = useApp((state) => state.removeSelectedAccount);
   const forgetSelectedMachine = useApp((state) => state.forgetSelectedMachine);
+  const selectedSeat = useApp((state) => state.selectedSeat);
   const selectedDesktopApp = useApp((state) => state.selectedDesktopApp);
-  const openSelectedDesktopApp = useApp((state) => state.openSelectedDesktopApp);
+  const isDesktopAppBusy = useApp((state) => state.isDesktopAppBusy);
+  const openDesktopApp = useApp((state) => state.openDesktopApp);
   const isAddAccountOpen = useApp((state) => state.isAddAccountOpen);
   const isRenameAccountOpen = useApp((state) => state.isRenameAccountOpen);
   const isAddMachineOpen = useApp((state) => state.isAddMachineOpen);
@@ -77,24 +79,25 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     });
   }
 
-  async function onCloseAndReopenDesktopApp() {
-    await openSelectedDesktopApp(true);
-  }
-
   async function onOpenDesktopApp() {
-    if (!selectedDesktopApp) return;
+    if (!selectedSeat || !selectedDesktopApp) return;
+    const seat = selectedSeat;
     const { label } = selectedDesktopApp;
-    const opening = await openSelectedDesktopApp();
+    const displayName = selectedAccount?.displayName;
+    const opening = await openDesktopApp(seat);
     if (opening !== DesktopOpening.stillOpen) return;
+    async function onCloseAndReopen() {
+      await openDesktopApp(seat, true);
+    }
     setConfirmation({
       title: `close ${label}`,
-      message: `${label} is open. Close it and reopen as ${selectedAccount?.displayName}? Anything running in it stops.`,
-      onAccept: () => void error.handle(onCloseAndReopenDesktopApp)(),
+      message: `${label} is open. Close it and reopen as ${displayName}? Anything running in it stops.`,
+      onAccept: () => void error.handle(onCloseAndReopen)(),
     });
   }
 
   useCombKeys({
-    isEnabled: !isDialogOpen,
+    isEnabled: !isDialogOpen && !isDesktopAppBusy,
     onHelp: () => setIsHelpOpen(true),
     onQuit,
     onRemoveAccount,

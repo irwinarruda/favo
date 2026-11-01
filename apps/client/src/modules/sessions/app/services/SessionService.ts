@@ -11,8 +11,9 @@ import type { ServiceCreator } from '@/shared/stores/app';
 export type SessionService = {
   desktopApps: DesktopAppView[];
   selectedDesktopApp?: DesktopAppView;
+  isDesktopAppBusy: boolean;
   loadDesktopApps(): Promise<void>;
-  openSelectedDesktopApp(shouldClose?: boolean): Promise<DesktopOpening | undefined>;
+  openDesktopApp(seat: Seat, canClose?: boolean): Promise<DesktopOpening | undefined>;
   openSelectedSeat(): Promise<void>;
   launchSelectedSeat(): Promise<void>;
   signInSelectedSeat(): Promise<void>;
@@ -28,17 +29,26 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
       : undefined,
   })),
   desktopApps: [],
+  isDesktopAppBusy: false,
   async loadDesktopApps() {
     const desktopRepository = container.get('IDesktopRepository');
     set({ desktopApps: await desktopRepository.getApps() });
   },
-  async openSelectedDesktopApp(shouldClose = false) {
-    const { selectedSeat, selectedDesktopApp, selectedAccount, showToast } = get();
-    if (!selectedSeat || !selectedDesktopApp) return undefined;
-    const desktopRepository = container.get('IDesktopRepository');
-    const { opening, label } = await desktopRepository.open(selectedSeat, shouldClose);
-    if (opening === DesktopOpening.opened) showToast(`${label} is opening as ${selectedAccount?.displayName}.`);
-    return opening;
+  async openDesktopApp(seat, canClose = false) {
+    const { accounts, isDesktopAppBusy, refreshSeat, showToast } = get();
+    if (isDesktopAppBusy) return undefined;
+    try {
+      set({ isDesktopAppBusy: true });
+      const desktopRepository = container.get('IDesktopRepository');
+      const { opening, label } = await desktopRepository.open(seat, canClose);
+      if (opening === DesktopOpening.stillOpen) return opening;
+      const account = accounts.find(({ machineId, name }) => machineId === seat.machineId && name === seat.account);
+      showToast(`${label} is opening as ${account?.displayName}.`);
+      await refreshSeat(seat);
+      return opening;
+    } finally {
+      set({ isDesktopAppBusy: false });
+    }
   },
   async openSelectedSeat() {
     const { selectedSeat, launchSelectedSeat, signInSelectedSeat } = get();

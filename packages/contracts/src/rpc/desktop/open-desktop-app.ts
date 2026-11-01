@@ -6,19 +6,19 @@ import { defineMethod, MethodRouting } from '#contracts/rpc/method';
 export const OpenDesktopAppParams = z.strictObject({
   account: z.string(),
   provider: z.enum(ProviderId),
-  shouldClose: z.boolean(),
+  canClose: z.boolean(),
 });
 export type OpenDesktopAppParams = z.infer<typeof OpenDesktopAppParams>;
 
-export const OpenedDesktopApp = z.strictObject({
+export const DesktopOpenResult = z.strictObject({
   opening: z.enum(DesktopOpening),
   label: z.string(),
 });
-export type OpenedDesktopApp = z.infer<typeof OpenedDesktopApp>;
+export type DesktopOpenResult = z.infer<typeof DesktopOpenResult>;
 
 export const openDesktopApp = defineMethod({
   name: 'desktop.open',
   routing: MethodRouting.hub,
   params: OpenDesktopAppParams,
-  result: OpenedDesktopApp,
+  result: DesktopOpenResult,
 });

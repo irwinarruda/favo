@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { DomainError } from '@favo/domain/shared/domain-error';
 import { mockDb } from '@/__tests__/db';
 import { renderApp } from '@/__tests__/utils/renderApp';
 
@@ -595,7 +596,18 @@ describe('adding a machine', () => {
     await press('i');
     await waitFor(() => mockDb.installed.includes('devbox'));
   });
-  test('offers the app on the key bar only when it exists', async () => {
+  test('forgets a machine after asking', async () => {
+    const { app, select, press, captureCharFrame, waitFor } = await open();
+    await select('machine:studio');
+    await press('X');
+    expect(captureCharFrame()).toContain('Forget studio?');
+    await press('y');
+    await waitFor(() => !app.state.machines.some((machine) => machine.id === 'studio'));
+  });
+});
+
+describe('opening a desktop app', () => {
+  test('offers it on the key bar only when it exists', async () => {
     const { select, captureCharFrame } = await open();
     expect(captureCharFrame()).toContain('p open Claude');
     await select('seat:local/personal/codex');
@@ -603,46 +615,53 @@ describe('adding a machine', () => {
     await select('seat:devbox/personal/claude');
     expect(captureCharFrame()).not.toContain('p open');
   });
-  test('shows the app on the key bar at 80 columns', async () => {
+  test('shows it on the key bar at 80 columns', async () => {
     const { captureCharFrame } = await open({ width: 80, height: 30 });
     expect(captureCharFrame()).toContain('p open Claude');
   });
-  test('opens the app with p', async () => {
-    const { select, press, waitFor, captureCharFrame, flush, renderOnce } = await open();
+  test('fits its row in the help', async () => {
+    const { press, waitForFrame } = await open();
+    await press('?');
+    await waitForFrame((frame) => frame.includes('p           open the desktop app'));
+  });
+  test('opens with p and says so', async () => {
+    const { select, press, waitForFrame } = await open();
     await select('seat:local/work/claude');
     await press('p');
-    await waitFor(() => mockDb.desktopOpenings.length === 1);
-    await flush();
-    await renderOnce();
+    await waitForFrame((frame) => frame.includes('Claude is opening as work.'));
     expect(mockDb.desktopOpenings).toEqual(['seat:local/work/claude']);
-    expect(captureCharFrame()).toContain('Claude is opening as work.');
   });
-  test('opens the app with a click', async () => {
+  test('opens with a click', async () => {
     const { select, clickOn, waitFor } = await open();
     await select('seat:local/work/claude');
     await clickOn('open Claude');
     await waitFor(() => mockDb.desktopOpenings.length === 1);
   });
-  test('p does nothing where there is no app', async () => {
-    const { select, press, flush } = await open();
-    await select('seat:local/personal/codex');
+  test.each([
+    ['a provider with no app here', 'seat:local/personal/codex'],
+    ['another machine', 'seat:devbox/personal/claude'],
+  ])('p does nothing on %s', async (_name, seat) => {
+    const { select, press, flush, renderOnce, captureCharFrame } = await open();
+    await select(seat);
     await press('p');
     await flush();
+    await renderOnce();
     expect(mockDb.desktopOpenings).toEqual([]);
+    expect(captureCharFrame()).not.toContain('has no desktop app');
+    expect(captureCharFrame()).not.toContain('is opening as');
   });
-  test('asks before closing an app that is open, and keeps it open on no', async () => {
-    const { select, press, waitForFrame, captureCharFrame, flush, renderOnce } = await open();
+  test('asks before closing an open app, and keeps it open on no', async () => {
+    const { select, press, waitForFrame, captureCharFrame } = await open();
     mockDb.runningDesktopApps = ['claude'];
     await select('seat:local/work/claude');
     await press('p');
     await waitForFrame((frame) => frame.includes('Close it and reopen as work?'));
     expect(captureCharFrame()).toContain('Anything running in it stops.');
     await press('n');
-    await flush();
-    await renderOnce();
+    await waitForFrame((frame) => !frame.includes('Close it and reopen as work?'));
     expect(mockDb.desktopOpenings).toEqual([]);
   });
-  test('closes and reopens the app on yes', async () => {
+  test('closes and reopens on yes', async () => {
     const { select, press, waitForFrame, waitFor } = await open();
     mockDb.runningDesktopApps = ['claude'];
     await select('seat:local/work/claude');
@@ -651,12 +670,25 @@ describe('adding a machine', () => {
     await press('y');
     await waitFor(() => mockDb.desktopOpenings.length === 1);
   });
-  test('forgets a machine after asking', async () => {
-    const { app, select, press, captureCharFrame, waitFor } = await open();
-    await select('machine:studio');
-    await press('X');
-    expect(captureCharFrame()).toContain('Forget studio?');
+  test('acts on the account it named, even if the selection moved', async () => {
+    const { select, press, waitForFrame, waitFor } = await open();
+    mockDb.runningDesktopApps = ['claude'];
+    await select('seat:local/work/claude');
+    await press('p');
+    await waitForFrame((frame) => frame.includes('Close it and reopen as work?'));
+    await select('seat:local/personal/claude');
     await press('y');
-    await waitFor(() => !app.state.machines.some((machine) => machine.id === 'studio'));
+    await waitFor(() => mockDb.desktopOpenings.length === 1);
+    expect(mockDb.desktopOpenings).toEqual(['seat:local/work/claude']);
+  });
+  test('shows why an app could not be closed', async () => {
+    const { select, press, waitForFrame } = await open();
+    mockDb.runningDesktopApps = ['claude'];
+    await select('seat:local/work/claude');
+    await press('p');
+    await waitForFrame((frame) => frame.includes('Close it and reopen as work?'));
+    mockDb.desktopFailure = new DomainError('desktopAppStuck', 'Claude did not close.');
+    await press('y');
+    await waitForFrame((frame) => frame.includes('Claude did not close.'));
   });
 });

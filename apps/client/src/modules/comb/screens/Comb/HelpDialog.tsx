@@ -9,7 +9,7 @@ const Keys = [
   ['enter', 'launch, or sign in'],
   ['s / o', 'sign in / sign out'],
   ['c', 'copy the config path'],
-  ['p', 'open the desktop app as this cell'],
+  ['p', 'open the desktop app'],
   ['a / n / x', 'add / rename / delete a cell'],
   ['m / X', 'add / forget a machine'],
   ['i', 'install or update favo there'],

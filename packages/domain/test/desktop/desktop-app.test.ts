@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'bun:test';
-import { DesktopApps, desktopLaunchOf, desktopProfileOf, mainProcessIds } from '#domain/desktop/desktop-app';
+import { DesktopAppSpecs, desktopLaunchOf, desktopProfileOf, mainProcessIds } from '#domain/desktop/desktop-app';
 import { Providers } from '#domain/providers/provider';
 
 const paths = { accounts: '/h/.favo/accounts' };
-const claude = DesktopApps.claude!;
-const chatgpt = DesktopApps.codex!;
+const claude = DesktopAppSpecs.claude!;
+const chatgpt = DesktopAppSpecs.codex!;
 
 describe('desktop apps', () => {
   it('exist only for the providers that ship one', () => {
-    expect(Object.keys(DesktopApps).toSorted()).toEqual(['claude', 'codex']);
+    expect(Object.keys(DesktopAppSpecs).toSorted()).toEqual(['claude', 'codex']);
+  });
+  it('never treat a bare chatgpt command as the app, because other tools use that name', () => {
+    expect(chatgpt.linux.processNames).toEqual(['/usr/lib/chatgpt/ChatGPT']);
   });
   it('keep their folder apart from the provider folder, so a cell can hold both', () => {
     for (const spec of [claude, chatgpt]) {
