@@ -18,7 +18,7 @@ favo's binaries embed the Bun runtime. From https://bun.com/docs/project/license
 >
 > Bun's patched version of WebKit lives at https://github.com/oven-sh/webkit.
 
-That page also lists how to relink Bun with changes and the other libraries Bun links statically, with their licenses. favo's own source is at https://github.com/irwinarruda/favo, and \`bun run build:all\` compiles it against whichever \`bun\` you run it with.
+That page also lists how to relink Bun with changes and the other libraries Bun links statically, with their licenses. favo's own source is at https://github.com/irwinarruda/favo-cli, and \`bun run build:all\` compiles it against whichever \`bun\` you run it with.
 `;
 
 type NoticeSection = {

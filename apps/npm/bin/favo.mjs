@@ -10,7 +10,7 @@ import zlib from 'node:zlib';
 const PackageRoot = path.dirname(import.meta.dirname);
 const { version } = JSON.parse(fs.readFileSync(path.join(PackageRoot, 'package.json'), 'utf8'));
 
-const DefaultReleaseBaseUrl = 'https://github.com/irwinarruda/favo/releases/download';
+const DefaultReleaseBaseUrl = 'https://github.com/irwinarruda/favo-cli/releases/download';
 const Assets = {
   'darwin-arm64': 'favo-darwin-arm64.gz',
   'darwin-x64': 'favo-darwin-x64.gz',

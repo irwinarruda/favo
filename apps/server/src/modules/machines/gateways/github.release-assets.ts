@@ -7,7 +7,7 @@ import { gunzip } from 'node:zlib';
 import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { ReleaseAssets } from '@/modules/machines/gateways/release-assets';
 
-const ReleaseBaseUrl = 'https://github.com/irwinarruda/favo/releases/download';
+const ReleaseBaseUrl = 'https://github.com/irwinarruda/favo-cli/releases/download';
 const ChecksumsFile = 'SHA256SUMS';
 const ChecksumLine = /^([0-9a-fA-F]{64}) {2}(.+)$/;
 const ChecksumsTimeoutMs = 30_000;

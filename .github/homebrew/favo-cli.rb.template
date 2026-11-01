@@ -1,6 +1,6 @@
-class Favo < Formula
+class FavoCli < Formula
   desc "Keep every AI subscription on every computer you own"
-  homepage "https://github.com/irwinarruda/favo"
+  homepage "https://github.com/irwinarruda/favo-cli"
   license "MIT"
 
   # The release workflow already builds and checksums a binary per target, so
@@ -8,24 +8,24 @@ class Favo < Formula
   # Each release file is one gzipped binary, which Homebrew unpacks by itself.
   on_macos do
     on_arm do
-      url "https://github.com/irwinarruda/favo/releases/download/v@VERSION@/favo-darwin-arm64.gz"
+      url "https://github.com/irwinarruda/favo-cli/releases/download/v@VERSION@/favo-darwin-arm64.gz"
       sha256 "@SHA_MACOS_ARM@"
     end
 
     on_intel do
-      url "https://github.com/irwinarruda/favo/releases/download/v@VERSION@/favo-darwin-x64.gz"
+      url "https://github.com/irwinarruda/favo-cli/releases/download/v@VERSION@/favo-darwin-x64.gz"
       sha256 "@SHA_MACOS_INTEL@"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/irwinarruda/favo/releases/download/v@VERSION@/favo-linux-arm64.gz"
+      url "https://github.com/irwinarruda/favo-cli/releases/download/v@VERSION@/favo-linux-arm64.gz"
       sha256 "@SHA_LINUX_ARM@"
     end
 
     on_intel do
-      url "https://github.com/irwinarruda/favo/releases/download/v@VERSION@/favo-linux-x64.gz"
+      url "https://github.com/irwinarruda/favo-cli/releases/download/v@VERSION@/favo-linux-x64.gz"
       sha256 "@SHA_LINUX_INTEL@"
     end
   end

@@ -1,6 +1,6 @@
 {
   "name": "favo-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "favo keeps several AI subscriptions on every computer you own. Downloads the self-contained executable for this platform from the GitHub Release.",
   "keywords": [
     "favo",
@@ -12,13 +12,13 @@
     "codex",
     "opencode"
   ],
-  "homepage": "https://github.com/irwinarruda/favo#readme",
+  "homepage": "https://github.com/irwinarruda/favo-cli#readme",
   "bugs": {
-    "url": "https://github.com/irwinarruda/favo/issues"
+    "url": "https://github.com/irwinarruda/favo-cli/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/irwinarruda/favo.git"
+    "url": "git+https://github.com/irwinarruda/favo-cli.git"
   },
   "license": "MIT",
   "bin": {

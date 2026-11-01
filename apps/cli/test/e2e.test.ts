@@ -230,7 +230,7 @@ describe.skipIf(isWindows)('favo with another machine', () => {
 
   it('installs itself over ssh and answers from the other side', async () => {
     const added = await joinRemote();
-    expect(added.stdout).toContain('favo 0.1.0 is running on remote');
+    expect(added.stdout).toContain(`favo ${FavoVersion} is running on remote`);
     expect(existsSync(`${remoteHome}/.favo/bin/favo`)).toBe(true);
     const { stdout } = await favo(['machine', 'list', '--json']);
     const machines = JSON.parse(stdout);

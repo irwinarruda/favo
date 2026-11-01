@@ -128,7 +128,7 @@ describe('machine status', () => {
     const status = await mac.client.call(getMachineStatus, { id: 'devbox' });
     expect(status).toEqual({
       state: 'online',
-      version: '0.1.0',
+      version: FavoVersion,
       hostname: 'devbox',
       directory: `${Home}/projects/hive`,
     });

@@ -16,7 +16,7 @@ if [[ -z "${sums}" ]]; then
   sums="$(mktemp)"
   trap 'rm -f "${sums}"' EXIT
   curl --fail --silent --show-error --location --output "${sums}" \
-    "https://github.com/irwinarruda/favo/releases/download/v${version}/SHA256SUMS"
+    "https://github.com/irwinarruda/favo-cli/releases/download/v${version}/SHA256SUMS"
 fi
 
 # A missing target has to stop the render. A formula carrying an empty sha256
@@ -43,4 +43,4 @@ sed \
   -e "s|@SHA_MACOS_INTEL@|${macos_intel}|g" \
   -e "s|@SHA_LINUX_ARM@|${linux_arm}|g" \
   -e "s|@SHA_LINUX_INTEL@|${linux_intel}|g" \
-  "$(dirname "$0")/favo.rb.template"
+  "$(dirname "$0")/favo-cli.rb.template"

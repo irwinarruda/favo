@@ -53,7 +53,7 @@ jobs:
       # formula, so no `brew trust` step belongs here: one would hide a change in
       # what users have to do.
       - name: Install favo from the tap
-        run: brew install irwinarruda/tap/favo
+        run: brew install irwinarruda/tap/favo-cli
 
       - name: Check it is the expected version
         env:

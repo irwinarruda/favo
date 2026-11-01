@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/favo-cli"><img src="https://img.shields.io/npm/v/favo-cli?color=F5A623&labelColor=14110B" alt="npm version"></a>
-  <a href="https://github.com/irwinarruda/favo/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/irwinarruda/favo/ci.yml?branch=main&labelColor=14110B" alt="CI status"></a>
+  <a href="https://github.com/irwinarruda/favo-cli/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/irwinarruda/favo-cli/ci.yml?branch=main&labelColor=14110B" alt="CI status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F5A623?labelColor=14110B" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-F3E7CF?labelColor=14110B" alt="macOS, Linux and Windows">
 </p>
@@ -46,11 +46,11 @@ favo codex client      # Codex as a client's account
 ## Install
 
 ```sh
-npm install --global favo-cli       # macOS, Linux and Windows
-brew install irwinarruda/tap/favo   # or Homebrew, on macOS and Linux
+npm install --global favo-cli           # macOS, Linux and Windows
+brew install irwinarruda/tap/favo-cli   # or Homebrew, on macOS and Linux
 ```
 
-Then run `favo`. The npm install needs Node 20.11 or newer, and Homebrew needs nothing else ([details](#install-details)). To try it without installing, use `npx favo-cli`; plain `npx favo` runs an unrelated package.
+Everywhere you install it, the name is `favo-cli`. The command you run is `favo`. The npm install needs Node 20.11 or newer, and Homebrew needs nothing else ([details](#install-details)). To try it without installing, use `npx favo-cli`; plain `npx favo` runs an unrelated package.
 
 Your first account is already there: `personal` is the setup you have today. To add another:
 
@@ -147,7 +147,7 @@ There is no telemetry. favo's own network use is downloading its release from Gi
 That gives you a second login, and it's how many of us started. The new folder starts empty, though, so you maintain your setup twice, and it stops at one machine and one provider. favo keeps the setup shared and does the same for all four providers, across your computers.
 
 **How do I uninstall it?**
-Run `npm uninstall --global favo-cli` or `brew uninstall favo`, then delete `~/.favo`. That removes every account except `personal`, along with their logins and threads, and leaves your normal config folders alone.
+Run `npm uninstall --global favo-cli` or `brew uninstall favo-cli`, then delete `~/.favo`. That removes every account except `personal`, along with their logins and threads, and leaves your normal config folders alone.
 
 ## Reference
 
@@ -159,9 +159,9 @@ Run `npm uninstall --global favo-cli` or `brew uninstall favo`, then delete `~/.
 | Linux   | x64 and arm64, glibc (not Alpine or musl) |
 | Windows | x64                                       |
 
-The npm package is a small launcher with no dependencies and no install scripts. The first run downloads the right binary, about 40 MB, from [GitHub Releases](https://github.com/irwinarruda/favo/releases) and checks it against the hashes published in the npm package. After that, favo starts with no network. Homebrew installs the same binary directly, with no launcher and no Node.
+The npm package is a small launcher with no dependencies and no install scripts. The first run downloads the right binary, about 40 MB, from [GitHub Releases](https://github.com/irwinarruda/favo-cli/releases) and checks it against the hashes published in the npm package. After that, favo starts with no network. Homebrew installs the same binary directly, with no launcher and no Node.
 
-To update, run `npm install --global favo-cli@latest` or `brew upgrade favo`, then `favo machine install <machine>` for each other machine.
+To update, run `npm install --global favo-cli@latest` or `brew upgrade favo-cli`, then `favo machine install <machine>` for each other machine.
 
 ### Use it with T3 Code
 
@@ -265,7 +265,7 @@ Without Developer Mode, Windows refuses symlinks, so favo shares folders with ju
 
 A provider installed by npm is a `.cmd` file, which only runs through `cmd.exe`. That shell cannot pass some characters safely, so favo refuses an argument containing `"`, `&`, `|`, `<`, `>`, `^`, `%`, `!` or a line break for those providers, and says so.
 
-Tailscale SSH has no server on Windows, so another machine needs the OpenSSH server that ships with it. Install Tailscale first, download [`enable-windows-ssh.ps1`](https://github.com/irwinarruda/favo/blob/main/scripts/enable-windows-ssh.ps1), and run it once in an administrator PowerShell, with the public key of the machine connecting:
+Tailscale SSH has no server on Windows, so another machine needs the OpenSSH server that ships with it. Install Tailscale first, download [`enable-windows-ssh.ps1`](https://github.com/irwinarruda/favo-cli/blob/main/scripts/enable-windows-ssh.ps1), and run it once in an administrator PowerShell, with the public key of the machine connecting:
 
 ```powershell
 .\enable-windows-ssh.ps1 -PublicKey "ssh-ed25519 AAAA... you@mac"

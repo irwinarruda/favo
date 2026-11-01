@@ -396,7 +396,7 @@ jobs:
           persist-credentials: false
 
       - name: Render the formula
-        run: ./.github/homebrew/render-formula.sh "${RELEASE_TAG#v}" > "${RUNNER_TEMP}/favo.rb"
+        run: ./.github/homebrew/render-formula.sh "${RELEASE_TAG#v}" > "${RUNNER_TEMP}/favo-cli.rb"
 
       # GITHUB_TOKEN can't push to a second repository. A deploy key can reach
       # only the tap, so losing it costs less than losing a personal token. It
@@ -416,15 +416,15 @@ jobs:
         working-directory: tap
         run: |
           mkdir -p Formula
-          cp "${RUNNER_TEMP}/favo.rb" Formula/favo.rb
-          if [[ -z "$(git status --porcelain -- Formula/favo.rb)" ]]; then
+          cp "${RUNNER_TEMP}/favo-cli.rb" Formula/favo-cli.rb
+          if [[ -z "$(git status --porcelain -- Formula/favo-cli.rb)" ]]; then
             echo "The tap already has ${RELEASE_TAG}"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/favo.rb
-          git commit --message "favo ${RELEASE_TAG#v}"
+          git add Formula/favo-cli.rb
+          git commit --message "favo-cli ${RELEASE_TAG#v}"
           git push
 
   homebrew-check:
