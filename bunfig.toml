@@ -1,0 +1,7 @@
+[install]
+# Refuse any package version younger than seven days, the same wait Dependabot
+# has in .github/dependabot.yml. A hijacked release is usually caught within
+# days, and this stops `bun add` and `bun update` from picking one up first.
+# When a real security fix cannot wait, take that one version by hand:
+#   bun add <package>@<version> --minimum-release-age 0
+minimumReleaseAge = 604800
