@@ -1,3 +1,4 @@
+import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
 import type { ScrollBoxRenderable } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/react';
 import { useEffect, useRef, useState } from 'react';
@@ -32,6 +33,8 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   const selectedMachine = useApp((state) => state.selectedMachine);
   const removeSelectedAccount = useApp((state) => state.removeSelectedAccount);
   const forgetSelectedMachine = useApp((state) => state.forgetSelectedMachine);
+  const selectedDesktopApp = useApp((state) => state.selectedDesktopApp);
+  const openSelectedDesktopApp = useApp((state) => state.openSelectedDesktopApp);
   const isAddAccountOpen = useApp((state) => state.isAddAccountOpen);
   const isRenameAccountOpen = useApp((state) => state.isRenameAccountOpen);
   const isAddMachineOpen = useApp((state) => state.isAddMachineOpen);
@@ -74,12 +77,29 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     });
   }
 
+  async function onCloseAndReopenDesktopApp() {
+    await openSelectedDesktopApp(true);
+  }
+
+  async function onOpenDesktopApp() {
+    if (!selectedDesktopApp) return;
+    const { label } = selectedDesktopApp;
+    const opening = await openSelectedDesktopApp();
+    if (opening !== DesktopOpening.stillOpen) return;
+    setConfirmation({
+      title: `close ${label}`,
+      message: `${label} is open. Close it and reopen as ${selectedAccount?.displayName}? Anything running in it stops.`,
+      onAccept: () => void error.handle(onCloseAndReopenDesktopApp)(),
+    });
+  }
+
   useCombKeys({
     isEnabled: !isDialogOpen,
     onHelp: () => setIsHelpOpen(true),
     onQuit,
     onRemoveAccount,
     onForgetMachine,
+    onOpenDesktopApp,
   });
 
   useEffect(() => {
@@ -108,7 +128,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
         <SeatDetail width={isWide ? DetailWidth : undefined} isCompact={isCompact} onRemoveAccount={onRemoveAccount} />
       </box>
       <ToastLine />
-      <KeyBar onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} />
+      <KeyBar onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} onOpenDesktopApp={onOpenDesktopApp} />
       {isHelpOpen && <HelpDialog onClose={() => setIsHelpOpen(false)} />}
       {isAddAccountOpen && <AddAccount />}
       {isRenameAccountOpen && <RenameAccount />}

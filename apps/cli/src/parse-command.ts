@@ -18,6 +18,7 @@ export const CommandKind = {
   remove: 'remove',
   adopt: 'adopt',
   path: 'path',
+  app: 'app',
   sync: 'sync',
   inspect: 'inspect',
   theme: 'theme',
@@ -41,6 +42,7 @@ export type Command = {
   target?: string;
   name?: string;
   directory?: string;
+  shouldClose?: boolean;
 };
 
 export function parseCommand(rawArgv: string[]): Command {
@@ -79,6 +81,13 @@ export function parseCommand(rawArgv: string[]): Command {
       return { ...base, kind: CommandKind.logout, ...seatOf(second, third, 'favo logout <account> <provider>') };
     case 'path':
       return { ...base, kind: CommandKind.path, ...seatOf(second, third, 'favo path <account> <provider>') };
+    case 'app':
+      return {
+        ...base,
+        kind: CommandKind.app,
+        shouldClose: flags.shouldClose,
+        ...seatOf(second, third, 'favo app <account> <provider> [--close]'),
+      };
     case 'inspect':
       return { ...base, kind: CommandKind.inspect, ...seatOf(second, third, 'favo inspect <account> <provider>') };
     case 'adopt':
@@ -132,6 +141,7 @@ function readFlags(argv: string[]) {
     isJson: false,
     isHelp: false,
     isVersion: false,
+    shouldClose: false,
     machine: undefined as string | undefined,
     name: undefined as string | undefined,
     directory: undefined as string | undefined,
@@ -141,6 +151,7 @@ function readFlags(argv: string[]) {
     if (word === '--json') flags.isJson = true;
     else if (word === '--help' || word === '-h') flags.isHelp = true;
     else if (word === '--version' || word === '-v') flags.isVersion = true;
+    else if (word === '--close') flags.shouldClose = true;
     else if (word === '--stdio') continue;
     else if (word === '--machine' || word === '-m') flags.machine = required(argv[++index], '--machine <machine>');
     else if (word === '--name') flags.name = required(argv[++index], '--name <name>');

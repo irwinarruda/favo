@@ -10,6 +10,7 @@ const ModuleLevels: Record<string, number> = {
   directories: 2,
   accounts: 3,
   machines: 4,
+  desktop: 4,
   terminal: 5,
 };
 const StaticImport = /^\s*(?:import|export)(\s+type)?\s+(?:[\w$*{},\s]*?from\s*)?['"]([^'"]+)['"]/gm;

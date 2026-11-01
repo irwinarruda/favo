@@ -1,6 +1,10 @@
 import { arch, homedir, hostname, platform } from 'node:os';
 import { delimiter } from 'node:path';
 import { ProviderId } from '@favo/domain/providers/provider';
+import { HeadlessDesktopApps } from '@/modules/desktop/gateways/headless.desktop-apps';
+import { LinuxDesktopApps } from '@/modules/desktop/gateways/linux.desktop-apps';
+import { MacDesktopApps } from '@/modules/desktop/gateways/mac.desktop-apps';
+import { WindowsDesktopApps } from '@/modules/desktop/gateways/windows.desktop-apps';
 import { CliTailscale } from '@/modules/machines/gateways/cli.tailscale';
 import { GithubReleaseAssets } from '@/modules/machines/gateways/github.release-assets';
 import { OpenSsh } from '@/modules/machines/gateways/open.ssh';
@@ -30,9 +34,10 @@ export function createProductionServer(env: Record<string, string | undefined>) 
     : new InheritedShellEnvironment(inheritedPath);
   const ssh = new OpenSsh(processes);
   const name = (env.FAVO_HOSTNAME ?? hostname()).split('.')[0]!.toLowerCase();
+  const fileSystem = new NodeFileSystem(platform());
   return createServer(
     {
-      fileSystem: new NodeFileSystem(platform()),
+      fileSystem,
       processes,
       shell,
       clock: new SystemClock(),
@@ -46,6 +51,7 @@ export function createProductionServer(env: Record<string, string | undefined>) 
       tailscale: new CliTailscale(processes),
       remotes: new SshRemoteBackends(ssh),
       releaseAssets: new GithubReleaseAssets(),
+      desktopApps: desktopAppsFor(isInSshSession),
     },
     {
       paths,
@@ -53,6 +59,14 @@ export function createProductionServer(env: Record<string, string | undefined>) 
       callerEnv: env,
     }
   );
+
+  function desktopAppsFor(isOverSsh: boolean) {
+    if (isOverSsh) return new HeadlessDesktopApps();
+    if (platform() === 'darwin') return new MacDesktopApps(processes, home);
+    if (isWindows) return new WindowsDesktopApps(processes, env.LOCALAPPDATA ?? `${home}/AppData/Local`);
+    if (env.DISPLAY || env.WAYLAND_DISPLAY) return new LinuxDesktopApps(processes, fileSystem);
+    return new HeadlessDesktopApps();
+  }
 }
 
 function forwardSlashes(path: string) {

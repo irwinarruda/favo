@@ -68,6 +68,22 @@ export class BunProcessRunner extends ProcessRunner {
     };
   }
 
+  detach(request: ProcessRequest) {
+    try {
+      const child = Bun.spawn(spawnCommandOf(request.command, request.args), {
+        env: this.environmentOf(request),
+        stdin: 'ignore',
+        stdout: 'ignore',
+        stderr: 'ignore',
+        detached: true,
+      });
+      child.unref();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   which(command: string, path: string) {
     return Bun.which(command, { PATH: path }) ?? undefined;
   }

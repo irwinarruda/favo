@@ -128,6 +128,21 @@ describe('the TUI on a real backend', () => {
     expect(await devbox.fileSystem.list(`${Home}/.favo/accounts`)).toEqual(['side']);
     expect((await mac.client.call(listAccounts, {})).map(({ displayName }) => displayName)).not.toContain('side-two');
   });
+  test('offers an app only once the backend finds it, and opens it isolated', async () => {
+    const { mac, mockInput, flush, renderOnce, captureCharFrame, waitForFrame } = await openFleet();
+    useApp.getState().selectRow('seat:local/work/claude');
+    await flush();
+    await renderOnce();
+    expect(captureCharFrame()).not.toContain('p open');
+    mac.desktopApps.install('claude');
+    await useApp.getState().loadDesktopApps();
+    await flush();
+    await renderOnce();
+    expect(captureCharFrame()).toContain('p open Claude');
+    mockInput.pressKey('p');
+    await waitForFrame((frame) => frame.includes('Claude is opening as work.'));
+    expect(mac.desktopApps.opened[0]?.launch.env.CLAUDE_CONFIG_DIR).toBe(`${Home}/.favo/accounts/work/claude`);
+  });
   test('shows a real backend error as a toast', async () => {
     const { mockInput, flush, waitForFrame } = await openFleet();
     useApp.getState().selectRow('seat:local/personal/antigravity');

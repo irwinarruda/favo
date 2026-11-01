@@ -1,11 +1,18 @@
+import type { DesktopAppView } from '@favo/contracts/rpc/views';
+import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
 import { ownValue } from '@favo/domain/shared/own-value';
 import { TerminalAction } from '@favo/domain/terminal/terminal-plan';
+import { compute } from '@/libs/zustand';
 import type { Seat } from '@/modules/comb/app/entities/Seat';
 import { ToastKind } from '@/shared/app/services/ToastService';
 import { container } from '@/shared/container';
 import type { ServiceCreator } from '@/shared/stores/app';
 
 export type SessionService = {
+  desktopApps: DesktopAppView[];
+  selectedDesktopApp?: DesktopAppView;
+  loadDesktopApps(): Promise<void>;
+  openSelectedDesktopApp(shouldClose?: boolean): Promise<DesktopOpening | undefined>;
   openSelectedSeat(): Promise<void>;
   launchSelectedSeat(): Promise<void>;
   signInSelectedSeat(): Promise<void>;
@@ -14,7 +21,25 @@ export type SessionService = {
   repairSelectedMachine(): Promise<void>;
 };
 
-export const createSessionService: ServiceCreator<SessionService> = (_set, get) => ({
+export const createSessionService: ServiceCreator<SessionService> = (set, get) => ({
+  ...compute(get, ({ desktopApps, selectedSeat, selectedMachine }) => ({
+    selectedDesktopApp: selectedMachine?.isLocal
+      ? desktopApps.find((app) => app.provider === selectedSeat?.provider)
+      : undefined,
+  })),
+  desktopApps: [],
+  async loadDesktopApps() {
+    const desktopRepository = container.get('IDesktopRepository');
+    set({ desktopApps: await desktopRepository.getApps() });
+  },
+  async openSelectedDesktopApp(shouldClose = false) {
+    const { selectedSeat, selectedDesktopApp, selectedAccount, showToast } = get();
+    if (!selectedSeat || !selectedDesktopApp) return undefined;
+    const desktopRepository = container.get('IDesktopRepository');
+    const { opening, label } = await desktopRepository.open(selectedSeat, shouldClose);
+    if (opening === DesktopOpening.opened) showToast(`${label} is opening as ${selectedAccount?.displayName}.`);
+    return opening;
+  },
   async openSelectedSeat() {
     const { selectedSeat, launchSelectedSeat, signInSelectedSeat } = get();
     if (!selectedSeat) return;

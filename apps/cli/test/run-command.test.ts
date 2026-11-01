@@ -55,6 +55,42 @@ describe('commands', () => {
     expect(output).toContain('macbook this machine · online · /Users/bee/code/app');
     expect(output).toContain('devbox bee@devbox · online · /home/bee');
   });
+  it('opens a desktop app as an account', async () => {
+    const { run, lines, client, desktopApps } = harness();
+    desktopApps.install('codex');
+    await client.call(createAccount, { name: 'work' });
+    expect(await run('app', 'work', 'codex')).toBe(0);
+    expect(lines).toEqual(['⬢ ChatGPT is opening as work.']);
+    expect(desktopApps.opened[0]?.provider).toBe('codex');
+  });
+  it('says so when the app is not installed', async () => {
+    const { run, client } = harness();
+    await client.call(createAccount, { name: 'work' });
+    await expect(run('app', 'work', 'claude')).rejects.toThrow('The Claude app is not installed here.');
+  });
+  it('tells you how to replace an app that is already open, and leaves it alone', async () => {
+    const { run, lines, client, desktopApps } = harness();
+    desktopApps.install('claude');
+    desktopApps.run('claude');
+    await client.call(createAccount, { name: 'work' });
+    expect(await run('app', 'work', 'claude')).toBe(1);
+    expect(lines).toEqual(['Claude is open. To close it and reopen: favo app work claude --close']);
+    expect(desktopApps.quitCalls).toEqual([]);
+  });
+  it('closes an open app when told to', async () => {
+    const { run, client, desktopApps } = harness();
+    desktopApps.install('claude');
+    desktopApps.run('claude');
+    await client.call(createAccount, { name: 'work' });
+    expect(await run('app', 'work', 'claude', '--close')).toBe(0);
+    expect(desktopApps.quitCalls).toEqual(['claude']);
+  });
+  it('refuses to open a window on another machine', async () => {
+    const { run, desktopApps } = harness();
+    desktopApps.install('claude');
+    await expect(run('app', 'personal', 'claude', '--machine', 'devbox')).rejects.toThrow('takes no --machine');
+    expect(desktopApps.opened).toEqual([]);
+  });
   it('lists themes and marks the active one', async () => {
     const { run, lines, fileSystem, paths } = harness();
     await fileSystem.writePrivateText(`${paths.themes}/mine.json`, JSON.stringify({ colors: {} }));

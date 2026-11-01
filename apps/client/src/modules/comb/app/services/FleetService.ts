@@ -42,6 +42,7 @@ export const createFleetService: ServiceCreator<FleetService> = (set, get) => ({
       const fleetRepository = container.get('IFleetRepository');
       const machines = await fleetRepository.getMachines();
       set({ machines });
+      await get().loadDesktopApps();
       await Promise.all(machines.map((machine) => get().refreshMachine(machine.id)));
     } finally {
       set({ isFleetLoading: false });

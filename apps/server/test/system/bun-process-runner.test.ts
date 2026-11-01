@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'bun:test';
+import { tmpdir } from 'node:os';
 import { BunProcessRunner } from '@/modules/system/gateways/bun.process-runner';
 import { MaximumLineBytes } from '@/shared/rpc/read-lines';
 
 const runner = new BunProcessRunner(process.env, false);
+
+async function waitFor(isDone: () => Promise<boolean>) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (await isDone()) return;
+    await Bun.sleep(20);
+  }
+  throw new Error('It never happened.');
+}
 
 function sh(script: string) {
   return { command: 'sh', args: ['-c', script] };
@@ -17,6 +26,21 @@ describe.skipIf(process.platform === 'win32')('the process runner', () => {
     expect(result.stdout).toHaveLength(MaximumLineBytes);
     expect(result.stderr).toHaveLength(64 * 1024);
     expect(result.code).toBe(0);
+  });
+  it('leaves a detached process running with what it was given', async () => {
+    const file = `${tmpdir()}/favo-detach-${process.pid}-${Date.now()}`;
+    const isDetached = runner.detach({
+      ...sh('sleep 0.1; echo "$FAVO_DETACHED" > "$FILE"'),
+      env: { FAVO_DETACHED: 'yes', FILE: file },
+    });
+    expect(isDetached).toBe(true);
+    await waitFor(() => Bun.file(file).exists());
+    await Bun.sleep(50);
+    expect(await Bun.file(file).text()).toBe('yes\n');
+    await Bun.file(file).delete();
+  });
+  it('says so when there is nothing to detach', () => {
+    expect(runner.detach({ command: '/nonexistent/favo-app', args: [] })).toBe(false);
   });
   it('keeps a bounded tail of stderr on a long connection, with its last line', async () => {
     const child = runner.open(sh(`head -c 500000 /dev/zero | tr '\\0' y >&2; echo; echo last words >&2; exit 3`));

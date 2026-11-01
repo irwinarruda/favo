@@ -100,6 +100,28 @@ Twelve themes come built in, with a live preview, and your own is a small JSON f
 
 Your `~/.claude`, `~/.codex` and the rest stay where they are, and an old config folder can move in with `favo adopt work claude ~/.claude-work`. Using [T3 Code](#use-it-with-t3-code)? Press `c` on any seat to copy the path it needs.
 
+## Desktop apps
+
+favo can also open the **Claude** and **ChatGPT** desktop apps as any account. Press `p` on a seat, or run:
+
+```sh
+favo app work claude         # Claude, as work
+favo app work codex          # ChatGPT, as work
+favo app personal claude     # back to the app you always had
+favo app work claude --close # close it first if it is open
+```
+
+The first time, sign in inside the app. It remembers each account after that, and the Claude Code or Codex inside it uses the same seat as the CLI. `p` only appears when the app is installed on the computer you are at.
+
+> [!WARNING]
+> **This is unofficial.** Neither app documents running several accounts, so an update could break it. Your apps themselves stay as they were, and `personal` always opens the default one.
+
+- One account at a time, per app. favo closes the app to switch, and anything running in it stops.
+- Opening the app from the Dock or Start menu uses your default account, not the last one favo opened.
+- A login stays on the computer where you signed in. It does not travel to your other machines.
+- On Windows, Cowork may not work outside your default account, and a sign-in that bounces to your browser can get lost. Use the emailed code if it does.
+- macOS, Windows, and the official Linux packages (Claude on Ubuntu and Debian, ChatGPT on Ubuntu, Debian and Fedora). In WSL, run favo on Windows instead.
+
 ## Supported providers
 
 | Provider        | Private to each account | Shared across accounts                                                     |
@@ -183,6 +205,7 @@ favo rm work                 # move a cell to the trash
 favo sync                    # repair shared links
 favo inspect work claude     # what is shared and what is private
 favo path work claude        # print the config path
+favo app work claude         # open the Claude app as work
 favo theme tokyo-night       # pick a theme
 ```
 

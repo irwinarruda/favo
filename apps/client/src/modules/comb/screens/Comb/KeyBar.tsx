@@ -2,8 +2,9 @@ import { KeyHint } from '@/shared/components/KeyHint';
 import { useError } from '@/shared/error/useError';
 import { useApp } from '@/shared/stores/app';
 
-export function KeyBar(props: { onHelp(): void; onQuit(): void }) {
+export function KeyBar(props: { onHelp(): void; onQuit(): void; onOpenDesktopApp(): Promise<void> }) {
   const selectedSeat = useApp((state) => state.selectedSeat);
+  const selectedDesktopApp = useApp((state) => state.selectedDesktopApp);
   const selectedMachine = useApp((state) => state.selectedMachine);
   const openSelectedSeat = useApp((state) => state.openSelectedSeat);
   const copySelectedPath = useApp((state) => state.copySelectedPath);
@@ -31,6 +32,9 @@ export function KeyBar(props: { onHelp(): void; onQuit(): void }) {
         />
       )}
       {!!selectedSeat && <KeyHint keys="c" label="copy path" onPress={error.handle(copySelectedPath)} />}
+      {!!selectedDesktopApp && (
+        <KeyHint keys="p" label={`open ${selectedDesktopApp.label}`} onPress={error.handle(props.onOpenDesktopApp)} />
+      )}
       {!!selectedMachine?.canInstall && (
         <KeyHint keys="i" label={selectedMachine.installLabel} onPress={error.handle(installSelectedMachine)} />
       )}

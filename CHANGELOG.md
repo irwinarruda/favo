@@ -4,6 +4,10 @@ Every change people using favo would notice, newest first. The format follows [K
 
 ## [Unreleased]
 
+### Added
+
+- Open the Claude or ChatGPT desktop app as any account. Press `p` on a seat, or run `favo app work claude`. Each account keeps its own login in the app, and favo only offers this when the app is installed on the computer you are at. If the app is already open, favo asks before closing it; `favo app work claude --close` skips the question.
+
 ## [0.2.0] - 2026-10-31
 
 ### Added
