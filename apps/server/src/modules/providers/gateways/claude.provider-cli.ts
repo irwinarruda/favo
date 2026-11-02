@@ -1,14 +1,24 @@
 import { LoginState } from '@favo/contracts/rpc/views';
-import { ProviderId } from '@favo/domain/providers/provider';
+import { ProviderId, Providers } from '@favo/domain/providers/provider';
+import { parseJson } from '@favo/domain/shared/parse-json';
 import { UsageUnavailableReason, unavailableUsage } from '@favo/domain/usage/seat-usage';
-import { type LaunchEnvironment, ProviderCli, type ProviderSession } from '@/modules/providers/gateways/provider-cli';
+import { z } from 'zod';
+import {
+  type LaunchEnvironment,
+  ProviderCli,
+  type ProviderSession,
+  type UpdateSwitchSearch,
+} from '@/modules/providers/gateways/provider-cli';
 import { type ClaudeUsageResponse, claudeUsageOf } from '@/modules/providers/utils/claude-usage';
+import type { FileSystem } from '@/modules/system/gateways/file-system';
 import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 
 const StatusTimeoutMs = 15_000;
 const UsageTimeoutMs = 10_000;
 const PersonalOrganizationSuffix = "'s Organization";
 const AmbientVariable = /^(?:CLAUDE|ANTHROPIC|HERDR)/i;
+const SwitchedOnValues = ['1', 'true', 'yes', 'on'];
+const ClaudeSettings = z.object({ env: z.record(z.string(), z.unknown()).optional() });
 const UsageRequestId = 'usage';
 const UsageArguments = [
   '-p',
@@ -71,6 +81,13 @@ export class ClaudeProviderCli extends ProviderCli {
     return { env, unsetEnv: [...unsetEnv, ...Object.keys(current).filter((name) => AmbientVariable.test(name))] };
   }
 
+  override async updateSwitch({ env, home }: UpdateSwitchSearch, fileSystem: FileSystem) {
+    const text = await fileSystem.readText(`${env.CLAUDE_CONFIG_DIR ?? `${home}/.claude`}/settings.json`);
+    const settings = ClaudeSettings.safeParse(parseJson(text ?? '{}')).data;
+    const switches = Providers.claude.update.switches ?? [];
+    return switches.find((name) => isSwitchedOn(env[name]) || isSwitchedOn(settings?.env?.[name]));
+  }
+
   override async usage({ binary, env, cwd }: ProviderSession, checkedAt: string) {
     const server = this.processes.open({ command: binary, args: UsageArguments, env, cwd });
     const answer = await this.ask(server, UsageRequests, usageAnswerOf, this.usageTimeoutMs);
@@ -103,4 +120,8 @@ function planOf(status: ClaudeStatus) {
   const organization = status.orgName?.endsWith(PersonalOrganizationSuffix) ? undefined : status.orgName;
   const parts = [status.subscriptionType, organization].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : undefined;
+}
+
+function isSwitchedOn(value: unknown) {
+  return SwitchedOnValues.includes(String(value).toLowerCase());
 }

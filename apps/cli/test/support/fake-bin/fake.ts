@@ -25,6 +25,14 @@ async function claudeUsage() {
 
 function claude() {
   const folder = process.env.CLAUDE_CONFIG_DIR ?? `${home}/.claude`;
+  if (args[0] === '--version') {
+    console.log('2.1.316 (Claude Code)');
+    return;
+  }
+  if (args[0] === 'update') {
+    console.log('fake claude updating');
+    return;
+  }
   if (args[0] === 'auth' && args[1] === 'status') {
     if (!existsSync(`${folder}/identity`)) {
       console.log('{"loggedIn":false}');
@@ -73,6 +81,20 @@ function runSessionHooks(folder: string) {
 
 async function codex() {
   const folder = process.env.CODEX_HOME ?? `${home}/.codex`;
+  const versionFile = process.env.FAKE_CODEX_VERSION_FILE;
+  if (args[0] === '--version') {
+    console.log(`codex-cli ${versionFile ? readFileSync(versionFile, 'utf8') : '0.1.0'}`);
+    return;
+  }
+  if (args[0] === 'update') {
+    console.log('fake codex updating');
+    if (versionFile) writeFileSync(versionFile, '0.2.0');
+    return;
+  }
+  if (process.env.FAKE_CODEX_HOLD) {
+    while (!existsSync(process.env.FAKE_CODEX_HOLD)) await Bun.sleep(25);
+    return;
+  }
   if (args[0] !== 'app-server') {
     console.log(`fake codex home=${folder} args=${args.join(' ')}`);
     return;
@@ -95,6 +117,10 @@ async function codex() {
 }
 
 function agy() {
+  if (args[0] === '--version') {
+    console.log('1.4.12');
+    return;
+  }
   if (args[0] === 'models') {
     if (existsSync(`${home}/.gemini/antigravity-cli/signed-in`)) {
       console.log('gemini-3');
@@ -109,6 +135,14 @@ function agy() {
 
 function opencode() {
   const data = process.env.XDG_DATA_HOME ?? `${home}/.local/share`;
+  if (args[0] === '--version') {
+    console.log('opencode v2.2.5');
+    return;
+  }
+  if (args[0] === 'upgrade') {
+    console.log('fake opencode upgrading');
+    return;
+  }
   if (args[0] === '--help') {
     console.log('--standalone  Run with a private server');
     return;

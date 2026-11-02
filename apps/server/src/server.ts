@@ -23,6 +23,8 @@ import { MachineRepository } from '@/modules/machines/repositories/machine.repos
 import { InstallerService } from '@/modules/machines/services/installer.service';
 import { MachinesService } from '@/modules/machines/services/machines.service';
 import type { ProviderCli } from '@/modules/providers/gateways/provider-cli';
+import { ProviderRunRepository } from '@/modules/providers/repositories/provider-run.repository';
+import { ProviderUpdatesService } from '@/modules/providers/services/provider-updates.service';
 import { ProvidersService } from '@/modules/providers/services/providers.service';
 import { registerSystemController } from '@/modules/system/controllers/system.controller';
 import type { Clock } from '@/modules/system/gateways/clock';
@@ -32,6 +34,7 @@ import type { ShellEnvironment } from '@/modules/system/gateways/shell-environme
 import { ConfigRepository } from '@/modules/system/repositories/config.repository';
 import { registerTerminalController } from '@/modules/terminal/controllers/terminal.controller';
 import { TerminalService } from '@/modules/terminal/services/terminal.service';
+import { UpdateService } from '@/modules/terminal/services/update.service';
 import { registerThemesController } from '@/modules/themes/controllers/themes.controller';
 import { ThemeRepository } from '@/modules/themes/repositories/theme.repository';
 import { ThemesService } from '@/modules/themes/services/themes.service';
@@ -108,13 +111,35 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
   );
   const installer = new InstallerService(machines, ssh, remotes, releaseAssets, hooks, fileSystem, paths, FavoVersion);
   const directories = new DirectoriesService(fileSystem, paths, host);
-  const terminal = new TerminalService(providers, seats, threads, machines, directories, config, callerEnv, binary);
+  const providerRuns = new ProviderRunRepository(fileSystem, processes, paths);
+  const providerUpdates = new ProviderUpdatesService(
+    providers,
+    providerRuns,
+    processes,
+    fileSystem,
+    shell,
+    config,
+    paths,
+    callerEnv
+  );
+  const terminal = new TerminalService(
+    providers,
+    seats,
+    threads,
+    machines,
+    directories,
+    config,
+    providerRuns,
+    callerEnv,
+    binary
+  );
+  const updates = new UpdateService(providerUpdates, machines, fileSystem, paths, callerEnv, FavoVersion, binary);
   const themes = new ThemesService(new ThemeRepository(fileSystem, paths), config);
   const desktop = new DesktopAppsService(desktopApps, seats, providers, fileSystem, paths);
   registerSystemController(router, host);
   registerAccountsController(router, accounts, seats, usage, threads, hooks);
   registerMachinesController(router, machines, installer);
-  registerTerminalController(router, terminal);
+  registerTerminalController(router, terminal, updates, providerUpdates);
   registerDesktopController(router, desktop);
   registerThemesController(router, themes);
   registerDirectoriesController(router, directories);

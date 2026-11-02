@@ -187,7 +187,7 @@ favo never reads them. Logins run each provider's own command, and credentials s
 It stays where it is and becomes your `personal` account. Shared items in other accounts are links to it, so editing one edits your original. favo changes it in one case, and only when you ask: `favo hooks install` adds its own hook, leaves yours alone, and `favo hooks uninstall` takes it out again.
 
 **Does favo phone home?**
-There is no telemetry. favo's own network use is downloading its release from GitHub: on the npm package's first run, and when it installs itself on another machine. Reaching your machines goes over your own ssh.
+There is no telemetry, and favo never checks for updates by itself. Its own network use is downloading its release from GitHub: on the npm package's first run, and when it installs itself on another machine. Reaching your machines goes over your own ssh. `favo update` runs your package manager and the providers' own update commands, and only when you run it.
 
 **Why not a shell alias with `CLAUDE_CONFIG_DIR`?**
 That gives you a second login, and it's how many of us started. The new folder starts empty, though, so you maintain your setup twice, and it stops at one machine and one provider. favo keeps the setup shared and does the same for all four providers, across your computers.
@@ -207,7 +207,7 @@ Run `favo hooks uninstall` first, so no hook stays behind in your provider confi
 
 The npm package is a small launcher with no dependencies and no install scripts. The first run downloads the right binary, about 40 MB, from [GitHub Releases](https://github.com/irwinarruda/favo-cli/releases) and checks it against the hashes published in the npm package. After that, favo starts with no network. Homebrew installs the same binary directly, with no launcher and no Node.
 
-To update, run `npm install --global favo-cli@latest` or `brew upgrade favo-cli`, then `favo machine update` to bring every other machine along. favo marks a machine on an older version as `older favo` and keeps it working until you do.
+To update, run `favo update`. It updates favo here, then on every other machine, then the provider CLIs everywhere. favo marks a machine on an older version as `older favo` and keeps it working until you do. favo 0.4.0 and earlier have no such command, so update those once by hand: `npm install --global favo-cli@latest` or `brew upgrade favo-cli`.
 
 ### Use it with T3 Code
 
@@ -231,6 +231,7 @@ favo hooks status            # is that working, seat by seat
 favo hooks uninstall         # take favo's hook out again
 favo list                    # every machine, account and login
 favo usage                   # what every seat has left, and when it comes back
+favo update                  # favo and the provider CLIs, on every machine
 favo rename work client      # a new name, on this machine
 favo rm work                 # move a cell to the trash
 favo sync                    # repair shared links
@@ -264,6 +265,7 @@ Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--mac
 | `m`                 | add a machine                       |
 | `i`                 | install or update favo on a machine |
 | `U`                 | update favo on every machine        |
+| `P`                 | update provider CLIs on a machine   |
 | `X`                 | forget a machine                    |
 | `r` / `R`           | refresh / repair shared links       |
 | `t`                 | pick a theme                        |
@@ -342,7 +344,29 @@ Add `launchArgs` to `~/.favo/config.json`:
 
 To install itself, favo downloads the binary for that machine from the GitHub Release of its own version, checks it, and uploads it over ssh, so the other machine only needs ssh and this one needs internet.
 
-A machine on an older favo keeps working and shows `older favo` with its version. Press `i` on it, `U` for every machine, or run `favo machine update`. Over ssh, Codex signs in with a device code, and Claude gives you a link and asks for the code back. The first ssh connection to a new machine trusts its host key, as ssh's `accept-new` does, and a changed key is refused.
+A machine on an older favo keeps working and shows `older favo` with its version. Press `i` on it, `U` for every machine, or run `favo update`. Over ssh, Codex signs in with a device code, and Claude gives you a link and asks for the code back. The first ssh connection to a new machine trusts its host key, as ssh's `accept-new` does, and a changed key is refused.
+
+</details>
+
+<details>
+<summary><strong>What favo update does</strong></summary>
+
+It works in this order, because a machine gets favo from the release of the favo that installs it:
+
+1. It updates favo on this computer, with whatever installed it: `brew upgrade --formula favo-cli`, or `npm install --global favo-cli@latest` for the npm package. If that fails, it stops and touches nothing else. A favo that came from another machine stays as it is and the rest goes on.
+2. It starts the new favo, which refreshes any provider hooks already there and updates favo on the other machines. A machine that fails or is offline is reported, and the others go on.
+3. It updates each provider once per machine, in your terminal, so a password prompt reaches you, and over ssh on your other machines. It uses the binary favo launches and reports any other copy on your `PATH`.
+
+| Provider    | How it updates                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code | `claude update`. A Homebrew install only prints what to run there, so favo runs `brew upgrade --cask` itself.                                                   |
+| Codex       | `codex update`, then the package manager if that fails.                                                                                                         |
+| OpenCode    | `opencode upgrade`, then the package manager if that fails.                                                                                                     |
+| Antigravity | It has no update command, and updates itself. A Homebrew install gets `brew upgrade --cask antigravity-cli`. Any other install is left alone, and favo says so. |
+
+A global npm install belongs to its Node version, so favo uses the `npm` next to it. A `mise` or `asdf` shim hides where the real install is, so favo runs the provider's own command there, with no package manager to fall back on. favo never runs `sudo`: if a system-wide install needs it, you see the failure and can run the command yourself.
+
+favo leaves a provider alone and says why when you pinned it in Homebrew, or turned its updates off: `DISABLE_UPDATES` or `DISABLE_AUTOUPDATER` for Claude Code, in your environment or the `env` of its `settings.json`; `OPENCODE_DISABLE_AUTOUPDATE`, or `autoupdate: false` or `update: "disable"` in the OpenCode config; `AGY_CLI_DISABLE_AUTO_UPDATE` for Antigravity. It asks before touching a provider running through favo.
 
 </details>
 

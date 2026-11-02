@@ -15,6 +15,10 @@ This package is a small launcher with no dependencies and no install scripts. Th
 
 It runs on macOS (Apple Silicon and Intel), Linux (x64 and arm64, glibc only) and Windows (x64). Alpine and other musl systems aren't supported yet. It needs Node 20.11 or newer.
 
+## Updating
+
+Run `favo update`. It updates this package with the package manager that installed it, then favo on your other machines and the provider CLIs. A running favo never blocks an update, because each version keeps its own folder.
+
 ## More
 
 The source, documentation and issues are at <https://github.com/irwinarruda/favo-cli>. favo is MIT licensed, and `THIRD-PARTY-NOTICES.md` lists what its binaries contain.

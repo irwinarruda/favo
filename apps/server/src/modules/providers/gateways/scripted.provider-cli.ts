@@ -7,6 +7,7 @@ import {
   type ProviderLogin,
   type ProviderSession,
   type ThreadSearch,
+  type UpdateSwitchSearch,
 } from '@/modules/providers/gateways/provider-cli';
 
 export class ScriptedProviderCli extends ProviderCli {
@@ -17,6 +18,8 @@ export class ScriptedProviderCli extends ProviderCli {
   readonly threadSearches: ThreadSearch[] = [];
   usageReading?: Omit<SeatUsage, 'checkedAt'> | Error;
   readonly usageSessions: ProviderSession[] = [];
+  updateOff?: string;
+  updateOffUnless?: (search: UpdateSwitchSearch) => string | undefined;
   currentReads = 0;
   mostReadsAtOnce = 0;
 
@@ -45,6 +48,10 @@ export class ScriptedProviderCli extends ProviderCli {
   override async recentThreads(search: ThreadSearch) {
     this.threadSearches.push(search);
     return this.foundThreads;
+  }
+
+  override async updateSwitch(search: UpdateSwitchSearch) {
+    return this.updateOffUnless?.(search) ?? this.updateOff;
   }
 
   override async isolationArguments() {

@@ -43,7 +43,7 @@ export function remoteBinaryOf(system: RemoteSystem = RemoteSystem.posix) {
 }
 
 export function versionFrom(output: string) {
-  return /\b\d+\.\d+\.\d+\b/.exec(output)?.[0];
+  return /\bv?(\d+\.\d+\.\d+)\b/.exec(output)?.[1];
 }
 
 export function isOlderVersion(version: string, than: string) {

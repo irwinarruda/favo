@@ -324,7 +324,51 @@ describe.skipIf(isWindows)('a version folder this user did not install', () => {
   });
 });
 
+describe('the binary it starts', () => {
+  it.skipIf(isWindows)('hears the path it was started from, which survives an upgrade', async () => {
+    const stable = `${root}/stable`;
+    symlinkSync(installedPackage, stable);
+    const child = Bun.spawn(['node', `${stable}/bin/favo.mjs`, '--print-launcher'], {
+      env: { ...process.env, FAVO_HOME: favoHome, FAVO_RELEASE_BASE_URL: `http://127.0.0.1:${server.port}/` },
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    const { stdout, code } = await finished(child);
+
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout.trim().split('\n').at(-1)!).launcher).toBe(`${stable}/bin/favo.mjs`);
+  });
+
+  it('learns where the launcher lives, so favo update can find the package manager', async () => {
+    const { stdout, code } = await finished(launch(['--print-launcher']));
+
+    expect(code).toBe(0);
+    const told = JSON.parse(stdout.trim().split('\n').at(-1)!);
+    expect(told.launcher.replaceAll('\\', '/')).toEndWith('/package/bin/favo.mjs');
+    expect(existsSync(told.node)).toBe(true);
+  });
+});
+
 describe('the runtime folder', () => {
+  it('starts a new version while the old one is still running', async () => {
+    const running = `${runtime}/0.0.1`;
+    mkdirSync(running, { recursive: true });
+    const oldBinary = `${running}/${BinaryName}`;
+    copyFileSync(`${buildRoot}/fake-favo${isWindows ? '.exe' : ''}`, oldBinary);
+    const old = Bun.spawn([oldBinary, '--wait-for-term'], { stdout: 'pipe', stderr: 'ignore', stdin: 'ignore' });
+    await old.stdout.getReader().read();
+
+    const { stdout, code } = await finished(launch(['--exit=0']));
+
+    old.kill();
+    await old.exited;
+    expect(code).toBe(0);
+    expect(stdout).toContain('--exit=0');
+    expect(existsSync(`${runtime}/${Version}/${BinaryName}`)).toBe(true);
+  });
+
   it('drops older versions after an install and keeps newer and unrelated folders', async () => {
     for (const name of ['0.0.1', '0.0.1.staging-abc123', '99.0.0', 'keep-me'])
       mkdirSync(`${runtime}/${name}`, { recursive: true });

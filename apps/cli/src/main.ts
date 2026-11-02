@@ -38,6 +38,10 @@ async function main() {
       paint: createPaint(process.stdout.isTTY === true && process.env.NO_COLOR === undefined, colors),
       print: (line) => console.log(line),
       runPlan: (plan) => runTerminalPlan(plan, process.env),
+      ask: async (question) => process.stdin.isTTY === true && confirm(question),
+      hold: async () => {
+        if (process.stdin.isTTY === true) prompt('Press enter to go back.');
+      },
     });
     server.close();
     return code;

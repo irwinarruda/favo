@@ -5,6 +5,28 @@ import { getApp } from '@/__tests__/utils/getApp';
 import { container } from '@/shared/container';
 
 describe('SessionService', () => {
+  test('hands the terminal over to update the provider CLIs of the selected machine', async () => {
+    const app = await getApp();
+    await app.state.updateProviders('devbox');
+    expect(mockDb.terminalRuns).toEqual([{ command: 'favo', args: ['update', 'devbox'], env: {}, unsetEnv: [] }]);
+  });
+  test('updates no provider CLI on a machine it cannot reach', async () => {
+    const app = await getApp();
+    await app.state.updateProviders('studio');
+    expect(mockDb.terminalRuns).toEqual([]);
+  });
+  test('says so when that update does not finish', async () => {
+    const app = await getApp();
+    mockDb.terminalExitCode = 255;
+    await app.state.updateProviders('devbox');
+    expect(app.state.toast?.message).toBe('The update on devbox did not finish.');
+  });
+  test('updates the machine it was asked for, whatever is selected by then', async () => {
+    const app = await getApp();
+    app.state.selectRow('seat:local/personal/claude');
+    await app.state.updateProviders('devbox');
+    expect(mockDb.terminalRuns[0]?.args).toEqual(['update', 'devbox']);
+  });
   test('launches a signed in seat', async () => {
     const app = await getApp();
     await app.state.openSelectedSeat();

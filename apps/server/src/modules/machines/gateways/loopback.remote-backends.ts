@@ -20,6 +20,9 @@ export class LoopbackRemoteBackends extends RemoteBackends {
   async request(machine: Machine, request: RpcRequest): Promise<RpcResponse> {
     if (this.failure) throw new DomainError(this.failure, `${machine.name}: scripted failure`);
     const backend = this.backends.get(machine.id);
+    if (!backend && this.installed.has(machine.id)) {
+      throw new DomainError(DomainErrorCode.machineNeedsInstall, `favo is not installed on ${machine.name} yet.`);
+    }
     if (!backend) throw new DomainError(DomainErrorCode.machineUnreachable, `${machine.name}: no route to host`);
     return backend.send({ ...request, machineId: undefined });
   }

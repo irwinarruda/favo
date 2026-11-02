@@ -72,6 +72,47 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+describe('favo update', () => {
+  it('runs the provider command with the terminal attached, and reports the result', async () => {
+    writeFileSync(`${root}/codex-version`, '0.1.0');
+    const { stdout, code } = await favo(['update', '--skip-favo', '--machine', 'local'], {
+      FAKE_CODEX_VERSION_FILE: `${root}/codex-version`,
+    });
+    expect(code).toBe(0);
+    expect(stdout).toContain('Codex 0.1.0, own install at');
+    expect(stdout).toContain('fake codex updating');
+    expect(stdout).toContain('Codex 0.1.0 → 0.2.0');
+  });
+  it('leaves a provider whose updates are off, reporting why', async () => {
+    const { stdout, code } = await favo(['update', '--skip-favo', '--machine', 'local'], { DISABLE_UPDATES: '1' });
+    expect(code).toBe(0);
+    expect(stdout).toContain('its updates are turned off by DISABLE_UPDATES');
+    expect(stdout).not.toContain('fake claude updating');
+  });
+  it('leaves a running provider alone when nobody can answer', async () => {
+    const launch = Bun.spawn(['bun', Main, 'codex'], {
+      env: {
+        PATH: `${fakeBin}${delimiter}${process.env.PATH}`,
+        HOME: home,
+        FAKE_CODEX_HOLD: `${root}/codex-release`,
+        NO_COLOR: '1',
+      },
+      stdin: 'ignore',
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    const folder = `${home}/.favo/running/personal/codex`;
+    for (let attempt = 0; attempt < 200 && !existsSync(folder); attempt++) await Bun.sleep(25);
+    for (let attempt = 0; attempt < 200 && readdirSync(folder).length === 0; attempt++) await Bun.sleep(25);
+    const { stdout } = await favo(['update', '--skip-favo', '--machine', 'local']);
+    writeFileSync(`${root}/codex-release`, '');
+    await launch.exited;
+    expect(stdout).toContain('it is running');
+    expect(stdout).not.toContain('fake codex updating');
+    expect(readdirSync(folder)).toEqual([]);
+  });
+});
+
 describe('favo usage', () => {
   it('reads a real conversation with the provider and prints what is left', async () => {
     const { stdout, code } = await favo(['usage']);
@@ -534,6 +575,22 @@ describe.skipIf(isWindows)('favo with another machine', () => {
     expect(stdout).toContain('/my project');
     const missing = await favo(['claude', '-m', 'remote', '--dir', `${remoteHome}/nothing`]);
     expect(missing.stderr).toContain('No folder at');
+  });
+  it('updates the provider CLIs here, then over there through a real terminal', async () => {
+    await joinRemote();
+    const { stdout, code } = await favo(['update', '--skip-favo']);
+    expect(code).toBe(0);
+    expect(stdout).toContain('Provider CLIs on remote');
+    expect(stdout.match(/fake codex updating/g)).toHaveLength(2);
+    expect(readFileSync(`${root}/ssh.log`, 'utf8')).toMatch(
+      /-t -- bee@remote ~\/\.favo\/bin\/favo --argv-b64 [A-Za-z0-9_-]+\n/
+    );
+  });
+  it('updates only the machine you name', async () => {
+    await joinRemote();
+    const { stdout, code } = await favo(['update', '--machine', 'remote']);
+    expect(code).toBe(0);
+    expect(stdout.match(/fake codex updating/g)).toHaveLength(1);
   });
   it('launches over ssh with a real terminal', async () => {
     await joinRemote();

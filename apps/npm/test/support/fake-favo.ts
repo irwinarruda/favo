@@ -3,6 +3,10 @@ const exitFlag = args.find((word) => word.startsWith('--exit='));
 
 console.log(JSON.stringify(args));
 
+if (args.includes('--print-launcher')) {
+  console.log(JSON.stringify({ launcher: process.env.FAVO_LAUNCHER, node: process.env.FAVO_LAUNCHER_NODE }));
+}
+
 if (args.includes('--wait-for-term')) {
   process.on('SIGTERM', () => process.exit(42));
   setInterval(() => {}, 1000);

@@ -9,6 +9,7 @@ import type { RpcResponse } from '#contracts/rpc/envelope';
 import { Protocol, RpcRequest, RpcResponse as RpcResponseSchema } from '#contracts/rpc/envelope';
 import { installHooks } from '#contracts/rpc/hooks/install-hooks';
 import { listHooks } from '#contracts/rpc/hooks/list-hooks';
+import { refreshHooks } from '#contracts/rpc/hooks/refresh-hooks';
 import { uninstallHooks } from '#contracts/rpc/hooks/uninstall-hooks';
 import { addMachine } from '#contracts/rpc/machines/add-machine';
 import { getSeatStatus } from '#contracts/rpc/seats/get-seat-status';
@@ -20,6 +21,9 @@ import { selectTheme } from '#contracts/rpc/themes/select-theme';
 import { listThreads } from '#contracts/rpc/threads/list-threads';
 import { recordThread } from '#contracts/rpc/threads/record-thread';
 import { reportThread } from '#contracts/rpc/threads/report-thread';
+import { listProviderUpdates } from '#contracts/rpc/updates/list-provider-updates';
+import { planFavoUpdate } from '#contracts/rpc/updates/plan-favo-update';
+import { planUpdate } from '#contracts/rpc/updates/plan-update';
 
 const seat = {
   account: 'work',
@@ -229,5 +233,39 @@ describe('rpc client', () => {
       },
     });
     await expect(client.call(ping, {})).rejects.toThrow();
+  });
+});
+
+describe('updates', () => {
+  const step = { command: 'brew', args: ['upgrade'], env: {}, unsetEnv: [] };
+  const update = {
+    provider: 'claude',
+    label: 'Claude Code',
+    version: '2.1.316',
+    installedWith: 'Homebrew cask claude-code',
+    otherCopies: [],
+    runningAccounts: ['work'],
+    steps: [step],
+  };
+
+  it('are listed on the machine that holds the providers', () => {
+    expect(listProviderUpdates.routing).toBe('machine');
+    expect(listProviderUpdates.params.safeParse({ provider: 'codex' }).success).toBe(true);
+    expect(listProviderUpdates.params.safeParse({ provider: 'gemini' }).success).toBe(false);
+    expect(listProviderUpdates.result.safeParse([update]).success).toBe(true);
+    expect(listProviderUpdates.result.safeParse([{ ...update, steps: 'brew' }]).success).toBe(false);
+  });
+  it('are planned by the favo you talk to', () => {
+    expect(planFavoUpdate.routing).toBe('hub');
+    expect(planFavoUpdate.result.safeParse({ version: '0.5.0', upgrade: step, restart: step }).success).toBe(true);
+    expect(planFavoUpdate.result.safeParse({ upgrade: step }).success).toBe(false);
+    expect(planUpdate.routing).toBe('hub');
+    expect(planUpdate.params.safeParse({ machineId: 'devbox', isHeld: true }).success).toBe(true);
+    expect(planUpdate.params.safeParse({ machine: 'devbox' }).success).toBe(false);
+  });
+  it('refresh hooks on the machine that has them', () => {
+    expect(refreshHooks.routing).toBe('machine');
+    expect(refreshHooks.params.safeParse({}).success).toBe(true);
+    expect(refreshHooks.params.safeParse({ provider: 'claude' }).success).toBe(false);
   });
 });

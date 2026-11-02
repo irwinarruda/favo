@@ -16,10 +16,15 @@ export class ScriptedProcessRunner extends ProcessRunner {
   private readonly conversations = new Map<string, string[]>();
   private readonly conversationsInTurn = new Map<string, string[][]>();
   private readonly installed = new Map<string, string>();
+  private readonly elsewhere = new Map<string, string>();
   private readonly undetachable = new Set<string>();
 
   install(command: string, path = `/usr/bin/${command}`) {
     this.installed.set(command, path);
+  }
+
+  installIn(folder: string, command: string) {
+    this.elsewhere.set(`${folder}/${command}`, `${folder}/${command}`);
   }
 
   reply(commandLine: string, reply: Reply) {
@@ -72,8 +77,8 @@ export class ScriptedProcessRunner extends ProcessRunner {
     this.undetachable.add(command);
   }
 
-  which(command: string) {
-    return this.installed.get(command);
+  which(command: string, path: string) {
+    return this.elsewhere.get(`${path}/${command}`) ?? this.installed.get(command);
   }
 
   isAlive(pid: number) {

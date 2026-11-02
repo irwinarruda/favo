@@ -25,7 +25,21 @@ type TestServerOptions = {
   callerEnv?: Record<string, string | undefined>;
   installed?: string[];
   binary?: string;
+  shellVariables?: Record<string, string>;
 };
+
+class FixedShellEnvironment extends InheritedShellEnvironment {
+  constructor(
+    path: string,
+    private readonly fixed: Record<string, string>
+  ) {
+    super(path);
+  }
+
+  override async variables() {
+    return this.fixed;
+  }
+}
 
 export function createTestServer(options: TestServerOptions = {}) {
   const fileSystem = new MemoryFileSystem();
@@ -47,7 +61,7 @@ export function createTestServer(options: TestServerOptions = {}) {
     {
       fileSystem,
       processes,
-      shell: new InheritedShellEnvironment('/usr/bin:/bin'),
+      shell: new FixedShellEnvironment('/usr/bin:/bin', options.shellVariables ?? {}),
       clock: new FixedClock(),
       clis,
       ssh,

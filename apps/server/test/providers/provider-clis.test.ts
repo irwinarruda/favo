@@ -517,3 +517,101 @@ describe('finding threads with no hook', () => {
     expect(await cli.recentThreads(search, new MemoryFileSystem())).toEqual([]);
   });
 });
+
+describe('whether a provider turned its updates off', () => {
+  const search = { env: {}, home: '/home/bee', configHome: '/home/bee/.config' };
+
+  it('reads either Claude Code variable from the environment', async () => {
+    const cli = new ClaudeProviderCli(new ScriptedProcessRunner());
+    const fileSystem = new MemoryFileSystem();
+    expect(await cli.updateSwitch(search, fileSystem)).toBeUndefined();
+    expect(await cli.updateSwitch({ ...search, env: { DISABLE_UPDATES: '1' } }, fileSystem)).toBe('DISABLE_UPDATES');
+    expect(await cli.updateSwitch({ ...search, env: { DISABLE_AUTOUPDATER: '1' } }, fileSystem)).toBe(
+      'DISABLE_AUTOUPDATER'
+    );
+  });
+  it('reads the env block of Claude Code settings, in the folder it is pointed at', async () => {
+    const cli = new ClaudeProviderCli(new ScriptedProcessRunner());
+    const fileSystem = new MemoryFileSystem();
+    const settings = JSON.stringify({ env: { DISABLE_UPDATES: '1' } });
+    await fileSystem.writePrivateText('/home/bee/.claude/settings.json', settings);
+    await fileSystem.writePrivateText('/seat/settings.json', '{}');
+    expect(await cli.updateSwitch(search, fileSystem)).toBe('DISABLE_UPDATES');
+    expect(await cli.updateSwitch({ ...search, env: { CLAUDE_CONFIG_DIR: '/seat' } }, fileSystem)).toBeUndefined();
+  });
+  it('survives Claude Code settings it cannot read', async () => {
+    const fileSystem = new MemoryFileSystem();
+    await fileSystem.writePrivateText('/home/bee/.claude/settings.json', '{ not json');
+    expect(await new ClaudeProviderCli(new ScriptedProcessRunner()).updateSwitch(search, fileSystem)).toBeUndefined();
+  });
+  it('never opens the file that holds the Claude Code login', async () => {
+    const fileSystem = new MemoryFileSystem();
+    const read: string[] = [];
+    const readText = fileSystem.readText.bind(fileSystem);
+    fileSystem.readText = (path) => {
+      read.push(path);
+      return readText(path);
+    };
+    await new ClaudeProviderCli(new ScriptedProcessRunner()).updateSwitch(search, fileSystem);
+    expect(read).toEqual(['/home/bee/.claude/settings.json']);
+  });
+  it('reads the OpenCode variable and both spellings of its config', async () => {
+    const cli = new OpencodeProviderCli(new ScriptedProcessRunner());
+    const fileSystem = new MemoryFileSystem();
+    expect(await cli.updateSwitch(search, fileSystem)).toBeUndefined();
+    expect(await cli.updateSwitch({ ...search, env: { OPENCODE_DISABLE_AUTOUPDATE: 'TRUE' } }, fileSystem)).toBe(
+      'OPENCODE_DISABLE_AUTOUPDATE'
+    );
+    await fileSystem.writePrivateText('/home/bee/.config/opencode/opencode.json', '{ "update": "disable" }');
+    expect(await cli.updateSwitch(search, fileSystem)).toBe('/home/bee/.config/opencode/opencode.json');
+    await fileSystem.writePrivateText('/home/bee/.config/opencode/opencode.json', '{ "update": "notify" }');
+    await fileSystem.writePrivateText('/home/bee/.config/opencode/opencode.jsonc', '{ "autoupdate": false }');
+    expect(await cli.updateSwitch(search, fileSystem)).toBe('/home/bee/.config/opencode/opencode.jsonc');
+  });
+  it('takes a Claude Code switch set to no as not set, as Claude Code does', async () => {
+    const cli = new ClaudeProviderCli(new ScriptedProcessRunner());
+    const fileSystem = new MemoryFileSystem();
+    for (const value of ['0', 'false', 'no']) {
+      expect(await cli.updateSwitch({ ...search, env: { DISABLE_UPDATES: value } }, fileSystem)).toBeUndefined();
+    }
+    for (const value of ['1', 'TRUE', 'yes', 'on']) {
+      expect(await cli.updateSwitch({ ...search, env: { DISABLE_UPDATES: value } }, fileSystem)).toBe(
+        'DISABLE_UPDATES'
+      );
+    }
+  });
+  it('reads OpenCode config as OpenCode does', async () => {
+    const cli = new OpencodeProviderCli(new ScriptedProcessRunner());
+    const fileSystem = new MemoryFileSystem();
+    const path = '/home/bee/.config/opencode/opencode.jsonc';
+    const schema = '"$schema": "https://opencode.ai/config.json"';
+    await fileSystem.writePrivateText(path, `{ ${schema}, // "autoupdate": false,\n}`);
+    expect(await cli.updateSwitch(search, fileSystem)).toBeUndefined();
+    await fileSystem.writePrivateText(path, `{ ${schema}, "agent": { "update": "disable" } }`);
+    expect(await cli.updateSwitch(search, fileSystem)).toBeUndefined();
+    await fileSystem.writePrivateText(path, `{ ${schema}, /* on */ "autoupdate": false, }`);
+    expect(await cli.updateSwitch(search, fileSystem)).toBe(path);
+    await fileSystem.writePrivateText(path, '{ "update": "notify", "autoupdate": false }');
+    expect(await cli.updateSwitch(search, fileSystem)).toBeUndefined();
+  });
+  it('lets the last OpenCode config file that says anything decide', async () => {
+    const cli = new OpencodeProviderCli(new ScriptedProcessRunner());
+    const fileSystem = new MemoryFileSystem();
+    await fileSystem.writePrivateText('/home/bee/.config/opencode/config.json', '{ "update": "disable" }');
+    await fileSystem.writePrivateText('/home/bee/.config/opencode/opencode.json', '{ "update": "auto" }');
+    expect(await cli.updateSwitch(search, fileSystem)).toBeUndefined();
+  });
+  it('reads the Antigravity variable', async () => {
+    const cli = new AntigravityProviderCli(new ScriptedProcessRunner());
+    const fileSystem = new MemoryFileSystem();
+    expect(await cli.updateSwitch(search)).toBeUndefined();
+    expect(await cli.updateSwitch({ ...search, env: { AGY_CLI_DISABLE_AUTO_UPDATE: '1' } })).toBe(
+      'AGY_CLI_DISABLE_AUTO_UPDATE'
+    );
+    expect(await fileSystem.list('/home/bee')).toEqual([]);
+  });
+  it('finds nothing for Codex, which has no such switch', async () => {
+    const cli = new CodexProviderCli(new ScriptedProcessRunner());
+    expect(await cli.updateSwitch(search, new MemoryFileSystem())).toBeUndefined();
+  });
+});

@@ -58,6 +58,15 @@ afterEach(async () => {
   dispose = undefined;
 });
 
+describe('updating the provider CLIs from the comb', () => {
+  test('plans the update for the selected machine through the real backend', async () => {
+    const view = await openFleet();
+    await useApp.getState().updateProviders('local');
+    expect(view.plans.at(-1)?.command).toBe('favo');
+    expect(view.plans.at(-1)?.args).toEqual(['update', '--skip-favo', '--machine', 'local', '--hold']);
+  });
+});
+
 describe('threads on a real backend', () => {
   test('shows the thread of a seat and goes back to it, in its folder', async () => {
     const view = await openFleet({

@@ -278,4 +278,47 @@ describe('another machine', () => {
     await mac.client.call(installMachine, { id: 'devbox' });
     expect(await devbox.fileSystem.readText(Settings)).toBe('{}');
   });
+  it('refreshes hooks a machine has even if this one has none', async () => {
+    const { mac, devbox } = await fleet();
+    await devbox.client.call(installHooks, {});
+    const text = await devbox.fileSystem.readText(Settings);
+    await devbox.fileSystem.writePrivateText(Settings, text!.replaceAll(`claude:${HookVersion}`, 'claude:0'));
+    await mac.client.call(installMachine, { id: 'devbox' });
+    expect(await devbox.fileSystem.readText(Settings)).toContain(`favo-hook:claude:${HookVersion}`);
+  });
+  it('adds no hook to a provider that has none when favo updates itself', async () => {
+    const { mac, devbox } = await fleet();
+    await mac.client.call(installHooks, {});
+    await devbox.client.call(installHooks, {});
+    await devbox.fileSystem.writePrivateText(Settings, '{}');
+    const codex = await devbox.fileSystem.readText(CodexHooks);
+    await mac.client.call(installMachine, { id: 'devbox' });
+    expect(await devbox.fileSystem.readText(Settings)).toBe('{}');
+    expect(await devbox.fileSystem.readText(CodexHooks)).toBe(codex);
+  });
+  it('adds no hook when it could not ask a machine that has favo', async () => {
+    const { mac, devbox } = await fleet();
+    await mac.client.call(installHooks, {});
+    mac.remotes.connect('devbox', {
+      async send(request) {
+        if (request.method === 'hooks.list') throw new DomainError(DomainErrorCode.machineUnreachable, 'timed out');
+        return devbox.router.send(request);
+      },
+    });
+    await mac.client.call(installMachine, { id: 'devbox' });
+    expect(await devbox.fileSystem.readText(Settings)).toBe('{}');
+  });
+  it('adds no hook to a machine too old to have had one', async () => {
+    const { mac, devbox } = await fleet();
+    await mac.client.call(installHooks, {});
+    mac.remotes.connect('devbox', {
+      async send(request) {
+        const unknown = { code: 'unknownMethod', message: `Unknown method ${request.method}` };
+        if (request.method === 'hooks.list') return { id: request.id, ok: false, error: unknown };
+        return devbox.router.send(request);
+      },
+    });
+    await mac.client.call(installMachine, { id: 'devbox' });
+    expect(await devbox.fileSystem.readText(Settings)).toBe('{}');
+  });
 });

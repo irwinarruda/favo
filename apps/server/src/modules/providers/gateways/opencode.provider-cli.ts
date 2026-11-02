@@ -2,12 +2,21 @@ import { LoginState } from '@favo/contracts/rpc/views';
 import { ProviderId } from '@favo/domain/providers/provider';
 import { parseJson } from '@favo/domain/shared/parse-json';
 import { z } from 'zod';
-import { ProviderCli, type ProviderSession, type ThreadSearch } from '@/modules/providers/gateways/provider-cli';
+import {
+  ProviderCli,
+  type ProviderSession,
+  type ThreadSearch,
+  type UpdateSwitchSearch,
+} from '@/modules/providers/gateways/provider-cli';
 import { stripAnsi } from '@/modules/providers/utils/strip-ansi';
+import type { FileSystem } from '@/modules/system/gateways/file-system';
 import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 
 const StatusTimeoutMs = 15_000;
 const StandaloneFlag = '--standalone';
+const UpdateVariable = 'OPENCODE_DISABLE_AUTOUPDATE';
+const ConfigFiles = ['config.json', 'opencode.json', 'opencode.jsonc'];
+const OpencodeConfig = z.object({ update: z.unknown().optional(), autoupdate: z.unknown().optional() });
 const OpencodeSession = z.object({ id: z.string(), directory: z.string(), updated: z.number() });
 
 export class OpencodeProviderCli extends ProviderCli {
@@ -60,6 +69,16 @@ export class OpencodeProviderCli extends ProviderCli {
     }));
   }
 
+  override async updateSwitch({ env, configHome }: UpdateSwitchSearch, fileSystem: FileSystem) {
+    if (['1', 'true'].includes(env[UpdateVariable]?.toLowerCase() ?? '')) return UpdateVariable;
+    for (const file of ConfigFiles.toReversed()) {
+      const path = `${configHome}/opencode/${file}`;
+      const isOff = isUpdateOff(await fileSystem.readText(path));
+      if (isOff !== undefined) return isOff ? path : undefined;
+    }
+    return undefined;
+  }
+
   private supportsStandalone(session: ProviderSession) {
     const known = this.standaloneSupport.get(session.binary);
     if (known) return known;
@@ -68,6 +87,16 @@ export class OpencodeProviderCli extends ProviderCli {
       .then((result) => `${result.stdout}${result.stderr}`.includes(StandaloneFlag));
     this.standaloneSupport.set(session.binary, support);
     return support;
+  }
+}
+
+function isUpdateOff(text?: string) {
+  try {
+    const config = OpencodeConfig.safeParse(Bun.JSONC.parse(text ?? '')).data;
+    if (config?.update !== undefined) return config.update === 'disable';
+    return config?.autoupdate === undefined ? undefined : config.autoupdate === false;
+  } catch {
+    return undefined;
   }
 }
 

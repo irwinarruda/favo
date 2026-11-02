@@ -2,6 +2,7 @@ import { HookState } from '@favo/domain/hooks/provider-hook';
 import { LoginScope, ProviderId } from '@favo/domain/providers/provider';
 import type { ValueOf } from '@favo/domain/shared/value-of';
 import { SharedItemState } from '@favo/domain/sharing/shared-item';
+import { TerminalPlan } from '@favo/domain/terminal/terminal-plan';
 import { SeatUsage } from '@favo/domain/usage/seat-usage';
 import { z } from 'zod';
 
@@ -99,3 +100,15 @@ export const HookView = z.strictObject({
   problems: z.array(z.string()),
 });
 export type HookView = z.infer<typeof HookView>;
+
+export const ProviderUpdateView = z.strictObject({
+  provider: z.enum(ProviderId),
+  label: z.string(),
+  version: z.string().optional(),
+  installedWith: z.string(),
+  otherCopies: z.array(z.string()),
+  runningAccounts: z.array(z.string()),
+  heldBack: z.string().optional(),
+  steps: z.array(TerminalPlan),
+});
+export type ProviderUpdateView = z.infer<typeof ProviderUpdateView>;

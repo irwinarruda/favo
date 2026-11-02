@@ -1,5 +1,6 @@
 import { DomainError, DomainErrorCode } from '#domain/shared/domain-error';
 import type { ValueOf } from '#domain/shared/value-of';
+import { InstallMethod, type InstallSource } from '#domain/updates/install-source';
 
 export const ProviderId = {
   claude: 'claude',
@@ -38,6 +39,13 @@ export type ProviderHook = {
   needsTrust?: boolean;
 };
 
+export type ProviderUpdateSpec = {
+  packages: string[];
+  arguments?: string[];
+  refusedOn?: InstallMethod[];
+  switches?: string[];
+};
+
 export type ProviderSpec = {
   id: ProviderId;
   label: string;
@@ -53,6 +61,7 @@ export type ProviderSpec = {
   pathHint: string;
   resumeArguments: string[];
   hook: ProviderHook;
+  update: ProviderUpdateSpec;
   herdrAgent?: string;
 };
 
@@ -90,6 +99,12 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
       event: 'SessionStart',
       matcher: '^(startup|resume|clear|compact|fork)$',
     },
+    update: {
+      packages: ['@anthropic-ai/claude-code', 'claude-code', 'claude-code@latest'],
+      arguments: ['update'],
+      refusedOn: [InstallMethod.homebrew],
+      switches: ['DISABLE_UPDATES', 'DISABLE_AUTOUPDATER'],
+    },
     herdrAgent: 'claude',
   },
   codex: {
@@ -113,6 +128,7 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
       event: 'SessionStart',
       needsTrust: true,
     },
+    update: { packages: ['@openai/codex', 'codex'], arguments: ['update'] },
     herdrAgent: 'codex',
   },
   antigravity: {
@@ -141,6 +157,7 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
       sharedItem: '.gemini/config',
       event: 'PreInvocation',
     },
+    update: { packages: ['antigravity-cli'], switches: ['AGY_CLI_DISABLE_AUTO_UPDATE'] },
   },
   opencode: {
     id: ProviderId.opencode,
@@ -156,8 +173,25 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
     pathHint: 'XDG_DATA_HOME for opencode',
     resumeArguments: ['--session'],
     hook: { kind: HookKind.plugin, file: 'opencode/plugins/favo-threads.js' },
+    update: {
+      packages: [
+        'opencode-ai',
+        '@opencode-ai/cli',
+        '@opencode-ai/cli-node',
+        'opencode',
+        'opencode-beta',
+        'opencode-v2',
+      ],
+      arguments: ['upgrade'],
+      switches: ['OPENCODE_DISABLE_AUTOUPDATE'],
+    },
   },
 };
+
+export const UpdateVariables = [
+  ...Object.values(Providers).flatMap(({ update }) => update.switches ?? []),
+  Providers.claude.homeVariable!,
+];
 
 export const ProviderOrder: ProviderId[] = [
   ProviderId.claude,
@@ -179,6 +213,11 @@ export function requireProvider(name: string) {
     );
   }
   return spec;
+}
+
+export function canUpdateItself({ update }: ProviderSpec, source?: InstallSource) {
+  if (!update.arguments) return false;
+  return source === undefined || !update.refusedOn?.includes(source.method);
 }
 
 export function isolationEnvironment(spec: ProviderSpec, seatHome: string): Record<string, string> {

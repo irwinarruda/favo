@@ -6,6 +6,7 @@ import {
   remoteTerminalPlan,
   spawnCommandOf,
   TerminalAction,
+  updateArgumentsFor,
 } from '#domain/terminal/terminal-plan';
 
 const Hostile = [
@@ -139,5 +140,17 @@ describe('terminal plans', () => {
       '--',
       '-c',
     ]);
+  });
+});
+
+describe('the arguments of a second favo update', () => {
+  it('skips the favo that was just updated', () => {
+    expect(updateArgumentsFor({ isHereOnly: false })).toEqual(['update', '--skip-favo']);
+  });
+  it('stays on this computer when asked', () => {
+    expect(updateArgumentsFor({ isHereOnly: true })).toEqual(['update', '--skip-favo', '--machine', 'local']);
+  });
+  it('can hold the report on screen', () => {
+    expect(updateArgumentsFor({ isHereOnly: true, isHeld: true }).at(-1)).toBe('--hold');
   });
 });

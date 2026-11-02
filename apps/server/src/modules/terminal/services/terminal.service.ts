@@ -16,6 +16,7 @@ import type { SeatsService } from '@/modules/accounts/services/seats.service';
 import type { ThreadsService } from '@/modules/accounts/services/threads.service';
 import type { DirectoriesService } from '@/modules/directories/services/directories.service';
 import type { MachinesService } from '@/modules/machines/services/machines.service';
+import type { ProviderRunRepository } from '@/modules/providers/repositories/provider-run.repository';
 import type { ProvidersService } from '@/modules/providers/services/providers.service';
 import type { ConfigRepository } from '@/modules/system/repositories/config.repository';
 
@@ -27,6 +28,7 @@ export class TerminalService {
     private readonly machines: MachinesService,
     private readonly directories: DirectoriesService,
     private readonly config: ConfigRepository,
+    private readonly runs: ProviderRunRepository,
     private readonly callerEnv: Record<string, string | undefined>,
     private readonly binary?: string
   ) {}
@@ -80,6 +82,7 @@ export class TerminalService {
       return { command: binary, args: [...logoutArguments, ...isolation], env, unsetEnv: [] };
     }
     const launch = cli.launchEnvironment(this.callerEnv);
+    const launchId = crypto.randomUUID();
     const folder = directory ? await this.directories.requireExisting(directory) : undefined;
     const target =
       action === TerminalAction.resume
@@ -97,10 +100,11 @@ export class TerminalService {
       env: {
         ...env,
         ...launch.env,
-        ...threadEnvironment({ account, launchId: crypto.randomUUID(), binary: this.binary }),
+        ...threadEnvironment({ account, launchId, binary: this.binary }),
       },
       unsetEnv: launch.unsetEnv,
       afterExit: herdrReleaseStep(this.callerEnv, account, provider),
+      pidFile: this.runs.pidFile(account, provider, launchId),
     };
   }
 }
