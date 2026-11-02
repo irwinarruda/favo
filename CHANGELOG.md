@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-02
+
 ### Added
 
 - `favo update` now updates everything in one command: favo on this computer through Homebrew or npm, favo on your other machines, then Claude Code, Codex, OpenCode and Antigravity CLI on each one. It shows each provider's version and how it was installed before changing anything, and reports each result. If favo cannot update on this computer, it stops there and leaves your other machines alone. `favo update --machine <machine>` does one machine, and `local` means this computer. In the comb, press `P` to update the provider CLIs of the selected machine.
@@ -63,7 +65,8 @@
 - A TUI that shows every machine, account and login, plus a command for everything it does.
 - Native on macOS, Linux and Windows, installed with `npm install --global favo-cli`.
 
-[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/irwinarruda/favo-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/irwinarruda/favo-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/irwinarruda/favo-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/irwinarruda/favo-cli/compare/v0.1.2...v0.2.0
