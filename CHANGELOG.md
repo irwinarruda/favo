@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-01
+
 ### Added
 
 - See how much limit every seat has left and when it comes back, on every machine, in one screen. Press `u` in the comb, or run `favo usage`, which also takes `--machine <machine>` and `--json`. favo reads every machine once when the TUI opens, so the numbers are ready when you press `u`. It covers Claude Code and Codex, and reads them through their own commands. OpenCode and Antigravity show no limits for now, because favo never reads a token.
@@ -48,7 +50,8 @@
 - A TUI that shows every machine, account and login, plus a command for everything it does.
 - Native on macOS, Linux and Windows, installed with `npm install --global favo-cli`.
 
-[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/irwinarruda/favo-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/irwinarruda/favo-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/irwinarruda/favo-cli/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/irwinarruda/favo-cli/compare/v0.1.1...v0.1.2
