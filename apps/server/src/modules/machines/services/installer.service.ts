@@ -4,7 +4,7 @@ import { refreshHooks } from '@favo/contracts/rpc/hooks/refresh-hooks';
 import { HookState } from '@favo/domain/hooks/provider-hook';
 import { RemoteSystem, versionFrom } from '@favo/domain/machines/machine';
 import { installPlanFor, ProbeCommands } from '@favo/domain/machines/remote-commands';
-import { assertDomain, DomainErrorCode } from '@favo/domain/shared/domain-error';
+import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { EntryKind } from '@favo/domain/sharing/shared-item';
 import type { HooksService } from '@/modules/accounts/services/hooks.service';
 import type { ReleaseAssets } from '@/modules/machines/gateways/release-assets';
@@ -50,11 +50,17 @@ export class InstallerService {
   }
 
   private async hooksStepFor(machineId: string) {
-    const response = await this.machines.forward(this.request(listHooks.name, machineId)).catch(() => undefined);
-    this.remotes.close(machineId);
-    if (!response) return (await this.hooks.isInstalled()) ? installHooks.name : undefined;
-    const hooks = response.ok ? listHooks.result.safeParse(response.result).data : undefined;
-    return hooks?.some(({ state }) => state !== HookState.absent) ? refreshHooks.name : undefined;
+    try {
+      const response = await this.machines.forward(this.request(listHooks.name, machineId));
+      const hooks = response.ok ? listHooks.result.safeParse(response.result).data : undefined;
+      return hooks?.some(({ state }) => state !== HookState.absent) ? refreshHooks.name : undefined;
+    } catch (error) {
+      if (!(error instanceof DomainError)) throw error;
+      if (error.code !== DomainErrorCode.machineNeedsInstall) return undefined;
+      return (await this.hooks.isInstalled()) ? installHooks.name : undefined;
+    } finally {
+      this.remotes.close(machineId);
+    }
   }
 
   private request(method: string, machineId: string) {

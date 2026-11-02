@@ -325,6 +325,22 @@ describe.skipIf(isWindows)('a version folder this user did not install', () => {
 });
 
 describe('the binary it starts', () => {
+  it.skipIf(isWindows)('hears the path it was started from, which survives an upgrade', async () => {
+    const stable = `${root}/stable`;
+    symlinkSync(installedPackage, stable);
+    const child = Bun.spawn(['node', `${stable}/bin/favo.mjs`, '--print-launcher'], {
+      env: { ...process.env, FAVO_HOME: favoHome, FAVO_RELEASE_BASE_URL: `http://127.0.0.1:${server.port}/` },
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    const { stdout, code } = await finished(child);
+
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout.trim().split('\n').at(-1)!).launcher).toBe(`${stable}/bin/favo.mjs`);
+  });
+
   it('learns where the launcher lives, so favo update can find the package manager', async () => {
     const { stdout, code } = await finished(launch(['--print-launcher']));
 

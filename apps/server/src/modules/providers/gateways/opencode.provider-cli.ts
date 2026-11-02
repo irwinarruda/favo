@@ -16,7 +16,7 @@ const StatusTimeoutMs = 15_000;
 const StandaloneFlag = '--standalone';
 const UpdateVariable = 'OPENCODE_DISABLE_AUTOUPDATE';
 const ConfigFiles = ['config.json', 'opencode.json', 'opencode.jsonc'];
-const ConfigSwitch = /"update"\s*:\s*"disable"|"autoupdate"\s*:\s*false/;
+const OpencodeConfig = z.object({ update: z.unknown().optional(), autoupdate: z.unknown().optional() });
 const OpencodeSession = z.object({ id: z.string(), directory: z.string(), updated: z.number() });
 
 export class OpencodeProviderCli extends ProviderCli {
@@ -71,9 +71,10 @@ export class OpencodeProviderCli extends ProviderCli {
 
   override async updateSwitch({ env, configHome }: UpdateSwitchSearch, fileSystem: FileSystem) {
     if (['1', 'true'].includes(env[UpdateVariable]?.toLowerCase() ?? '')) return UpdateVariable;
-    for (const file of ConfigFiles) {
+    for (const file of ConfigFiles.toReversed()) {
       const path = `${configHome}/opencode/${file}`;
-      if (ConfigSwitch.test((await fileSystem.readText(path)) ?? '')) return path;
+      const isOff = isUpdateOff(await fileSystem.readText(path));
+      if (isOff !== undefined) return isOff ? path : undefined;
     }
     return undefined;
   }
@@ -86,6 +87,16 @@ export class OpencodeProviderCli extends ProviderCli {
       .then((result) => `${result.stdout}${result.stderr}`.includes(StandaloneFlag));
     this.standaloneSupport.set(session.binary, support);
     return support;
+  }
+}
+
+function isUpdateOff(text?: string) {
+  try {
+    const config = OpencodeConfig.safeParse(Bun.JSONC.parse(text ?? '')).data;
+    if (config?.update !== undefined) return config.update === 'disable';
+    return config?.autoupdate === undefined ? undefined : config.autoupdate === false;
+  } catch {
+    return undefined;
   }
 }
 

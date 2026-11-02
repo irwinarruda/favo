@@ -118,6 +118,7 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
     processes,
     fileSystem,
     shell,
+    config,
     paths,
     callerEnv
   );

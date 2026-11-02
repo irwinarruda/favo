@@ -189,7 +189,7 @@ function assertGlibc() {
 function run(binary) {
   const child = spawn(binary, process.argv.slice(2), {
     stdio: 'inherit',
-    env: { ...process.env, FAVO_LAUNCHER: import.meta.filename, FAVO_LAUNCHER_NODE: process.execPath },
+    env: { ...process.env, FAVO_LAUNCHER: process.argv[1], FAVO_LAUNCHER_NODE: process.execPath },
   });
   process.on('SIGINT', () => {});
   for (const signal of ForwardedSignals) process.on(signal, () => child.kill(signal));

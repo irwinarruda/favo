@@ -207,7 +207,7 @@ Run `favo hooks uninstall` first, so no hook stays behind in your provider confi
 
 The npm package is a small launcher with no dependencies and no install scripts. The first run downloads the right binary, about 40 MB, from [GitHub Releases](https://github.com/irwinarruda/favo-cli/releases) and checks it against the hashes published in the npm package. After that, favo starts with no network. Homebrew installs the same binary directly, with no launcher and no Node.
 
-To update, run `favo update`. It updates favo here, then on every other machine, then the provider CLIs everywhere. favo marks a machine on an older version as `older favo` and keeps it working until you do.
+To update, run `favo update`. It updates favo here, then on every other machine, then the provider CLIs everywhere. favo marks a machine on an older version as `older favo` and keeps it working until you do. favo 0.4.0 and earlier have no such command, so update those once by hand: `npm install --global favo-cli@latest` or `brew upgrade favo-cli`.
 
 ### Use it with T3 Code
 
@@ -364,7 +364,7 @@ It works in this order, because a machine gets favo from the release of the favo
 | OpenCode    | `opencode upgrade`, then the package manager if that fails.                                                                                                     |
 | Antigravity | It has no update command, and updates itself. A Homebrew install gets `brew upgrade --cask antigravity-cli`. Any other install is left alone, and favo says so. |
 
-A global npm install belongs to its Node version, so with `nvm`, `mise` or `asdf` favo uses the `npm` next to it. favo never runs `sudo`: if a system-wide install needs it, you see the failure and can run the command yourself.
+A global npm install belongs to its Node version, so favo uses the `npm` next to it. A `mise` or `asdf` shim hides where the real install is, so favo runs the provider's own command there, with no package manager to fall back on. favo never runs `sudo`: if a system-wide install needs it, you see the failure and can run the command yourself.
 
 favo leaves a provider alone and says why when you pinned it in Homebrew, or turned its updates off: `DISABLE_UPDATES` or `DISABLE_AUTOUPDATER` for Claude Code, in your environment or the `env` of its `settings.json`; `OPENCODE_DISABLE_AUTOUPDATE`, or `autoupdate: false` or `update: "disable"` in the OpenCode config; `AGY_CLI_DISABLE_AUTO_UPDATE` for Antigravity. It asks before touching a provider running through favo.
 

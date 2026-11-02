@@ -38,13 +38,17 @@ export class UpdateService {
     const args = updateArgumentsFor({ isHereOnly: true, isHeld });
     if (machineId === undefined || machineId === LocalMachineId) return this.planOf(this.binary ?? FavoCommand, args);
     const machine = await this.machines.requireRemote(machineId);
-    const { state, isBehind } = await this.machines.status(machine.id);
+    const { state, isBehind, message } = await this.machines.status(machine.id);
     assertDomain(
       state !== MachineState.outdated && !isBehind,
       DomainErrorCode.machineOutdated,
       `${machine.name} runs an older favo. To update it: favo machine install ${machine.name}`
     );
-    assertDomain(state === MachineState.online, DomainErrorCode.machineUnreachable, `Could not reach ${machine.name}.`);
+    assertDomain(
+      state === MachineState.online,
+      DomainErrorCode.machineUnreachable,
+      message ?? `Could not reach ${machine.name}.`
+    );
     return remoteTerminalPlan(machine.target!, machine.system, args);
   }
 
@@ -57,10 +61,11 @@ export class UpdateService {
     return source && { source, restart: this.planOf(`${source.root}/bin/${FavoCommand}`) };
   }
 
-  private launcherInstall() {
+  private async launcherInstall() {
     const { FAVO_LAUNCHER: launcher, FAVO_LAUNCHER_NODE: node } = this.callerEnv;
-    const source = launcher ? this.favoSourceOf(launcher) : undefined;
-    return source && node && launcher ? { source, restart: this.planOf(node, [launcher]) } : undefined;
+    if (!launcher || !node) return undefined;
+    const source = this.favoSourceOf(await this.fileSystem.realPath(launcher));
+    return source && { source, restart: this.planOf(node, [launcher]) };
   }
 
   private favoSourceOf(path: string) {

@@ -24,7 +24,6 @@ type Options = {
   exitCodeOf?: (plan: TerminalPlan) => number;
   answer?: boolean;
   onRun?: (plan: TerminalPlan) => void;
-  isHeld?: boolean;
 };
 
 async function updater(options: Options = {}, serverOptions: Parameters<typeof createTestServer>[0] = {}) {
@@ -167,6 +166,12 @@ describe('favo update, on this computer', () => {
     await server.run('update', '--skip-favo');
     expect(await server.fileSystem.readText(Settings)).toContain(`favo-hook:claude:${HookVersion}`);
   });
+  it('keeps a failure on screen when the report is held', async () => {
+    const server = await updater();
+    expect(await server.run('update', '--machine', 'nope', '--skip-favo', '--hold')).toBe(1);
+    expect(server.text()).toContain('favo: No machine named "nope".');
+    expect(server.holds).toEqual(['held']);
+  });
   it('holds the report on screen only when asked', async () => {
     const server = await updater();
     await server.run('update', '--skip-favo', '--machine', 'local');
@@ -202,9 +207,15 @@ describe('favo update, across machines', () => {
     await server.client.call(addMachine, { target: 'bee@offline' });
     await withMachine(server, '0.0.1');
     expect(await server.run('update', '--skip-favo')).toBe(0);
-    expect(server.text()).toContain('offline:');
-    expect(server.text()).toContain('Skipped.');
+    expect(server.lines).toContain('offline: no route to host. Skipped.');
     expect(server.text()).toContain('favo 0.5.0 is running on devbox.');
+  });
+  it('reports a machine with no favo as plainly', async () => {
+    const server = await updater();
+    await server.client.call(addMachine, { target: 'bee@devbox' });
+    server.remotes.connectWhenInstalled('devbox', remoteAt(FavoVersion));
+    await server.run('update', '--skip-favo');
+    expect(server.lines).toContain('favo is not installed on devbox yet. Skipped.');
   });
   it('leaves other machines alone when asked for this computer only', async () => {
     const server = await updater();
@@ -300,6 +311,22 @@ describe('favo update, for the provider CLIs', () => {
     expect(await server.run('update', '--skip-favo')).toBe(1);
     expect(commandsOf(server.plans)).toContain('/opt/homebrew/bin/codex update');
     expect(server.text()).toContain('Claude Code did not update (exit 1).');
+  });
+  it('stops everything on Ctrl-C, without starting the package manager', async () => {
+    const server = await updater({ exitCodeOf: () => 130 });
+    await withProvider(server, 'codex', CaskCodex);
+    await withProvider(server, 'opencode', '/opt/homebrew/Cellar/opencode-v2/2.2.5/bin/opencode');
+    await withMachine(server, FavoVersion);
+    expect(await server.run('update', '--skip-favo')).toBe(130);
+    expect(commandsOf(server.plans)).toEqual(['/opt/homebrew/bin/codex update']);
+    expect(server.lines.at(-1)).toBe('Stopped. Everything after this was left as it is.');
+  });
+  it('stops at the machine where Ctrl-C was pressed', async () => {
+    const server = await updater({ exitCodeOf: ({ command }) => (command === 'ssh' ? 130 : 0) });
+    await withMachine(server, FavoVersion, 'one');
+    await withMachine(server, FavoVersion, 'two');
+    expect(await server.run('update', '--skip-favo')).toBe(130);
+    expect(server.plans).toHaveLength(1);
   });
   it('updates each provider once, however many seats use it', async () => {
     const server = await updater();

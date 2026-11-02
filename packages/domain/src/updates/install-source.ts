@@ -32,8 +32,9 @@ const GlobalNodeFolders: [RegExp, InstallMethod][] = [
   [/\/\.bun\/install\/global\//, InstallMethod.bun],
   [/\/pnpm\/global\//i, InstallMethod.pnpm],
   [/\/yarn\/(?:data\/)?global\//i, InstallMethod.yarn],
-  [/\/(?:lib|npm|nodejs)\/node_modules\//, InstallMethod.npm],
+  [/\/(?:lib|npm|nodejs|installation|v\d[^/]*)\/node_modules\//, InstallMethod.npm],
 ];
+const ShimTarget = /(?:%dp0%|%~dp0|\$basedir)[\\/]+([^"\s]*node_modules[\\/][^"\s]+)/;
 
 export function installSourceOf(realPath: string): InstallSource | undefined {
   const path = realPath.replaceAll('\\', '/');
@@ -46,6 +47,12 @@ export function installSourceOf(realPath: string): InstallSource | undefined {
   const method = GlobalNodeFolders.find(([folder]) => folder.test(path))?.[1];
   if (!nodePackage || !method) return undefined;
   return { method, packageName: nodePackage[2]!, root: nodePackage[1]!, isCask: false };
+}
+
+export function shimTargetOf(shimPath: string, head: string) {
+  const target = ShimTarget.exec(head)?.[1];
+  if (!target) return undefined;
+  return `${shimPath.replaceAll('\\', '/').replace(/\/[^/]*$/, '')}/${target.replaceAll('\\', '/')}`;
 }
 
 export function upgradeArgumentsOf({ method, packageName, isCask }: InstallSource) {

@@ -1,0 +1,28 @@
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { runTerminalPlan } from '@/run-terminal-plan';
+
+let root: string;
+
+beforeEach(() => {
+  root = mkdtempSync(`${tmpdir()}/favo-plan-`).replaceAll('\\', '/');
+});
+
+afterEach(() => rmSync(root, { recursive: true, force: true, maxRetries: 5 }));
+
+function planWith(pidFile: string) {
+  return { command: process.execPath, args: ['--version'], env: {}, unsetEnv: [], pidFile };
+}
+
+describe('the pid file around a provider', () => {
+  it('is gone once the provider has exited', async () => {
+    const pidFile = `${root}/running/work/claude/launch`;
+    expect(await runTerminalPlan(planWith(pidFile), process.env)).toBe(0);
+    expect(existsSync(pidFile)).toBe(false);
+  });
+  it('never gets in the way of the launch when it cannot be written', async () => {
+    writeFileSync(`${root}/running`, 'a file where a folder should be');
+    expect(await runTerminalPlan(planWith(`${root}/running/work/claude/launch`), process.env)).toBe(0);
+  });
+});

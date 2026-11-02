@@ -14,19 +14,26 @@ import type { Command } from '@/parse-command';
 import type { CommandContext } from '@/run-command';
 
 const UnknownVersion = 'an unknown version';
+const InterruptedCode = 130;
 
 export async function runUpdate(command: Command, context: CommandContext) {
-  const { machineId, isHeld } = command;
-  const isRemote = machineId !== undefined && machineId !== LocalMachineId;
-  const exitCode = await (isRemote ? updateMachine(context, machineId) : updateFromHere(command, context));
-  if (isHeld) await context.hold();
-  return exitCode;
+  try {
+    const { machineId } = command;
+    const isRemote = machineId !== undefined && machineId !== LocalMachineId;
+    return await (isRemote ? updateMachine(context, machineId) : updateFromHere(command, context));
+  } catch (error) {
+    if (!command.isHeld || !(error instanceof DomainError)) throw error;
+    context.print(`favo: ${error.message}`);
+    return 1;
+  } finally {
+    if (command.isHeld) await context.hold();
+  }
 }
 
 async function updateFromHere(command: Command, context: CommandContext) {
   const { client } = context;
   const isHereOnly = command.machineId === LocalMachineId;
-  if (!command.skipsFavo) {
+  if (!command.isFavoSkipped) {
     const handedOver = await updateFavoHere(context, updateArgumentsFor({ isHereOnly }));
     if (handedOver !== undefined) return handedOver;
   }
@@ -34,8 +41,15 @@ async function updateFromHere(command: Command, context: CommandContext) {
   const fleet = isHereOnly ? { exitCode: 0, reachable: [] } : await updateMachines(context);
   if (fleet.reachable.length > 0) context.print(context.paint.bold('\nProvider CLIs here'));
   const providers = await updateProviders(context);
+  if (providers === InterruptedCode) return stopped(context);
   const elsewhere = await updateProvidersOn(context, fleet.reachable);
+  if (elsewhere === InterruptedCode) return stopped(context);
   return Math.max(fleet.exitCode, providers, elsewhere);
+}
+
+function stopped({ print }: CommandContext) {
+  print('Stopped. Everything after this was left as it is.');
+  return InterruptedCode;
 }
 
 async function updateFavoHere(context: CommandContext, restartArguments: string[]) {
@@ -59,7 +73,7 @@ async function updateFavoHere(context: CommandContext, restartArguments: string[
 }
 
 export async function updateMachines(context: CommandContext) {
-  const { client, print, paint } = context;
+  const { client, print } = context;
   const machines = await client.call(listMachines, {});
   const remotes = machines.filter(({ isLocal }) => !isLocal);
   const statuses = await Promise.all(remotes.map(({ id }) => client.call(getMachineStatus, { id })));
@@ -69,43 +83,39 @@ export async function updateMachines(context: CommandContext) {
     const status = statuses[index]!;
     const isBehind = status.isBehind || status.state === MachineState.outdated;
     if (!isBehind && status.state !== MachineState.online) {
-      print(`${machine.name}: ${status.message ?? status.state}. Skipped.`);
+      print(`${status.message?.replace(/\.$/, '') ?? `${machine.name}: ${status.state}`}. Skipped.`);
       continue;
     }
     if (!isBehind) {
       reachable.push(machine);
       continue;
     }
-    try {
-      print(`Updating favo on ${machine.name}...`);
-      const { version } = await client.call(installMachine, { id: machine.id });
-      print(`${paint.accent('⬢')} favo ${version} is running on ${machine.name}.`);
-      reachable.push(machine);
-    } catch (error) {
-      if (!(error instanceof DomainError)) throw error;
-      print(`${machine.name}: ${error.message}`);
-      exitCode = 1;
-    }
+    if (await installFavoOn(context, machine)) reachable.push(machine);
+    else exitCode = 1;
   }
   const isEveryMachineCurrent = statuses.every((status) => status.state === MachineState.online && !status.isBehind);
   if (isEveryMachineCurrent) print(`Every machine runs favo ${FavoVersion}.`);
   return { exitCode, reachable };
 }
 
-async function updateMachine(context: CommandContext, id: string) {
-  const { client, print, paint } = context;
-  const { state, isBehind } = await client.call(getMachineStatus, { id });
-  if (isBehind || state === MachineState.outdated) {
-    try {
-      print(`Updating favo on ${id}...`);
-      const { version } = await client.call(installMachine, { id });
-      print(`${paint.accent('⬢')} favo ${version} is running on ${id}.`);
-    } catch (error) {
-      if (!(error instanceof DomainError)) throw error;
-      print(`${id}: ${error.message}`);
-      return 1;
-    }
+async function installFavoOn({ client, print, paint }: CommandContext, machine: { id: string; name: string }) {
+  try {
+    print(`Updating favo on ${machine.name}...`);
+    const { version } = await client.call(installMachine, { id: machine.id });
+    print(`${paint.accent('⬢')} favo ${version} is running on ${machine.name}.`);
+    return true;
+  } catch (error) {
+    if (!(error instanceof DomainError)) throw error;
+    print(`${machine.name}: ${error.message}`);
+    return false;
   }
+}
+
+async function updateMachine(context: CommandContext, id: string) {
+  const { client } = context;
+  const { state, isBehind } = await client.call(getMachineStatus, { id });
+  const isCurrent = !isBehind && state !== MachineState.outdated;
+  if (!isCurrent && !(await installFavoOn(context, { id, name: id }))) return 1;
   return context.runPlan(await client.call(planUpdate, { machineId: id }));
 }
 
@@ -116,6 +126,7 @@ async function updateProvidersOn(context: CommandContext, machines: Machine[]) {
     try {
       print(paint.bold(`\nProvider CLIs on ${machine.name}`));
       const code = await runPlan(await client.call(planUpdate, { machineId: machine.id }));
+      if (code === InterruptedCode) return code;
       if (code !== 0) exitCode = 1;
     } catch (error) {
       if (!(error instanceof DomainError)) throw error;
@@ -132,7 +143,9 @@ async function updateProviders(context: CommandContext) {
   if (updates.length === 0) print('No provider CLI is installed here.');
   let exitCode = 0;
   for (const update of updates) {
-    if (!(await updateProvider(context, update))) exitCode = 1;
+    const code = await updateProvider(context, update);
+    if (code === InterruptedCode) return code;
+    if (code !== 0) exitCode = 1;
   }
   return exitCode;
 }
@@ -145,29 +158,29 @@ async function updateProvider(context: CommandContext, update: ProviderUpdateVie
   for (const copy of otherCopies) print(paint.dim(`  another copy, left alone: ${copy}`));
   if (heldBack) {
     print(`  Left at ${version}: ${heldBack}.`);
-    return true;
+    return 0;
   }
   if (steps.length === 0) {
     print('  Left alone: it updates itself, or through whatever installed it.');
-    return true;
+    return 0;
   }
   if (runningAccounts.length > 0) {
     const isConfirmed = await ask(`${label} is running as ${runningAccounts.join(', ')}. Update it anyway?`);
     if (!isConfirmed) {
       print(`  Left at ${version}: it is running.`);
-      return true;
+      return 0;
     }
   }
   const code = await runSteps(context, update);
   if (code !== 0) {
     print(`  ${label} did not update (exit ${code}).`);
-    return false;
+    return code;
   }
   const [after] = await client.call(listProviderUpdates, { provider });
   const current = after?.version ?? UnknownVersion;
   const change = current === version ? `is still ${current}` : `${version} → ${current}`;
   print(`${paint.accent('⬢')} ${label} ${change}`);
-  return true;
+  return 0;
 }
 
 async function runSteps({ print, runPlan }: CommandContext, { steps }: ProviderUpdateView) {
@@ -175,7 +188,7 @@ async function runSteps({ print, runPlan }: CommandContext, { steps }: ProviderU
   for (const [index, step] of steps.entries()) {
     if (index > 0) print(`  That did not work, so favo is trying ${step.command}.`);
     code = await runPlan(step);
-    if (code === 0) break;
+    if (code === 0 || code === InterruptedCode) break;
   }
   return code;
 }

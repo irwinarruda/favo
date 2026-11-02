@@ -296,6 +296,18 @@ describe('another machine', () => {
     expect(await devbox.fileSystem.readText(Settings)).toBe('{}');
     expect(await devbox.fileSystem.readText(CodexHooks)).toBe(codex);
   });
+  it('adds no hook when it could not ask a machine that has favo', async () => {
+    const { mac, devbox } = await fleet();
+    await mac.client.call(installHooks, {});
+    mac.remotes.connect('devbox', {
+      async send(request) {
+        if (request.method === 'hooks.list') throw new DomainError(DomainErrorCode.machineUnreachable, 'timed out');
+        return devbox.router.send(request);
+      },
+    });
+    await mac.client.call(installMachine, { id: 'devbox' });
+    expect(await devbox.fileSystem.readText(Settings)).toBe('{}');
+  });
   it('adds no hook to a machine too old to have had one', async () => {
     const { mac, devbox } = await fleet();
     await mac.client.call(installHooks, {});

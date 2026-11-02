@@ -43,6 +43,7 @@ export type ProviderUpdateSpec = {
   packages: string[];
   arguments?: string[];
   refusedOn?: InstallMethod[];
+  switches?: string[];
 };
 
 export type ProviderSpec = {
@@ -102,6 +103,7 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
       packages: ['@anthropic-ai/claude-code', 'claude-code', 'claude-code@latest'],
       arguments: ['update'],
       refusedOn: [InstallMethod.homebrew],
+      switches: ['DISABLE_UPDATES', 'DISABLE_AUTOUPDATER'],
     },
     herdrAgent: 'claude',
   },
@@ -155,7 +157,7 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
       sharedItem: '.gemini/config',
       event: 'PreInvocation',
     },
-    update: { packages: ['antigravity-cli'] },
+    update: { packages: ['antigravity-cli'], switches: ['AGY_CLI_DISABLE_AUTO_UPDATE'] },
   },
   opencode: {
     id: ProviderId.opencode,
@@ -181,9 +183,15 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
         'opencode-v2',
       ],
       arguments: ['upgrade'],
+      switches: ['OPENCODE_DISABLE_AUTOUPDATE'],
     },
   },
 };
+
+export const UpdateVariables = [
+  ...Object.values(Providers).flatMap(({ update }) => update.switches ?? []),
+  Providers.claude.homeVariable!,
+];
 
 export const ProviderOrder: ProviderId[] = [
   ProviderId.claude,

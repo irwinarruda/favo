@@ -606,6 +606,16 @@ describe('adding a machine', () => {
     await waitFor(() => mockDb.terminalRuns.length === 1);
     expect(mockDb.terminalRuns[0]?.args).toEqual(['update', 'devbox']);
   });
+  test('updates the machine the dialog named, even if the selection moved', async () => {
+    const { app, select, press, captureCharFrame, waitFor } = await open();
+    await select('seat:devbox/personal/antigravity');
+    await press('P');
+    expect(captureCharFrame()).toContain('Update the provider CLIs on devbox?');
+    app.state.selectRow('seat:local/personal/claude');
+    await press('y');
+    await waitFor(() => mockDb.terminalRuns.length === 1);
+    expect(mockDb.terminalRuns[0]?.args).toEqual(['update', 'devbox']);
+  });
   test('does not offer that on a machine it cannot reach', async () => {
     const { select, press, captureCharFrame } = await open();
     await select('machine:studio');

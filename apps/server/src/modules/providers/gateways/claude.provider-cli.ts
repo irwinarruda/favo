@@ -1,5 +1,5 @@
 import { LoginState } from '@favo/contracts/rpc/views';
-import { ProviderId } from '@favo/domain/providers/provider';
+import { ProviderId, Providers } from '@favo/domain/providers/provider';
 import { parseJson } from '@favo/domain/shared/parse-json';
 import { UsageUnavailableReason, unavailableUsage } from '@favo/domain/usage/seat-usage';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ const StatusTimeoutMs = 15_000;
 const UsageTimeoutMs = 10_000;
 const PersonalOrganizationSuffix = "'s Organization";
 const AmbientVariable = /^(?:CLAUDE|ANTHROPIC|HERDR)/i;
-const UpdateSwitches = ['DISABLE_UPDATES', 'DISABLE_AUTOUPDATER'];
+const SwitchedOnValues = ['1', 'true', 'yes', 'on'];
 const ClaudeSettings = z.object({ env: z.record(z.string(), z.unknown()).optional() });
 const UsageRequestId = 'usage';
 const UsageArguments = [
@@ -84,7 +84,8 @@ export class ClaudeProviderCli extends ProviderCli {
   override async updateSwitch({ env, home }: UpdateSwitchSearch, fileSystem: FileSystem) {
     const text = await fileSystem.readText(`${env.CLAUDE_CONFIG_DIR ?? `${home}/.claude`}/settings.json`);
     const settings = ClaudeSettings.safeParse(parseJson(text ?? '{}')).data;
-    return UpdateSwitches.find((name) => env[name] || settings?.env?.[name]);
+    const switches = Providers.claude.update.switches ?? [];
+    return switches.find((name) => isSwitchedOn(env[name]) || isSwitchedOn(settings?.env?.[name]));
   }
 
   override async usage({ binary, env, cwd }: ProviderSession, checkedAt: string) {
@@ -119,4 +120,8 @@ function planOf(status: ClaudeStatus) {
   const organization = status.orgName?.endsWith(PersonalOrganizationSuffix) ? undefined : status.orgName;
   const parts = [status.subscriptionType, organization].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : undefined;
+}
+
+function isSwitchedOn(value: unknown) {
+  return SwitchedOnValues.includes(String(value).toLowerCase());
 }

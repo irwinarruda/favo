@@ -51,7 +51,7 @@ export type Command = {
   name?: string;
   directory?: string;
   canClose?: boolean;
-  skipsFavo?: boolean;
+  isFavoSkipped?: boolean;
   isHeld?: boolean;
 };
 
@@ -130,7 +130,12 @@ export function parseCommand(rawArgv: string[]): Command {
     case 'theme':
       return { ...base, kind: CommandKind.theme, target: second };
     case 'update':
-      return { ...base, kind: CommandKind.update, skipsFavo: flags.skipsFavo, isHeld: flags.isHeld };
+      assertDomain(
+        second === undefined,
+        DomainErrorCode.invalidParams,
+        'favo update takes no name. For one machine: favo update --machine <machine>'
+      );
+      return { ...base, kind: CommandKind.update, isFavoSkipped: flags.isFavoSkipped, isHeld: flags.isHeld };
     case 'machine':
       return parseMachine(base, flags.name, second, third);
     default:
@@ -186,7 +191,7 @@ function readFlags(argv: string[]) {
     isHelp: false,
     isVersion: false,
     canClose: false,
-    skipsFavo: false,
+    isFavoSkipped: false,
     isHeld: false,
     machine: undefined as string | undefined,
     name: undefined as string | undefined,
@@ -198,7 +203,7 @@ function readFlags(argv: string[]) {
     else if (word === '--help' || word === '-h') flags.isHelp = true;
     else if (word === '--version' || word === '-v') flags.isVersion = true;
     else if (word === '--close') flags.canClose = true;
-    else if (word === SkipFavoFlag) flags.skipsFavo = true;
+    else if (word === SkipFavoFlag) flags.isFavoSkipped = true;
     else if (word === HoldFlag) flags.isHeld = true;
     else if (word === '--stdio') continue;
     else if (word === '--machine' || word === '-m') flags.machine = required(argv[++index], '--machine <machine>');

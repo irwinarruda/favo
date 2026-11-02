@@ -61,7 +61,7 @@ afterEach(async () => {
 describe('updating the provider CLIs from the comb', () => {
   test('plans the update for the selected machine through the real backend', async () => {
     const view = await openFleet();
-    await useApp.getState().updateSelectedProviders();
+    await useApp.getState().updateProviders('local');
     expect(view.plans.at(-1)?.command).toBe('favo');
     expect(view.plans.at(-1)?.args).toEqual(['update', '--skip-favo', '--machine', 'local', '--hold']);
   });

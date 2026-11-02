@@ -101,6 +101,28 @@ describe('the way each provider updates', () => {
     expect(stepsOf(claude)).toEqual(['/opt/homebrew/bin/claude update']);
     expect(claude?.installedWith).toStartWith('own install at');
   });
+  it('sees through a Windows npm script to the package behind it', async () => {
+    const npmFolder = '/Users/bee/AppData/Roaming/npm';
+    const server = createTestServer({ installed: [], isWindows: true });
+    const shim = '"%_prog%"  "%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js" %*\r\n';
+    await server.fileSystem.writePrivateText(`${npmFolder}/codex.cmd`, shim);
+    server.processes.install('codex', `${npmFolder}/codex.cmd`);
+    server.processes.install('npm', `${npmFolder}/npm.cmd`);
+    const [codex] = await server.client.call(listProviderUpdates, {});
+    expect(codex?.installedWith).toBe(`npm in ${npmFolder}`);
+    expect(stepsOf(codex)?.[1]).toBe(`${npmFolder}/npm.cmd install --global @openai/codex@latest`);
+  });
+  it('sees through a pnpm script to the package behind it', async () => {
+    const pnpmFolder = `${Home}/Library/pnpm`;
+    const server = createTestServer({ installed: [] });
+    const shim = '#!/bin/sh\nexec node "$basedir/global/5/node_modules/@openai/codex/bin/codex.js" "$@"\n';
+    await server.fileSystem.writePrivateText(`${pnpmFolder}/codex`, shim);
+    server.processes.install('codex', `${pnpmFolder}/codex`);
+    server.processes.install('pnpm', `${pnpmFolder}/pnpm`);
+    const [codex] = await server.client.call(listProviderUpdates, {});
+    expect(codex?.installedWith).toBe('pnpm');
+    expect(stepsOf(codex)?.[1]).toBe(`${pnpmFolder}/pnpm add --global @openai/codex@latest`);
+  });
   it('uses the npm of the Node version that holds the install', async () => {
     const server = await serverWith({ codex: NpmCodex });
     server.processes.install('npm', `${NvmNode}/bin/npm`);
@@ -120,6 +142,12 @@ describe('what favo leaves alone', () => {
   it('holds back a provider whose updates are off', async () => {
     const server = await serverWith({ claude: CaskClaude });
     server.clis.claude.updateOff = 'DISABLE_UPDATES';
+    const [claude] = await server.client.call(listProviderUpdates, {});
+    expect(claude?.heldBack).toBe('its updates are turned off by DISABLE_UPDATES');
+  });
+  it('hears a switch set in the login shell of this machine', async () => {
+    const server = await serverWith({ claude: CaskClaude }, { shellVariables: { DISABLE_UPDATES: '1' } });
+    server.clis.claude.updateOffUnless = ({ env }) => (env.DISABLE_UPDATES ? 'DISABLE_UPDATES' : undefined);
     const [claude] = await server.client.call(listProviderUpdates, {});
     expect(claude?.heldBack).toBe('its updates are turned off by DISABLE_UPDATES');
   });
@@ -156,6 +184,27 @@ describe('a provider running through favo', () => {
     const [claude] = await server.client.call(listProviderUpdates, {});
     expect(claude?.runningAccounts).toEqual([]);
     expect(await server.fileSystem.readText(runs.pidFile('work', 'claude', 'launch-1'))).toBeUndefined();
+  });
+  it('uses the name you gave the account', async () => {
+    const { server } = await running(4242);
+    await server.fileSystem.writePrivateText(
+      server.paths.configFile,
+      JSON.stringify({ accountNames: { work: 'office' } })
+    );
+    const [claude] = await server.client.call(listProviderUpdates, {});
+    expect(claude?.runningAccounts).toEqual(['office']);
+  });
+  it('survives a launch that ends while favo looks at it', async () => {
+    const { server, runs } = await running(4242);
+    const list = server.fileSystem.list.bind(server.fileSystem);
+    server.fileSystem.list = async (path) => [...(await list(path)), ...(path.endsWith('/claude') ? ['ended'] : [])];
+    server.fileSystem.unlink = async () => {
+      throw new Error('already gone');
+    };
+    server.processes.gone.add(4242);
+    const [claude] = await server.client.call(listProviderUpdates, {});
+    expect(claude?.runningAccounts).toEqual([]);
+    expect(await server.fileSystem.readText(runs.pidFile('work', 'claude', 'launch-1'))).toBe('4242');
   });
   it('does not count one provider as another', async () => {
     const { server, runs } = await running(4242);

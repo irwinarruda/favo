@@ -50,6 +50,15 @@ describe('updating favo on this computer', () => {
     const plan = await launcherServer().client.call(planFavoUpdate, {});
     expect(plan.restart).toMatchObject({ command: LauncherEnv.FAVO_LAUNCHER_NODE, args: [Launcher] });
   });
+  it('restarts pnpm through the stable path, because the real one holds the old version', async () => {
+    const stable = `${Home}/.local/share/pnpm/global/5/node_modules/favo-cli`;
+    const versioned = `${Home}/.local/share/pnpm/global/5/.pnpm/favo-cli@0.4.0/node_modules/favo-cli`;
+    const server = launcherServer({ ...LauncherEnv, FAVO_LAUNCHER: `${stable}/bin/favo.mjs` });
+    await server.fileSystem.link(versioned, stable);
+    const plan = await server.client.call(planFavoUpdate, {});
+    expect(plan.installedWith).toBe('pnpm');
+    expect(plan.restart?.args).toEqual([`${stable}/bin/favo.mjs`]);
+  });
   it('leaves a pinned favo alone', async () => {
     const server = await homebrewServer();
     server.processes.reply('/opt/homebrew/bin/brew list --pinned', { stdout: 'favo-cli\n' });
@@ -153,6 +162,14 @@ describe('updating the provider CLIs on a machine', () => {
     await server.client.call(addMachine, { target: 'bee@devbox' });
     await expect(server.client.call(planUpdate, { machineId: 'devbox' })).rejects.toMatchObject({
       code: 'machineUnreachable',
+    });
+  });
+  it('passes on why a machine is not usable', async () => {
+    const server = createTestServer();
+    await server.client.call(addMachine, { target: 'bee@devbox' });
+    server.remotes.failure = 'machineNeedsInstall';
+    await expect(server.client.call(planUpdate, { machineId: 'devbox' })).rejects.toMatchObject({
+      message: 'devbox: scripted failure',
     });
   });
   it('refuses a machine it does not know', async () => {

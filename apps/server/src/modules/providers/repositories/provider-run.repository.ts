@@ -25,8 +25,9 @@ export class ProviderRunRepository {
     let isRunning = false;
     for (const launch of await this.fileSystem.list(folder)) {
       const pid = Number(await this.fileSystem.readText(`${folder}/${launch}`));
-      if (pid > 0 && this.processes.isAlive(pid)) isRunning = true;
-      else await this.fileSystem.unlink(`${folder}/${launch}`);
+      if (!(pid > 0)) continue;
+      if (this.processes.isAlive(pid)) isRunning = true;
+      else await this.fileSystem.unlink(`${folder}/${launch}`).catch(() => {});
     }
     return isRunning;
   }
