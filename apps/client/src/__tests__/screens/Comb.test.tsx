@@ -596,6 +596,28 @@ describe('adding a machine', () => {
     await press('i');
     await waitFor(() => mockDb.installed.includes('devbox'));
   });
+  test('offers to update the provider CLIs of a machine, and asks first', async () => {
+    const { select, press, captureCharFrame, waitFor } = await open();
+    await select('seat:devbox/personal/antigravity');
+    await press('P');
+    expect(captureCharFrame()).toContain('Update the provider CLIs on devbox?');
+    expect(mockDb.terminalRuns).toEqual([]);
+    await press('y');
+    await waitFor(() => mockDb.terminalRuns.length === 1);
+    expect(mockDb.terminalRuns[0]?.args).toEqual(['update', 'devbox']);
+  });
+  test('does not offer that on a machine it cannot reach', async () => {
+    const { select, press, captureCharFrame } = await open();
+    await select('machine:studio');
+    await press('P');
+    expect(captureCharFrame()).not.toContain('Update the provider CLIs');
+  });
+  test('lists the key in the help', async () => {
+    const { select, press, captureCharFrame } = await open();
+    await select('seat:local/personal/claude');
+    await press('?');
+    expect(captureCharFrame()).toContain('update the provider CLIs');
+  });
   test('forgets a machine after asking', async () => {
     const { app, select, press, captureCharFrame, waitFor } = await open();
     await select('machine:studio');

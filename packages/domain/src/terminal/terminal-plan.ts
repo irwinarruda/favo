@@ -1,9 +1,11 @@
 import { z } from 'zod';
-import { type RemoteSystem, remoteBinaryOf } from '#domain/machines/machine';
+import { LocalMachineId, type RemoteSystem, remoteBinaryOf } from '#domain/machines/machine';
 import { assertDomain, DomainError, DomainErrorCode } from '#domain/shared/domain-error';
 import type { ValueOf } from '#domain/shared/value-of';
 
 export const EncodedArgumentsFlag = '--argv-b64';
+export const SkipFavoFlag = '--skip-favo';
+export const HoldFlag = '--hold';
 
 const EncodedArguments = z.array(z.string());
 const Base64UrlPattern = /^[A-Za-z0-9_-]+$/;
@@ -32,6 +34,7 @@ export const TerminalPlan = z.strictObject({
   unsetEnv: z.array(z.string()),
   cwd: z.string().optional(),
   afterExit: TerminalStep.optional(),
+  pidFile: z.string().optional(),
 });
 export type TerminalPlan = z.infer<typeof TerminalPlan>;
 
@@ -81,6 +84,11 @@ function assertSafeForCmd(argument: string, command: string) {
     DomainErrorCode.unsafeArgument,
     `An argument contains ${named}. ${shim} runs through cmd.exe, which reads that as a command, not as text, so favo refused to start it.`
   );
+}
+
+export function updateArgumentsFor(input: { isHereOnly: boolean; isHeld?: boolean }) {
+  const here = input.isHereOnly ? ['--machine', LocalMachineId] : [];
+  return ['update', SkipFavoFlag, ...here, ...(input.isHeld ? [HoldFlag] : [])];
 }
 
 export function favoArgumentsFor(input: {

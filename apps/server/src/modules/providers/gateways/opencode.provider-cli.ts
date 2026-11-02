@@ -2,12 +2,21 @@ import { LoginState } from '@favo/contracts/rpc/views';
 import { ProviderId } from '@favo/domain/providers/provider';
 import { parseJson } from '@favo/domain/shared/parse-json';
 import { z } from 'zod';
-import { ProviderCli, type ProviderSession, type ThreadSearch } from '@/modules/providers/gateways/provider-cli';
+import {
+  ProviderCli,
+  type ProviderSession,
+  type ThreadSearch,
+  type UpdateSwitchSearch,
+} from '@/modules/providers/gateways/provider-cli';
 import { stripAnsi } from '@/modules/providers/utils/strip-ansi';
+import type { FileSystem } from '@/modules/system/gateways/file-system';
 import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 
 const StatusTimeoutMs = 15_000;
 const StandaloneFlag = '--standalone';
+const UpdateVariable = 'OPENCODE_DISABLE_AUTOUPDATE';
+const ConfigFiles = ['config.json', 'opencode.json', 'opencode.jsonc'];
+const ConfigSwitch = /"update"\s*:\s*"disable"|"autoupdate"\s*:\s*false/;
 const OpencodeSession = z.object({ id: z.string(), directory: z.string(), updated: z.number() });
 
 export class OpencodeProviderCli extends ProviderCli {
@@ -58,6 +67,15 @@ export class OpencodeProviderCli extends ProviderCli {
       directory,
       updatedAt: new Date(updated).toISOString(),
     }));
+  }
+
+  override async updateSwitch({ env, configHome }: UpdateSwitchSearch, fileSystem: FileSystem) {
+    if (['1', 'true'].includes(env[UpdateVariable]?.toLowerCase() ?? '')) return UpdateVariable;
+    for (const file of ConfigFiles) {
+      const path = `${configHome}/opencode/${file}`;
+      if (ConfigSwitch.test((await fileSystem.readText(path)) ?? '')) return path;
+    }
+    return undefined;
   }
 
   private supportsStandalone(session: ProviderSession) {

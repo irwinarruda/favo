@@ -19,6 +19,8 @@ import { runCommand } from '@/run-command';
 function harness(server = createTestServer(), isPainted = false) {
   const lines: string[] = [];
   const plans: TerminalPlan[] = [];
+  const questions: string[] = [];
+  const holds: string[] = [];
   const context = {
     client: server.client,
     paint: createPaint(isPainted, BuiltInThemes[0]!.colors),
@@ -27,8 +29,16 @@ function harness(server = createTestServer(), isPainted = false) {
       plans.push(plan);
       return 7;
     },
+    async ask(question: string) {
+      questions.push(question);
+      return false;
+    },
+    async hold() {
+      holds.push('held');
+    },
   };
-  return { ...server, lines, plans, run: (...argv: string[]) => runCommand(parseCommand(argv), context) };
+  const run = (...argv: string[]) => runCommand(parseCommand(argv), context);
+  return { ...server, lines, plans, questions, holds, context, run };
 }
 
 describe('usage', () => {

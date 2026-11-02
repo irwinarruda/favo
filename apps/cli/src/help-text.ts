@@ -40,6 +40,11 @@ Machines
   favo machine update                update every machine on an older favo
   favo machine rm <machine>          forget a machine
 
+Updates
+  favo update                        update favo, then the provider CLIs, here
+                                     and on every machine
+  favo update --machine <machine>    only there (local means this computer)
+
 Themes
   favo theme                         list themes
   favo theme <theme>                 use a theme, saved in ~/.favo/config.json

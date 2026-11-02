@@ -17,6 +17,7 @@ export class ScriptedProviderCli extends ProviderCli {
   readonly threadSearches: ThreadSearch[] = [];
   usageReading?: Omit<SeatUsage, 'checkedAt'> | Error;
   readonly usageSessions: ProviderSession[] = [];
+  updateOff?: string;
   currentReads = 0;
   mostReadsAtOnce = 0;
 
@@ -45,6 +46,10 @@ export class ScriptedProviderCli extends ProviderCli {
   override async recentThreads(search: ThreadSearch) {
     this.threadSearches.push(search);
     return this.foundThreads;
+  }
+
+  override async updateSwitch() {
+    return this.updateOff;
   }
 
   override async isolationArguments() {

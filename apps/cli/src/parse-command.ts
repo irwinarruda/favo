@@ -3,7 +3,7 @@ import { LocalMachineId } from '@favo/domain/machines/machine';
 import { findProvider, type ProviderId } from '@favo/domain/providers/provider';
 import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import type { ValueOf } from '@favo/domain/shared/value-of';
-import { decodeArguments, EncodedArgumentsFlag } from '@favo/domain/terminal/terminal-plan';
+import { decodeArguments, EncodedArgumentsFlag, HoldFlag, SkipFavoFlag } from '@favo/domain/terminal/terminal-plan';
 
 export const CommandKind = {
   tui: 'tui',
@@ -26,6 +26,7 @@ export const CommandKind = {
   sync: 'sync',
   inspect: 'inspect',
   theme: 'theme',
+  update: 'update',
   hooksStatus: 'hooksStatus',
   hooksInstall: 'hooksInstall',
   hooksUninstall: 'hooksUninstall',
@@ -50,6 +51,8 @@ export type Command = {
   name?: string;
   directory?: string;
   canClose?: boolean;
+  skipsFavo?: boolean;
+  isHeld?: boolean;
 };
 
 export function parseCommand(rawArgv: string[]): Command {
@@ -126,6 +129,8 @@ export function parseCommand(rawArgv: string[]): Command {
       return { ...base, kind: CommandKind.sync, account: second };
     case 'theme':
       return { ...base, kind: CommandKind.theme, target: second };
+    case 'update':
+      return { ...base, kind: CommandKind.update, skipsFavo: flags.skipsFavo, isHeld: flags.isHeld };
     case 'machine':
       return parseMachine(base, flags.name, second, third);
     default:
@@ -181,6 +186,8 @@ function readFlags(argv: string[]) {
     isHelp: false,
     isVersion: false,
     canClose: false,
+    skipsFavo: false,
+    isHeld: false,
     machine: undefined as string | undefined,
     name: undefined as string | undefined,
     directory: undefined as string | undefined,
@@ -191,6 +198,8 @@ function readFlags(argv: string[]) {
     else if (word === '--help' || word === '-h') flags.isHelp = true;
     else if (word === '--version' || word === '-v') flags.isVersion = true;
     else if (word === '--close') flags.canClose = true;
+    else if (word === SkipFavoFlag) flags.skipsFavo = true;
+    else if (word === HoldFlag) flags.isHeld = true;
     else if (word === '--stdio') continue;
     else if (word === '--machine' || word === '-m') flags.machine = required(argv[++index], '--machine <machine>');
     else if (word === '--name') flags.name = required(argv[++index], '--name <name>');

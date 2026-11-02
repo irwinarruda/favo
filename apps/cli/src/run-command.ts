@@ -39,6 +39,7 @@ import { collectUsagePools, type UsagePool, type UsagePoolColumn } from '@favo/d
 import { HelpText } from '@/help-text';
 import type { Paint } from '@/paint';
 import { type Command, CommandKind } from '@/parse-command';
+import { runUpdate, updateMachines } from '@/run-update';
 
 const UsageBarWidth = 20;
 const UsageLabelWidth = 16;
@@ -57,6 +58,8 @@ export type CommandContext = {
   paint: Paint;
   print(line: string): void;
   runPlan(plan: TerminalPlan): Promise<number>;
+  ask(question: string): Promise<boolean>;
+  hold(): Promise<void>;
 };
 
 export async function runCommand(parsed: Command, context: CommandContext) {
@@ -207,7 +210,9 @@ export async function runCommand(parsed: Command, context: CommandContext) {
       return 0;
     }
     case CommandKind.machineUpdate:
-      return updateMachines(context);
+      return (await updateMachines(context)).exitCode;
+    case CommandKind.update:
+      return runUpdate(command, context);
     default:
       return 1;
   }
@@ -228,32 +233,6 @@ async function openApp(context: CommandContext, parsed: Command, command: Comman
 
 function stateOf(status: MachineStatus) {
   return status.isBehind ? `${status.state} · older favo ${status.version}` : status.state;
-}
-
-async function updateMachines(context: CommandContext) {
-  const { client, print, paint } = context;
-  const machines = await client.call(listMachines, {});
-  const statuses = await Promise.all(machines.map(({ id }) => client.call(getMachineStatus, { id })));
-  const behind = machines.filter(
-    (_, index) => statuses[index]!.isBehind || statuses[index]!.state === MachineState.outdated
-  );
-  if (behind.length === 0) {
-    print(`Every machine runs favo ${FavoVersion}.`);
-    return 0;
-  }
-  let exitCode = 0;
-  for (const machine of behind) {
-    try {
-      print(`Updating favo on ${machine.name}...`);
-      const { version } = await client.call(installMachine, { id: machine.id });
-      print(`${paint.accent('⬢')} favo ${version} is running on ${machine.name}.`);
-    } catch (error) {
-      if (!(error instanceof DomainError)) throw error;
-      print(`${machine.name}: ${error.message}`);
-      exitCode = 1;
-    }
-  }
-  return exitCode;
 }
 
 function seatOf(command: Command) {

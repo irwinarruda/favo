@@ -5,6 +5,18 @@ import { getApp } from '@/__tests__/utils/getApp';
 import { container } from '@/shared/container';
 
 describe('SessionService', () => {
+  test('hands the terminal over to update the provider CLIs of the selected machine', async () => {
+    const app = await getApp();
+    app.state.selectRow('seat:devbox/personal/claude');
+    await app.state.updateSelectedProviders();
+    expect(mockDb.terminalRuns).toEqual([{ command: 'favo', args: ['update', 'devbox'], env: {}, unsetEnv: [] }]);
+  });
+  test('updates no provider CLI on a machine it cannot reach', async () => {
+    const app = await getApp();
+    app.state.selectRow('machine:studio');
+    await app.state.updateSelectedProviders();
+    expect(mockDb.terminalRuns).toEqual([]);
+  });
   test('launches a signed in seat', async () => {
     const app = await getApp();
     await app.state.openSelectedSeat();

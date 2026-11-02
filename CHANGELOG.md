@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- `favo update` now updates everything in one command: favo on this computer through Homebrew or npm, favo on your other machines, then Claude Code, Codex, OpenCode and Antigravity CLI on each one. It shows each provider's version and how it was installed before changing anything, and reports each result. If favo cannot update on this computer, it stops there and leaves your other machines alone. `favo update --machine <machine>` does one machine, and `local` means this computer. In the comb, press `P` to update the provider CLIs of the selected machine.
+- `favo update` never touches a provider that is running through favo without asking first. It also leaves a provider alone if you turned its updates off or pinned it in Homebrew, and tells you why.
+
+### Changed
+
+- `favo machine update` now names the machines it skipped because it could not reach them.
+
+### Fixed
+
+- Updating favo on a machine no longer adds provider hooks to it. Hooks that are already there stay current, even if the computer you run the update from has none.
+
 ## [0.4.0] - 2026-11-01
 
 ### Added

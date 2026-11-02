@@ -35,6 +35,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   const selectedMachine = useApp((state) => state.selectedMachine);
   const removeSelectedAccount = useApp((state) => state.removeSelectedAccount);
   const forgetSelectedMachine = useApp((state) => state.forgetSelectedMachine);
+  const updateSelectedProviders = useApp((state) => state.updateSelectedProviders);
   const selectedSeat = useApp((state) => state.selectedSeat);
   const selectedDesktopApp = useApp((state) => state.selectedDesktopApp);
   const isDesktopAppBusy = useApp((state) => state.isDesktopAppBusy);
@@ -89,6 +90,15 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     });
   }
 
+  function onUpdateProviders() {
+    if (!selectedMachine?.isOnline) return;
+    setConfirmation({
+      title: 'update CLIs',
+      message: `Update the provider CLIs on ${selectedMachine.name}? favo shows what each one is, and asks before touching one that is running.`,
+      onAccept: () => void error.handle(updateSelectedProviders)(),
+    });
+  }
+
   async function onOpenDesktopApp() {
     if (!selectedSeat || !selectedDesktopApp) return;
     const seat = selectedSeat;
@@ -125,6 +135,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     onQuit,
     onRemoveAccount,
     onForgetMachine,
+    onUpdateProviders,
     onOpenDesktopApp,
     onGoBackToThread,
   });

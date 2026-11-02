@@ -127,6 +127,9 @@ describe('parseCommand', () => {
     });
     expect(parseCommand(['machine', 'rm', 'box']).kind).toBe(CommandKind.machineRemove);
     expect(parseCommand(['machine', 'update']).kind).toBe(CommandKind.machineUpdate);
+    expect(parseCommand(['update'])).toMatchObject({ kind: CommandKind.update, skipsFavo: false, isHeld: false });
+    expect(parseCommand(['update', '--machine', 'devbox']).machineId).toBe('devbox');
+    expect(parseCommand(['update', '--skip-favo', '--hold'])).toMatchObject({ skipsFavo: true, isHeld: true });
     expect(parseCommand(['rename', 'work', 'side'])).toMatchObject({
       kind: CommandKind.rename,
       account: 'work',

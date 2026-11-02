@@ -11,6 +11,11 @@ export type LaunchEnvironment = { env: Record<string, string>; unsetEnv: string[
 export type LoginContext = { isOverSsh: boolean };
 export type ThreadSearch = { session: ProviderSession; seatHome: string; directory: string };
 export type FoundThread = { id: string; directory: string; updatedAt: string };
+export type UpdateSwitchSearch = {
+  env: Record<string, string | undefined>;
+  home: string;
+  configHome: string;
+};
 
 export abstract class ProviderCli {
   abstract readonly id: ProviderId;
@@ -36,6 +41,10 @@ export abstract class ProviderCli {
 
   async recentThreads(_search: ThreadSearch, _fileSystem: FileSystem): Promise<FoundThread[]> {
     return [];
+  }
+
+  async updateSwitch(_search: UpdateSwitchSearch, _fileSystem: FileSystem): Promise<string | undefined> {
+    return undefined;
   }
 
   protected async ask<Message, Answer>(

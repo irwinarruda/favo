@@ -5,6 +5,7 @@ import { removeAccount } from '@favo/contracts/rpc/accounts/remove-account';
 import { renameAccount } from '@favo/contracts/rpc/accounts/rename-account';
 import { installHooks } from '@favo/contracts/rpc/hooks/install-hooks';
 import { listHooks } from '@favo/contracts/rpc/hooks/list-hooks';
+import { refreshHooks } from '@favo/contracts/rpc/hooks/refresh-hooks';
 import { uninstallHooks } from '@favo/contracts/rpc/hooks/uninstall-hooks';
 import { getSeatStatus } from '@favo/contracts/rpc/seats/get-seat-status';
 import { inspectSeat } from '@favo/contracts/rpc/seats/inspect-seat';
@@ -52,4 +53,8 @@ export function registerAccountsController(
   router.handle(listHooks, () => hooks.list());
   router.handle(installHooks, () => hooks.install());
   router.handle(uninstallHooks, () => hooks.uninstall());
+  router.handle(refreshHooks, async () => {
+    await hooks.refresh();
+    return {};
+  });
 }

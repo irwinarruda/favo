@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises';
 import { mergeEnvironment } from '@favo/domain/shared/environment';
 import { herdrSequenceOf } from '@favo/domain/terminal/herdr';
 import { spawnCommandOf, type TerminalPlan, type TerminalStep } from '@favo/domain/terminal/terminal-plan';
@@ -15,8 +16,10 @@ export async function runTerminalPlan(plan: TerminalPlan, baseEnv: Record<string
   });
   const ignoreSignal = () => {};
   process.on('SIGINT', ignoreSignal);
+  if (plan.pidFile) await Bun.write(plan.pidFile, String(child.pid));
   const code = await child.exited;
   process.off('SIGINT', ignoreSignal);
+  if (plan.pidFile) await rm(plan.pidFile, { force: true });
   if (plan.afterExit) await runAfterExit(plan.afterExit);
   return code;
 }
