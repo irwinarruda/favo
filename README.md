@@ -76,7 +76,7 @@ Add a machine once. favo installs itself there, and from then on that machine si
 ```sh
 favo machine discover         # what is on ssh and Tailscale
 favo machine add bee@devbox   # connect, and install favo there
-favo claude work --machine devbox
+favo --machine devbox claude work
 ```
 
 Choosing where a provider starts works remotely too. Here the Mac is browsing the real folders on a Linux box:
