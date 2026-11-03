@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { runTerminalPlan } from '@/run-terminal-plan';
+import { removeFolder } from './support/remove-folder';
 
 let root: string;
 
@@ -9,7 +10,7 @@ beforeEach(() => {
   root = mkdtempSync(`${tmpdir()}/favo-plan-`).replaceAll('\\', '/');
 });
 
-afterEach(() => rmSync(root, { recursive: true, force: true, maxRetries: 5 }));
+afterEach(() => removeFolder(root));
 
 function planWith(pidFile: string) {
   return { command: process.execPath, args: ['--version'], env: {}, unsetEnv: [], pidFile };

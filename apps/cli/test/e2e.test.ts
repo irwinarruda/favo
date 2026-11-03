@@ -10,7 +10,6 @@ import {
   readFileSync,
   readlinkSync,
   realpathSync,
-  rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
@@ -19,6 +18,7 @@ import { arch, platform, tmpdir } from 'node:os';
 import { delimiter } from 'node:path';
 import { FavoVersion } from '@favo/contracts/version';
 import { installFakes } from './support/fake-bin/install-fakes';
+import { removeFolder } from './support/remove-folder';
 
 setDefaultTimeout(60_000);
 
@@ -70,7 +70,7 @@ beforeEach(() => {
   mkdirSync(remoteHome, { recursive: true });
 });
 
-afterEach(() => rmSync(root, { recursive: true, force: true }));
+afterEach(() => removeFolder(root));
 
 describe('favo update', () => {
   it('runs the provider command with the terminal attached, and reports the result', async () => {

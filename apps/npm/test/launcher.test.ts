@@ -13,6 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { removeFolder } from './support/remove-folder';
 
 setDefaultTimeout(60_000);
 
@@ -87,9 +88,9 @@ beforeAll(async () => {
   });
 });
 
-afterAll(() => {
+afterAll(async () => {
   server.stop(true);
-  rmSync(buildRoot, { recursive: true, force: true, maxRetries: 5 });
+  await removeFolder(buildRoot);
 });
 
 beforeEach(() => {
@@ -107,9 +108,7 @@ beforeEach(() => {
   };
 });
 
-afterEach(() => {
-  rmSync(root, { recursive: true, force: true, maxRetries: 5 });
-});
+afterEach(() => removeFolder(root));
 
 describe('the first run', () => {
   it('downloads, verifies and runs the binary, passing arguments and the exit code through', async () => {
