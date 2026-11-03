@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-03
+
 ### Changed
 
 - Every command that names a seat now takes the provider first, the way starting one always did: `favo resume claude work`, `favo login claude work`, `favo app claude work`, and the same for `logout`, `threads`, `path`, `inspect` and `adopt`. When favo starts a provider, favo's own options such as `--dir` and `--machine` (`-m`) go before it: `favo -m devbox claude work`. Written after the account, they now go to the provider, so `favo codex work -m devbox` asks Codex for a model called devbox.
@@ -75,7 +77,8 @@
 - A TUI that shows every machine, account and login, plus a command for everything it does.
 - Native on macOS, Linux and Windows, installed with `npm install --global favo-cli`.
 
-[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/irwinarruda/favo-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/irwinarruda/favo-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/irwinarruda/favo-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/irwinarruda/favo-cli/compare/v0.2.0...v0.3.0
