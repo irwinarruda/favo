@@ -113,7 +113,7 @@ describe('threads on a real backend', () => {
       isDirectoryGone: false,
     };
     await useApp.getState().resumeSeatThread(seat, thread);
-    const encoded = encodeArguments(['resume', 'personal', 'claude', 'abc', '--dir', `${Home}/srv`]);
+    const encoded = encodeArguments(['--dir', `${Home}/srv`, 'resume', 'claude', 'personal', 'abc']);
     expect(view.plans[0]?.args.at(-1)).toBe(`~/.favo/bin/favo --argv-b64 ${encoded}`);
   });
 });

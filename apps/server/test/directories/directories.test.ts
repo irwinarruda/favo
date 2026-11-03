@@ -83,7 +83,7 @@ describe('launching in a folder', () => {
     const { client } = await serverWithFolders();
     await client.call(addMachine, { target: 'bee@devbox' });
     const plan = await client.call(planTerminal, { ...launch, machineId: 'devbox', directory: '/srv/my app' });
-    const encoded = encodeArguments(['claude', 'personal', '--dir', '/srv/my app']);
+    const encoded = encodeArguments(['--dir', '/srv/my app', 'claude', 'personal']);
     expect(plan.args.at(-1)).toBe(`~/.favo/bin/favo --argv-b64 ${encoded}`);
   });
 });

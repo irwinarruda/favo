@@ -24,19 +24,19 @@ const Hostile = [
 describe('terminal plans', () => {
   it('resumes on another machine through favo there, which holds the thread', () => {
     const resume = { action: TerminalAction.resume, account: 'work', provider: 'claude', args: [] };
-    expect(favoArgumentsFor(resume)).toEqual(['resume', 'work', 'claude']);
+    expect(favoArgumentsFor(resume)).toEqual(['resume', 'claude', 'work']);
     expect(favoArgumentsFor({ ...resume, thread: 'abc', directory: '/srv' })).toEqual([
-      'resume',
-      'work',
-      'claude',
-      'abc',
       '--dir',
       '/srv',
+      'resume',
+      'claude',
+      'work',
+      'abc',
     ]);
     expect(favoArgumentsFor({ ...resume, args: ['--model', 'x'] })).toEqual([
       'resume',
-      'work',
       'claude',
+      'work',
       '--',
       '--model',
       'x',
@@ -83,10 +83,10 @@ describe('terminal plans', () => {
   it('carries the launch folder to the other machine', () => {
     const base = { account: 'work', provider: 'claude', args: ['-c'], action: TerminalAction.launch };
     expect(favoArgumentsFor({ ...base, directory: '/srv/app' })).toEqual([
-      'claude',
-      'work',
       '--dir',
       '/srv/app',
+      'claude',
+      'work',
       '--',
       '-c',
     ]);
@@ -131,8 +131,8 @@ describe('terminal plans', () => {
   });
   it('turns each action into the favo command that performs it', () => {
     const base = { account: 'work', provider: 'claude', args: [] };
-    expect(favoArgumentsFor({ ...base, action: TerminalAction.login })).toEqual(['login', 'work', 'claude']);
-    expect(favoArgumentsFor({ ...base, action: TerminalAction.logout })).toEqual(['logout', 'work', 'claude']);
+    expect(favoArgumentsFor({ ...base, action: TerminalAction.login })).toEqual(['login', 'claude', 'work']);
+    expect(favoArgumentsFor({ ...base, action: TerminalAction.logout })).toEqual(['logout', 'claude', 'work']);
     expect(favoArgumentsFor({ ...base, action: TerminalAction.launch })).toEqual(['claude', 'work']);
     expect(favoArgumentsFor({ ...base, args: ['-c'], action: TerminalAction.launch })).toEqual([
       'claude',

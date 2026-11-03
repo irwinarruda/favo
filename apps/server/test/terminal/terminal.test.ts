@@ -257,7 +257,7 @@ describe('terminal plans on another machine', () => {
     remotes.connect('devbox', createTestServer({ hostname: 'devbox' }).router);
     const params = { ...launchWork, action: 'resume', machineId: 'devbox', thread: 'abc' } as const;
     const plan = await client.call(planTerminal, params);
-    const encoded = encodeArguments(['resume', 'work', 'claude', 'abc']);
+    const encoded = encodeArguments(['resume', 'claude', 'work', 'abc']);
     expect(plan.args).toEqual(['-t', '--', 'bee@devbox', `~/.favo/bin/favo --argv-b64 ${encoded}`]);
   });
   it('uses the provider command name, which is what favo accepts', async () => {
@@ -266,7 +266,7 @@ describe('terminal plans on another machine', () => {
     const params = { ...launchWork, machineId: 'devbox', provider: 'antigravity' } as const;
     expect((await client.call(planTerminal, params)).args.at(-1)).toEndWith(encodeArguments(['agy', 'work']));
     const login = { ...params, action: 'login' } as const;
-    expect((await client.call(planTerminal, login)).args.at(-1)).toEndWith(encodeArguments(['login', 'work', 'agy']));
+    expect((await client.call(planTerminal, login)).args.at(-1)).toEndWith(encodeArguments(['login', 'agy', 'work']));
   });
   it('uses the Windows path for a Windows machine', async () => {
     const { client, ssh } = await serverWithWork();

@@ -1,9 +1,11 @@
 export const HelpText = `favo, a honeycomb for your AI subscriptions
 
   favo                               open the comb
-  favo claude [account] [-- args]    run a provider as an account
+  favo claude [account] [args]       run a provider as an account
                                      (claude, codex, agy, opencode)
-                                     --dir <folder> starts it in that folder
+                                     the args after it go to the provider
+  favo --dir <folder> claude [account]
+                                     start it in that folder
 
 Accounts
   favo list [--json]                 every machine, account and login
@@ -12,22 +14,22 @@ Accounts
   favo add <account>                 add a cell
   favo rename <account> <new name>   rename a cell, its folder stays put
   favo rm <account>                  move a cell to the trash
-  favo login <account> <provider>    sign in, with the official command
-  favo logout <account> <provider>   sign out
-  favo path <account> <provider>     print the config path, for T3 Code
-  favo app <account> <provider>      open the Claude or ChatGPT app as an account
+  favo login <provider> <account>    sign in, with the official command
+  favo logout <provider> <account>   sign out
+  favo path <provider> <account>     print the config path, for T3 Code
+  favo app <provider> <account>      open the Claude or ChatGPT app as an account
                                      (claude, codex), on this computer
                                      --close closes it first if it is open
   favo sync [account]                repair shared links
-  favo inspect <account> <provider>  show what is shared and what is private
-  favo adopt <account> <provider> <folder>
+  favo inspect <provider> <account>  show what is shared and what is private
+  favo adopt <provider> <account> <folder>
                                      move an existing config folder in
 
 Threads
-  favo resume <account> <provider> [thread]
+  favo resume <provider> <account> [thread] [args]
                                      go back to a thread, in its own folder
                                      the newest one here, unless you pick one
-  favo threads <account> <provider>  the threads favo kept for a seat
+  favo threads <provider> <account>  the threads favo kept for a seat
   favo hooks status                  whether each provider tells favo its thread
   favo hooks install                 add favo's hook to your provider config
   favo hooks uninstall               take it out again
@@ -50,5 +52,6 @@ Themes
   favo theme <theme>                 use a theme, saved in ~/.favo/config.json
                                      custom themes live in ~/.favo/themes
 
-Most commands take --machine <machine> to run on another computer.
+Most commands take --machine <machine> to run on another computer. When favo
+starts a provider, its own options go before the provider.
 `;

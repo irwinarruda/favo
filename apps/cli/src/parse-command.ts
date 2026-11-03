@@ -56,10 +56,7 @@ export type Command = {
 };
 
 export function parseCommand(rawArgv: string[]): Command {
-  const argv = decodedArgv(rawArgv);
-  const separator = argv.indexOf('--');
-  const passthrough = separator >= 0 ? argv.slice(separator + 1) : [];
-  const { words, flags } = readFlags(separator >= 0 ? argv.slice(0, separator) : argv);
+  const { words, flags, passthrough } = readArguments(decodedArgv(rawArgv));
   const base = { isJson: flags.isJson, machineId: flags.machine, directory: flags.directory, args: passthrough };
   const [first, second, third, fourth] = words;
   if (flags.isVersion) return { ...base, kind: CommandKind.version };
@@ -88,22 +85,22 @@ export function parseCommand(rawArgv: string[]): Command {
     case 'remove':
       return { ...base, kind: CommandKind.remove, account: required(second, 'favo rm <account>') };
     case 'login':
-      return { ...base, kind: CommandKind.login, ...seatOf(second, third, 'favo login <account> <provider>') };
+      return { ...base, kind: CommandKind.login, ...seatOf(second, third, 'favo login <provider> <account>') };
     case 'logout':
-      return { ...base, kind: CommandKind.logout, ...seatOf(second, third, 'favo logout <account> <provider>') };
+      return { ...base, kind: CommandKind.logout, ...seatOf(second, third, 'favo logout <provider> <account>') };
     case 'resume':
       return {
         ...base,
         kind: CommandKind.resume,
         target: fourth,
-        ...seatOf(second, third, 'favo resume <account> <provider> [thread]'),
+        ...seatOf(second, third, 'favo resume <provider> <account> [thread]'),
       };
     case 'threads':
-      return { ...base, kind: CommandKind.threads, ...seatOf(second, third, 'favo threads <account> <provider>') };
+      return { ...base, kind: CommandKind.threads, ...seatOf(second, third, 'favo threads <provider> <account>') };
     case 'hooks':
       return parseHooks(base, second);
     case 'path':
-      return { ...base, kind: CommandKind.path, ...seatOf(second, third, 'favo path <account> <provider>') };
+      return { ...base, kind: CommandKind.path, ...seatOf(second, third, 'favo path <provider> <account>') };
     case 'app':
       assertDomain(
         flags.machine === undefined || flags.machine === LocalMachineId,
@@ -114,16 +111,16 @@ export function parseCommand(rawArgv: string[]): Command {
         ...base,
         kind: CommandKind.app,
         canClose: flags.canClose,
-        ...seatOf(second, third, 'favo app <account> <provider> [--close]'),
+        ...seatOf(second, third, 'favo app <provider> <account> [--close]'),
       };
     case 'inspect':
-      return { ...base, kind: CommandKind.inspect, ...seatOf(second, third, 'favo inspect <account> <provider>') };
+      return { ...base, kind: CommandKind.inspect, ...seatOf(second, third, 'favo inspect <provider> <account>') };
     case 'adopt':
       return {
         ...base,
         kind: CommandKind.adopt,
-        ...seatOf(second, third, 'favo adopt <account> <provider> <folder>'),
-        from: required(fourth, 'favo adopt <account> <provider> <folder>'),
+        ...seatOf(second, third, 'favo adopt <provider> <account> <folder>'),
+        from: required(fourth, 'favo adopt <provider> <account> <folder>'),
       };
     case 'sync':
       return { ...base, kind: CommandKind.sync, account: second };
@@ -184,7 +181,7 @@ function parseMachine(base: Omit<Command, 'kind'>, name: string | undefined, act
   }
 }
 
-function readFlags(argv: string[]) {
+function readArguments(argv: string[]) {
   const words: string[] = [];
   const flags = {
     isJson: false,
@@ -199,6 +196,8 @@ function readFlags(argv: string[]) {
   };
   for (let index = 0; index < argv.length; index++) {
     const word = argv[index]!;
+    if (word === '--') return { words, flags, passthrough: argv.slice(index + 1) };
+    if (isSeatRead(words, word)) return { words, flags, passthrough: argv.slice(index) };
     if (word === '--json') flags.isJson = true;
     else if (word === '--help' || word === '-h') flags.isHelp = true;
     else if (word === '--version' || word === '-v') flags.isVersion = true;
@@ -212,13 +211,21 @@ function readFlags(argv: string[]) {
     else if (word.startsWith('-')) throw new DomainError(DomainErrorCode.invalidParams, `Unknown flag "${word}".`);
     else words.push(word);
   }
-  return { words, flags };
+  return { words, flags, passthrough: [] };
 }
 
-function seatOf(account: string | undefined, provider: string | undefined, usage: string) {
+function isSeatRead(words: string[], next: string) {
+  const [first] = words;
+  const isFlag = next.startsWith('-');
+  if (first !== undefined && findProvider(first)) return words.length === 2 || (words.length === 1 && isFlag);
+  if (first === 'resume') return words.length === 4 || (words.length === 3 && isFlag);
+  return false;
+}
+
+function seatOf(provider: string | undefined, account: string | undefined, usage: string) {
   const spec = findProvider(required(provider, usage));
-  if (!spec) throw new DomainError(DomainErrorCode.unknownProvider, `Unknown provider "${provider}".`);
-  return { account: required(account, usage), provider: spec.id };
+  if (!spec) throw new DomainError(DomainErrorCode.unknownProvider, `Unknown provider "${provider}". Usage: ${usage}`);
+  return { provider: spec.id, account: required(account, usage) };
 }
 
 function required(value: string | undefined, usage: string) {

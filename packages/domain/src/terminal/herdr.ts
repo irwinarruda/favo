@@ -22,7 +22,7 @@ export function herdrAgentOf(account: string, provider: ProviderId) {
 }
 
 export function herdrResumeCommand(account: string, provider: ProviderId, threadId: string) {
-  return ['favo', 'resume', account, Providers[provider].executable, threadId];
+  return ['favo', 'resume', Providers[provider].executable, account, threadId];
 }
 
 export function hookReportArguments(provider: ProviderId, threadId: string) {

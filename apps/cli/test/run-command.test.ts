@@ -206,22 +206,22 @@ describe('commands', () => {
     const { run, lines, client, desktopApps } = harness();
     desktopApps.install('codex');
     await client.call(createAccount, { name: 'work' });
-    expect(await run('app', 'work', 'codex')).toBe(0);
+    expect(await run('app', 'codex', 'work')).toBe(0);
     expect(lines).toEqual(['⬢ ChatGPT is opening as work.']);
     expect(desktopApps.opened[0]?.provider).toBe('codex');
   });
   it('says so when the app is not installed', async () => {
     const { run, client } = harness();
     await client.call(createAccount, { name: 'work' });
-    await expect(run('app', 'work', 'claude')).rejects.toThrow('The Claude app is not installed here.');
+    await expect(run('app', 'claude', 'work')).rejects.toThrow('The Claude app is not installed here.');
   });
   it('tells you how to replace an app that is already open, and leaves it alone', async () => {
     const { run, lines, client, desktopApps } = harness();
     desktopApps.install('claude');
     desktopApps.run('claude');
     await client.call(createAccount, { name: 'work' });
-    expect(await run('app', 'work', 'claude')).toBe(1);
-    expect(lines).toEqual(['Claude is open. To close it and reopen: favo app work claude --close']);
+    expect(await run('app', 'claude', 'work')).toBe(1);
+    expect(lines).toEqual(['Claude is open. To close it and reopen: favo app claude work --close']);
     expect(desktopApps.quitCalls).toEqual([]);
   });
   it('closes an open app when told to', async () => {
@@ -229,7 +229,7 @@ describe('commands', () => {
     desktopApps.install('claude');
     desktopApps.run('claude');
     await client.call(createAccount, { name: 'work' });
-    expect(await run('app', 'work', 'claude', '--close')).toBe(0);
+    expect(await run('app', 'claude', 'work', '--close')).toBe(0);
     expect(desktopApps.quitCalls).toEqual(['claude']);
   });
   it('lists themes and marks the active one', async () => {
@@ -343,7 +343,7 @@ describe('commands', () => {
     expect(plans.map((plan) => plan.env.CLAUDE_CONFIG_DIR)).toEqual([folder, folder]);
     await run('rename', 'side', 'hive');
     expect(lines.at(-1)).toContain('side is now hive');
-    await run('path', 'hive', 'claude');
+    await run('path', 'claude', 'hive');
     expect(lines.at(-1)).toBe(folder);
   });
   it('renames the base and still runs it by default', async () => {
@@ -363,7 +363,7 @@ describe('commands', () => {
     const { run, lines, client, fileSystem } = harness();
     await seedClaudeBase(fileSystem);
     await client.call(createAccount, { name: 'work' });
-    await run('path', 'work', 'claude');
+    await run('path', 'claude', 'work');
     expect(lines).toEqual([`${Home}/.favo/accounts/work/claude`]);
     expect((await fileSystem.entry(lines[0]!)).kind).toBe('directory');
   });
@@ -413,8 +413,8 @@ describe('commands', () => {
     await seedClaudeBase(fileSystem);
     await client.call(createAccount, { name: 'work' });
     await run('sync');
-    await run('path', 'work', 'claude');
-    await run('inspect', 'work', 'claude');
+    await run('path', 'claude', 'work');
+    await run('inspect', 'claude', 'work');
     const output = lines.join('\n');
     expect(output).toContain('linked     skills');
     expect(output).toContain('private    .claude.json');
@@ -441,31 +441,31 @@ describe('threads', () => {
 
   it('lists what a seat kept, by position', async () => {
     const { run, lines } = await withThread();
-    expect(await run('threads', 'work', 'claude')).toBe(0);
+    expect(await run('threads', 'claude', 'work')).toBe(0);
     expect(lines.join('\n')).toMatch(new RegExp(`^ 1  .+ 0000abcd  ${Project}$`));
   });
   it('finds a cell by the name you gave it', async () => {
     const { run, lines, client } = await withThread();
     await client.call(renameAccount, { name: 'work', newName: 'side' });
-    await run('threads', 'side', 'claude');
+    await run('threads', 'claude', 'side');
     expect(lines.at(-1)).toContain('0000abcd');
   });
   it('says when a seat has none', async () => {
     const { run, lines } = await withThread();
-    await run('threads', 'personal', 'claude');
+    await run('threads', 'claude', 'personal');
     expect(lines).toEqual(['No threads yet.']);
   });
   it('warns about a guess and a folder that is gone', async () => {
     const { run, lines, clis, client } = await withThread();
     clis.codex.foundThreads = [{ id: 'found-1', directory: '/gone', updatedAt: '2026-10-30T12:00:00.000Z' }];
     await client.call(provisionSeat, { account: 'work', provider: 'codex' });
-    await run('threads', 'work', 'codex');
+    await run('threads', 'codex', 'work');
     expect(lines[0]).toContain('/gone · folder gone · a guess');
     expect(lines[1]).toContain('With two sessions in one folder it can pick the wrong one.');
   });
   it('gives machine readable output', async () => {
     const { run, lines } = await withThread();
-    await run('threads', 'work', 'claude', '--json');
+    await run('threads', 'claude', 'work', '--json');
     expect(JSON.parse(lines[0]!)[0]).toMatchObject({ isGuess: false, directory: Project });
   });
   it('explains a machine on an older favo instead of printing a raw error', async () => {
@@ -479,7 +479,7 @@ describe('threads', () => {
         return { id: request.id, ok: false, error };
       },
     });
-    expect(await run('threads', 'work', 'claude', '-m', 'old')).toBe(1);
+    expect(await run('threads', 'claude', 'work', '-m', 'old')).toBe(1);
     expect(await run('hooks', '-m', 'old')).toBe(1);
     expect(lines).toEqual(
       Array(2).fill('old runs an older favo, which keeps no threads. To update it: favo machine install old')
@@ -487,13 +487,13 @@ describe('threads', () => {
   });
   it('resumes through a plan', async () => {
     const { run, plans } = await withThread();
-    await run('resume', 'work', 'claude');
+    await run('resume', 'claude', 'work');
     expect(plans[0]?.args.slice(0, 2)).toEqual(['--resume', '11111111-aaaa-bbbb-cccc-00000000abcd']);
     expect(plans[0]?.cwd).toBe(Project);
   });
   it('passes what follows -- on to the resumed provider', async () => {
     const { run, plans } = await withThread();
-    await run('resume', 'work', 'claude', '--', '--model', 'x');
+    await run('resume', 'claude', 'work', '--', '--model', 'x');
     expect(plans[0]?.args.slice(-2)).toEqual(['--model', 'x']);
   });
 });

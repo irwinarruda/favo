@@ -261,7 +261,7 @@ describe('telling Herdr', () => {
       {
         agent: 'claude',
         threadId: 'abc',
-        resume: ['favo', 'resume', 'work', 'claude', 'abc'],
+        resume: ['favo', 'resume', 'claude', 'work', 'abc'],
         seq: Date.parse('2026-10-31T12:00:00.000Z') * 1000,
         pane: { binary: '/bin/herdr', paneId: 'w1:p1' },
       },

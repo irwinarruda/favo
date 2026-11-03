@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Every command that names a seat now takes the provider first, the way starting one always did: `favo resume claude work`, `favo login claude work`, `favo app claude work`, and the same for `logout`, `threads`, `path`, `inspect` and `adopt`. When favo starts a provider, favo's own options such as `--dir` and `--machine` go before it: `favo --dir ~/app claude work`.
+- Herdr panes saved by an older favo start fresh once after this update. Update every machine with `favo update`, because an older favo on another machine cannot sign in, sign out or resume when this one asks.
+
+### Fixed
+
+- Options and prompts after the account now reach the provider without `--`: `favo claude work --chrome` runs `claude --chrome` as work, and `favo claude work "fix the bug"` no longer drops the prompt. `--` still works.
+
 ## [0.5.0] - 2026-11-02
 
 ### Added
