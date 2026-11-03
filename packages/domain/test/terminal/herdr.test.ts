@@ -38,7 +38,7 @@ describe('who reports to Herdr', () => {
 describe('the report', () => {
   it('sends the command that brings this thread back', () => {
     const resume = herdrResumeCommand('work', ProviderId.claude, 'abc');
-    expect(resume).toEqual(['favo', 'resume', 'work', 'claude', 'abc']);
+    expect(resume).toEqual(['favo', 'resume', 'claude', 'work', 'abc']);
     const report = { agent: 'claude', threadId: 'abc', resume, seq: 5 };
     expect(herdrReportArguments({ binary: '/bin/herdr', paneId: 'w1:p1' }, report)).toEqual([
       'pane',
@@ -55,8 +55,8 @@ describe('the report', () => {
       '--',
       'favo',
       'resume',
-      'work',
       'claude',
+      'work',
       'abc',
     ]);
   });

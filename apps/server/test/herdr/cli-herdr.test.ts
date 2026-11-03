@@ -5,7 +5,7 @@ import { HerdrAnswer } from '@/modules/herdr/gateways/herdr';
 import { ScriptedProcessRunner } from '@/modules/system/gateways/scripted.process-runner';
 
 const Pane = { binary: '/usr/bin/herdr', paneId: 'p1' };
-const Report = { agent: 'claude', threadId: 'abc', resume: ['favo', 'resume', 'work', 'claude', 'abc'], seq: 7 };
+const Report = { agent: 'claude', threadId: 'abc', resume: ['favo', 'resume', 'claude', 'work', 'abc'], seq: 7 };
 const Line = [Pane.binary, ...herdrReportArguments(Pane, Report)].join(' ');
 
 async function answerTo(reply: { code: number; stdout?: string; stderr?: string }) {

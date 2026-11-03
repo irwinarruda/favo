@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Every command that names a seat now takes the provider first, the way starting one always did: `favo resume claude work`, `favo login claude work`, `favo app claude work`, and the same for `logout`, `threads`, `path`, `inspect` and `adopt`. When favo starts a provider, favo's own options such as `--dir` and `--machine` (`-m`) go before it: `favo -m devbox claude work`. Written after the account, they now go to the provider, so `favo codex work -m devbox` asks Codex for a model called devbox.
+- A machine on an older favo now shows as outdated, with no accounts, until you update it, because the two versions no longer read each other's commands. `favo update` updates them all.
+- A Herdr pane saved by an older favo shows an error when Herdr restarts, instead of going back to its thread. Start that seat again by hand, and Herdr brings it back from then on.
+
+### Fixed
+
+- Options and prompts after the account now reach the provider without `--`: `favo claude work --chrome` runs `claude --chrome` as work, and `favo claude work "fix the bug"` no longer drops the prompt. `--` still works.
+
 ## [0.5.0] - 2026-11-02
 
 ### Added

@@ -4,33 +4,46 @@ import { CommandKind, parseCommand } from '@/parse-command';
 
 describe('going back to a thread', () => {
   it('parses a resume, with or without a thread', () => {
-    expect(parseCommand(['resume', 'work', 'claude'])).toMatchObject({
+    expect(parseCommand(['resume', 'claude', 'work'])).toMatchObject({
       kind: 'resume',
       account: 'work',
       provider: 'claude',
       target: undefined,
     });
-    expect(parseCommand(['resume', 'work', 'codex', '2'])).toMatchObject({ provider: 'codex', target: '2' });
+    expect(parseCommand(['resume', 'codex', 'work', '2'])).toMatchObject({ provider: 'codex', target: '2' });
   });
-  it('takes a folder and a machine', () => {
-    expect(parseCommand(['resume', 'work', 'claude', '--dir', '/srv', '-m', 'devbox'])).toMatchObject({
+  it('hands everything after the seat and the thread to the provider', () => {
+    expect(parseCommand(['resume', 'claude', 'work', '--model', 'x'])).toMatchObject({
+      target: undefined,
+      args: ['--model', 'x'],
+    });
+    expect(parseCommand(['resume', 'claude', 'work', '2', '-m', 'x', 'go on'])).toMatchObject({
+      target: '2',
+      machineId: undefined,
+      args: ['-m', 'x', 'go on'],
+    });
+  });
+  it('takes a folder and a machine before the seat', () => {
+    expect(parseCommand(['--dir', '/srv', 'resume', '-m', 'devbox', 'claude', 'work'])).toMatchObject({
+      kind: CommandKind.resume,
       directory: '/srv',
       machineId: 'devbox',
+      args: [],
     });
   });
   it('needs a seat', () => {
-    expect(() => parseCommand(['resume', 'work'])).toThrow('Usage: favo resume <account> <provider> [thread]');
-    expect(() => parseCommand(['threads'])).toThrow('Usage: favo threads <account> <provider>');
+    expect(() => parseCommand(['resume', 'claude'])).toThrow('Usage: favo resume <provider> <account> [thread]');
+    expect(() => parseCommand(['threads'])).toThrow('Usage: favo threads <provider> <account>');
   });
   it('parses the list of threads', () => {
-    expect(parseCommand(['threads', 'work', 'agy', '--json'])).toMatchObject({
+    expect(parseCommand(['threads', 'agy', 'work', '--json'])).toMatchObject({
       kind: 'threads',
       provider: 'antigravity',
       isJson: true,
     });
   });
   it('runs a resume sent over ssh the same way', () => {
-    const parsed = parseCommand(['--argv-b64', encodeArguments(['resume', 'work', 'claude', 'abc'])]);
+    const parsed = parseCommand(['--argv-b64', encodeArguments(['resume', 'claude', 'work', 'abc'])]);
     expect(parsed).toMatchObject({ kind: 'resume', target: 'abc' });
   });
 });
@@ -70,11 +83,33 @@ describe('parseCommand', () => {
     expect(parseCommand(['agy', 'work']).provider).toBe('antigravity');
     expect(parseCommand(['antigravity', 'work']).provider).toBe('antigravity');
   });
-  it('hands everything after -- to the provider, flags included', () => {
+  it('hands everything after the account to the provider, untouched', () => {
+    expect(parseCommand(['claude', 'match', '--chrome'])).toMatchObject({ account: 'match', args: ['--chrome'] });
+    expect(parseCommand(['codex', 'work', '-m', 'gpt-5', 'fix the bug', '--json'])).toMatchObject({
+      account: 'work',
+      machineId: undefined,
+      isJson: false,
+      args: ['-m', 'gpt-5', 'fix the bug', '--json'],
+    });
+  });
+  it('reads a flag right after the provider as the provider own, as personal', () => {
+    expect(parseCommand(['claude', '--chrome', 'work'])).toMatchObject({
+      account: 'personal',
+      args: ['--chrome', 'work'],
+    });
+  });
+  it('leaves help and version after the seat to the provider', () => {
+    expect(parseCommand(['codex', 'work', '-h'])).toMatchObject({ kind: CommandKind.launch, args: ['-h'] });
+    expect(parseCommand(['claude', '--version'])).toMatchObject({ kind: CommandKind.launch, args: ['--version'] });
+    expect(parseCommand(['--help', 'claude']).kind).toBe(CommandKind.help);
+  });
+  it('still ends the seat at --', () => {
     expect(parseCommand(['claude', 'work', '--', '--resume', '-c']).args).toEqual(['--resume', '-c']);
+    expect(parseCommand(['claude', '--', 'fix it'])).toMatchObject({ account: 'personal', args: ['fix it'] });
+    expect(parseCommand(['claude', 'work', '--', '--', 'x']).args).toEqual(['--', 'x']);
   });
   it('opens a desktop app as an account', () => {
-    expect(parseCommand(['app', 'work', 'codex'])).toMatchObject({
+    expect(parseCommand(['app', 'codex', 'work'])).toMatchObject({
       kind: CommandKind.app,
       account: 'work',
       provider: 'codex',
@@ -82,14 +117,14 @@ describe('parseCommand', () => {
     });
   });
   it('closes the app first only when told to', () => {
-    expect(parseCommand(['app', 'work', 'claude', '--close']).canClose).toBe(true);
+    expect(parseCommand(['app', 'claude', 'work', '--close']).canClose).toBe(true);
   });
   it('refuses to open a window on another machine, before asking that machine anything', () => {
-    expect(() => parseCommand(['app', 'work', 'claude', '--machine', 'devbox'])).toThrow('takes no --machine');
-    expect(parseCommand(['app', 'work', 'claude', '--machine', 'local']).kind).toBe(CommandKind.app);
+    expect(() => parseCommand(['app', 'claude', 'work', '--machine', 'devbox'])).toThrow('takes no --machine');
+    expect(parseCommand(['app', 'claude', 'work', '--machine', 'local']).kind).toBe(CommandKind.app);
   });
-  it('needs an account and a provider to open an app', () => {
-    expect(() => parseCommand(['app', 'work'])).toThrow('favo app <account> <provider>');
+  it('needs a provider and an account to open an app', () => {
+    expect(() => parseCommand(['app', 'claude'])).toThrow('favo app <provider> <account>');
   });
   it('reads usage, for every machine or for one', () => {
     expect(parseCommand(['usage'])).toMatchObject({ kind: CommandKind.usage, isJson: false, machineId: undefined });
@@ -99,22 +134,23 @@ describe('parseCommand', () => {
       machineId: 'devbox',
     });
   });
-  it('takes a machine anywhere', () => {
+  it('takes a machine anywhere before the seat', () => {
     expect(parseCommand(['list', '--json']).isJson).toBe(true);
     expect(parseCommand(['add', 'side', '-m', 'devbox']).machineId).toBe('devbox');
     expect(parseCommand(['--machine', 'devbox', 'claude', 'work']).machineId).toBe('devbox');
   });
   it('reads seat commands', () => {
-    expect(parseCommand(['login', 'work', 'agy'])).toMatchObject({
+    expect(parseCommand(['login', 'agy', 'work'])).toMatchObject({
       kind: CommandKind.login,
       account: 'work',
       provider: 'antigravity',
     });
-    expect(parseCommand(['path', 'work', 'codex']).kind).toBe(CommandKind.path);
+    expect(parseCommand(['path', 'codex', 'work']).kind).toBe(CommandKind.path);
   });
   it('reads adopt with its folder', () => {
-    expect(parseCommand(['adopt', 'work', 'claude', '~/.claude-work'])).toMatchObject({
+    expect(parseCommand(['adopt', 'claude', 'work', '~/.claude-work'])).toMatchObject({
       kind: CommandKind.adopt,
+      account: 'work',
       from: '~/.claude-work',
     });
   });
@@ -139,7 +175,7 @@ describe('parseCommand', () => {
     expect(() => parseCommand(['rename', 'work'])).toThrow('favo rename <account> <new name>');
   });
   it('takes the folder to start in, and keeps it out of the provider arguments', () => {
-    const command = parseCommand(['claude', 'work', '--dir', '/srv/app', '--', '-c']);
+    const command = parseCommand(['--dir', '/srv/app', 'claude', 'work', '--', '-c']);
     expect(command).toMatchObject({ directory: '/srv/app', args: ['-c'] });
   });
   it('reads theme commands', () => {
@@ -148,7 +184,7 @@ describe('parseCommand', () => {
   });
   it('reads arguments that crossed ssh encoded, exactly as they were sent', () => {
     const prompt = 'a" & calc & "b\n$(calc) %PATH% it\'s';
-    const sent = ['claude', 'work', '--dir', '/srv/my app', '-m', 'devbox', '--', '-p', prompt];
+    const sent = ['--dir', '/srv/my app', '-m', 'devbox', 'claude', 'work', '--', '-p', prompt];
     const command = parseCommand(['--argv-b64', encodeArguments(sent)]);
     expect(command).toMatchObject({
       kind: CommandKind.launch,
@@ -160,7 +196,7 @@ describe('parseCommand', () => {
     });
   });
   it('reads the same command from encoded and plain arguments', () => {
-    const plain = ['login', 'work', 'agy'];
+    const plain = ['login', 'agy', 'work'];
     expect(parseCommand(['--argv-b64', encodeArguments(plain)])).toEqual(parseCommand(plain));
   });
   it('refuses encoded arguments it cannot trust, with a clear error', () => {
@@ -186,8 +222,11 @@ describe('parseCommand', () => {
   });
   it('gives usage instead of guessing', () => {
     expect(() => parseCommand(['add'])).toThrow('Usage: favo add <account>');
-    expect(() => parseCommand(['login', 'work'])).toThrow('Usage');
-    expect(() => parseCommand(['login', 'work', 'gemini'])).toThrow('Unknown provider');
+    expect(() => parseCommand(['login', 'claude'])).toThrow('Usage');
+    expect(() => parseCommand(['login', 'gemini', 'work'])).toThrow('Unknown provider');
+    expect(() => parseCommand(['login', 'work', 'claude'])).toThrow(
+      'Unknown provider "work". Usage: favo login <provider> <account>'
+    );
     expect(() => parseCommand(['fly'])).toThrow('Unknown command');
     expect(() => parseCommand(['list', '--nope'])).toThrow('Unknown flag');
   });

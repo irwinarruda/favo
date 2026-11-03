@@ -134,7 +134,7 @@ describe('favo usage', () => {
   });
   it('reads a seat that lives in a cell, from its own folder', async () => {
     await favo(['add', 'work']);
-    const path = (await favo(['path', 'work', 'claude'])).stdout.trim();
+    const path = (await favo(['path', 'claude', 'work'])).stdout.trim();
     writeFileSync(`${path}/identity`, 'work@bee.dev');
     const { stdout } = await favo(['usage']);
     expect(stdout).toContain('Session');
@@ -149,7 +149,7 @@ describe('favo usage', () => {
   });
   it('tells seats apart from inside a seat, whatever its shell inherited', async () => {
     await favo(['add', 'work']);
-    const path = (await favo(['path', 'work', 'claude'])).stdout.trim();
+    const path = (await favo(['path', 'claude', 'work'])).stdout.trim();
     writeFileSync(`${path}/identity`, 'work@bee.dev');
     const { stdout } = await favo(['usage', '--json'], { CLAUDE_CONFIG_DIR: path });
     const [{ seats }] = JSON.parse(stdout);
@@ -217,7 +217,7 @@ describe('favo and the provider hooks', () => {
     const project = await installed();
     const launched = await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
     expect(launched.stdout).not.toContain('hook wrote to the conversation');
-    const { stdout } = await favo(['threads', 'work', 'claude', '--json'], {}, project);
+    const { stdout } = await favo(['threads', 'claude', 'work', '--json'], {}, project);
     expect(threadsOf(stdout)).toMatchObject([{ id: Session, directory: project, isGuess: false }]);
   });
   it('reads a report that starts with byte order marks, as Windows PowerShell sends it', async () => {
@@ -234,7 +234,7 @@ describe('favo and the provider hooks', () => {
       stdin: new TextEncoder().encode(payload),
     });
     expect(await child.exited).toBe(0);
-    const { stdout } = await favo(['threads', 'work', 'claude', '--json'], {}, project);
+    const { stdout } = await favo(['threads', 'claude', 'work', '--json'], {}, project);
     expect(threadsOf(stdout)).toMatchObject([{ id: Session, directory: project }]);
   });
   it('keeps a folder with an accent in its name', async () => {
@@ -242,13 +242,13 @@ describe('favo and the provider hooks', () => {
     mkdirSync(`${root}/projeção`);
     const project = realpathSync(`${root}/projeção`).replaceAll('\\', '/');
     await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
-    const { stdout } = await favo(['threads', 'work', 'claude', '--json'], {}, project);
+    const { stdout } = await favo(['threads', 'claude', 'work', '--json'], {}, project);
     expect(threadsOf(stdout)).toMatchObject([{ id: Session, directory: project }]);
   });
   it('goes back to it from anywhere, in its own folder, with what you pass after --', async () => {
     const project = await installed();
     await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
-    const { stdout } = await favo(['resume', 'work', 'claude', '--', '--model', 'x']);
+    const { stdout } = await favo(['resume', 'claude', 'work', '--', '--model', 'x']);
     expect(stdout).toContain(`args=--resume ${Session} --model x`);
     expect(stdout).toContain(`cwd=${project}`);
     expect(stdout).toContain(`home=${home}/.favo/accounts/work/claude`);
@@ -257,24 +257,24 @@ describe('favo and the provider hooks', () => {
     const project = await installed();
     await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
     await favo(['rename', 'work', 'side']);
-    const { stdout } = await favo(['resume', 'side', 'claude']);
+    const { stdout } = await favo(['resume', 'claude', 'side']);
     expect(stdout).toContain(`args=--resume ${Session}`);
   });
   it('finds it by the old name too, which a saved Herdr pane still holds', async () => {
     const project = await installed();
     await favo(['claude', 'work'], { FAKE_SESSION: Session }, project);
     await favo(['rename', 'work', 'side']);
-    const { stdout } = await favo(['resume', 'work', 'claude', Session]);
+    const { stdout } = await favo(['resume', 'claude', 'work', Session]);
     expect(stdout).toContain(`home=${home}/.favo/accounts/work/claude`);
   });
   it('does not show a session that never got a message', async () => {
     const project = await installed();
     await favo(['claude', 'work'], { FAKE_SESSION: Session, FAKE_EMPTY_SESSION: '1' }, project);
-    expect((await favo(['threads', 'work', 'claude'], {}, project)).stdout).toContain('No threads yet.');
+    expect((await favo(['threads', 'claude', 'work'], {}, project)).stdout).toContain('No threads yet.');
   });
   it('explains itself when there is nothing to go back to', async () => {
     await installed();
-    const { stderr, code } = await favo(['resume', 'work', 'claude']);
+    const { stderr, code } = await favo(['resume', 'claude', 'work']);
     expect(code).toBe(1);
     expect(stderr).toContain('favo has no thread for work on Claude Code');
   });
@@ -307,7 +307,7 @@ describe('favo and the provider hooks', () => {
     expect(report).toStartWith(
       `pane report-agent-session p1 --source favo --agent claude --agent-session-id ${Session} --seq `
     );
-    expect(report).toEndWith(`-- favo resume work claude ${Session}`);
+    expect(report).toEndWith(`-- favo resume claude work ${Session}`);
     expect(release).toStartWith('pane release-agent p1 --source favo --agent claude --seq ');
   });
   it('asks Herdr again while it is not ready for the report', async () => {
@@ -329,7 +329,7 @@ describe('favo and the provider hooks', () => {
     expect(await child.exited).toBe(0);
     const calls = readFileSync(log, 'utf8').trim().split('\n');
     expect(calls).toHaveLength(2);
-    expect(calls[1]).toEndWith(`-- favo resume work claude ${Session}`);
+    expect(calls[1]).toEndWith(`-- favo resume claude work ${Session}`);
   });
   it('does nothing outside favo, quietly', async () => {
     await installed();
@@ -383,7 +383,7 @@ describe('favo and the provider hooks', () => {
 describe('favo on this machine', () => {
   it('adds an account, links the shared walls and keeps the login sealed', async () => {
     expect((await favo(['add', 'work'])).code).toBe(0);
-    const path = (await favo(['path', 'work', 'claude'])).stdout.trim();
+    const path = (await favo(['path', 'claude', 'work'])).stdout.trim();
     expect(path.replaceAll('\\', '/')).toBe(`${home}/.favo/accounts/work/claude`);
     expect(readFileSync(`${path}/CLAUDE.md`, 'utf8')).toBe('be kind');
     expect(lstatSync(`${path}/skills`).isSymbolicLink()).toBe(true);
@@ -398,13 +398,13 @@ describe('favo on this machine', () => {
   });
   it('starts the provider in the folder you asked for', async () => {
     mkdirSync(`${root}/project`);
-    const { stdout } = await favo(['claude', '--dir', `${root}/project`]);
+    const { stdout } = await favo(['--dir', `${root}/project`, 'claude']);
     expect(realpathSync(/cwd=(\S+)/.exec(stdout)![1]!).replaceAll('\\', '/')).toBe(
       realpathSync(`${root}/project`).replaceAll('\\', '/')
     );
   });
   it('refuses a folder that is not there', async () => {
-    const result = await favo(['claude', '--dir', `${root}/nothing`]);
+    const result = await favo(['--dir', `${root}/nothing`, 'claude']);
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('No folder at');
   });
@@ -413,14 +413,14 @@ describe('favo on this machine', () => {
   });
   it('keeps two accounts signed in at once', async () => {
     await favo(['add', 'work']);
-    await favo(['login', 'work', 'claude']);
+    await favo(['login', 'claude', 'work']);
     const { stdout } = await favo(['list']);
     expect(stdout).toContain('personal@bee.dev');
     expect(stdout).toContain('signed-in@bee.dev');
   });
   it('reads Codex identity through the app server of each account', async () => {
     await favo(['add', 'work']);
-    const path = (await favo(['path', 'work', 'codex'])).stdout.trim();
+    const path = (await favo(['path', 'codex', 'work'])).stdout.trim();
     writeFileSync(`${path}/identity`, 'codex@bee.dev');
     expect((await favo(['list'])).stdout).toContain('codex@bee.dev · plus');
   });
@@ -439,7 +439,7 @@ describe('favo on this machine', () => {
   });
   it('heals a link at launch, without a schedule', async () => {
     await favo(['add', 'work']);
-    await favo(['path', 'work', 'claude']);
+    await favo(['path', 'claude', 'work']);
     mkdirSync(`${home}/.claude/commands`);
     await favo(['claude', 'work']);
     expect(lstatSync(`${home}/.favo/accounts/work/claude/commands`).isSymbolicLink()).toBe(true);
@@ -468,7 +468,7 @@ describe('favo on this machine', () => {
   it('adopts an old config folder', async () => {
     mkdirSync(`${home}/.claude-work/projects`, { recursive: true });
     writeFileSync(`${home}/.claude-work/projects/thread.jsonl`, 'hello');
-    expect((await favo(['adopt', 'work', 'claude', '~/.claude-work'])).code).toBe(0);
+    expect((await favo(['adopt', 'claude', 'work', '~/.claude-work'])).code).toBe(0);
     expect(readFileSync(`${home}/.favo/accounts/work/claude/projects/thread.jsonl`, 'utf8')).toBe('hello');
     expect(readFileSync(`${home}/.favo/accounts/work/claude/CLAUDE.md`, 'utf8')).toBe('be kind');
   });
@@ -477,7 +477,7 @@ describe('favo on this machine', () => {
     symlinkSync(home, `${home}/hop/back`, 'junction');
     const spellings = ['~/.claude', '.claude', './.claude/', 'hop/../.claude', 'hop/back/.claude', home];
     for (const from of spellings) {
-      const result = await favo(['adopt', 'work', 'claude', from], {}, home);
+      const result = await favo(['adopt', 'claude', 'work', from], {}, home);
       expect({ from, code: result.code }).toEqual({ from, code: 1 });
       expect(result.stderr).toContain('favo never moves');
     }
@@ -486,8 +486,8 @@ describe('favo on this machine', () => {
   });
   it('never takes the seat of another account', async () => {
     await favo(['add', 'other']);
-    await favo(['path', 'other', 'claude']);
-    const result = await favo(['adopt', 'work', 'claude', '~/.favo/accounts/other/claude']);
+    await favo(['path', 'claude', 'other']);
+    const result = await favo(['adopt', 'claude', 'work', '~/.favo/accounts/other/claude']);
     expect(result.stderr).toContain('favo never moves');
     expect(existsSync(`${home}/.favo/accounts/other/claude`)).toBe(true);
   });
@@ -497,7 +497,7 @@ describe('favo on this machine', () => {
     mkdirSync(`${root}/outside`);
     mkdirSync(`${home}/old-seat`);
     symlinkSync(`${root}/outside`, `${home}/old-seat/.gemini`, 'junction');
-    await favo(['adopt', 'work', 'agy', '~/old-seat']);
+    await favo(['adopt', 'agy', 'work', '~/old-seat']);
     expect(readdirSync(`${root}/outside`)).toEqual([]);
   });
   it('lists and removes an account named like an inherited property', async () => {
@@ -518,7 +518,7 @@ describe('favo on this machine', () => {
     expect((await favo(['claude'])).stdout).toContain(`home=${home}/.claude`);
   });
   it('reports a friendly error and exit code', async () => {
-    const result = await favo(['login', 'ghost', 'claude']);
+    const result = await favo(['login', 'claude', 'ghost']);
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('favo: No account named "ghost".');
   });
@@ -563,7 +563,7 @@ describe.skipIf(isWindows)('favo with another machine', () => {
   it('creates an account over there, with links over there', async () => {
     await joinRemote();
     await favo(['add', 'side', '-m', 'remote']);
-    const path = (await favo(['path', 'side', 'claude', '-m', 'remote'])).stdout.trim();
+    const path = (await favo(['path', 'claude', 'side', '-m', 'remote'])).stdout.trim();
     expect(path).toBe(`${remoteHome}/.favo/accounts/side/claude`);
     expect(readlinkSync(`${path}/CLAUDE.md`)).toBe(`${remoteHome}/.claude/CLAUDE.md`);
     expect(existsSync(`${home}/.favo/accounts/side`)).toBe(false);
@@ -571,9 +571,9 @@ describe.skipIf(isWindows)('favo with another machine', () => {
   it('starts in a folder on the other machine, and checks it there', async () => {
     await joinRemote();
     mkdirSync(`${remoteHome}/my project`);
-    const { stdout } = await favo(['claude', '-m', 'remote', '--dir', `${remoteHome}/my project`]);
+    const { stdout } = await favo(['-m', 'remote', '--dir', `${remoteHome}/my project`, 'claude']);
     expect(stdout).toContain('/my project');
-    const missing = await favo(['claude', '-m', 'remote', '--dir', `${remoteHome}/nothing`]);
+    const missing = await favo(['-m', 'remote', '--dir', `${remoteHome}/nothing`, 'claude']);
     expect(missing.stderr).toContain('No folder at');
   });
   it('updates the provider CLIs here, then over there through a real terminal', async () => {
@@ -595,7 +595,7 @@ describe.skipIf(isWindows)('favo with another machine', () => {
   it('launches over ssh with a real terminal', async () => {
     await joinRemote();
     await favo(['add', 'side', '-m', 'remote']);
-    const { stdout } = await favo(['claude', 'side', '-m', 'remote', '--', 'hi there']);
+    const { stdout } = await favo(['-m', 'remote', 'claude', 'side', '--', 'hi there']);
     expect(stdout).toContain(`home=${remoteHome}/.favo/accounts/side/claude`);
     expect(stdout).toContain('args=hi there');
     expect(readFileSync(`${root}/ssh.log`, 'utf8')).toMatch(
@@ -606,7 +606,7 @@ describe.skipIf(isWindows)('favo with another machine', () => {
     await joinRemote();
     await favo(['add', 'side', '-m', 'remote']);
     const prompt = `a" & touch one & "b $(touch two) \`touch three\` %PATH% it's \\'; touch four; echo '`;
-    const { stdout } = await favo(['claude', 'side', '-m', 'remote', '--', '-p', prompt]);
+    const { stdout } = await favo(['-m', 'remote', 'claude', 'side', '--', '-p', prompt]);
     expect(stdout).toContain(`args=-p ${prompt}`);
     for (const name of ['one', 'two', 'three', 'four']) expect(existsSync(`${remoteHome}/${name}`)).toBe(false);
   });

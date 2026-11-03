@@ -55,7 +55,7 @@ Your first account is already there: `personal` is the setup you have today. To 
 
 ```sh
 favo add work            # a new cell
-favo login work claude   # sign in, with Claude's own login
+favo login claude work   # sign in, with Claude's own login
 favo claude work         # go
 ```
 
@@ -76,7 +76,7 @@ Add a machine once. favo installs itself there, and from then on that machine si
 ```sh
 favo machine discover         # what is on ssh and Tailscale
 favo machine add bee@devbox   # connect, and install favo there
-favo claude work --machine devbox
+favo --machine devbox claude work
 ```
 
 Choosing where a provider starts works remotely too. Here the Mac is browsing the real folders on a Linux box:
@@ -93,16 +93,16 @@ When a machine falls behind, favo says so and keeps it working. Press `U` to upd
 
 ### Your place, kept
 
-Close a provider and the thread is still there. Press `b` on a seat, or run `favo resume work claude`, and you are back in it, in its own folder. Two sessions in one folder are both kept, and `b` lets you pick.
+Close a provider and the thread is still there. Press `b` on a seat, or run `favo resume claude work`, and you are back in it, in its own folder. Two sessions in one folder are both kept, and `b` lets you pick.
 
 ```sh
 favo hooks install                     # let your providers tell favo their thread
-favo resume work claude                # the newest thread in this folder
-favo resume work claude -- --model x   # the same, with a one-off option
-favo threads work claude               # everything that seat kept
+favo resume claude work             # the newest thread in this folder
+favo resume claude work --model x   # the same, with a one-off option
+favo threads claude work            # everything that seat kept
 ```
 
-Your `launchArgs` come back by themselves. A one-off option does not, so pass it again after `--`.
+Your `launchArgs` come back by themselves. A one-off option does not, so pass it again.
 
 To know which thread you are in, favo adds one small hook to your provider config, and only once you ask. [The reference](#reference) spells out exactly what it does. Run Herdr? A restart brings each seat back on the right account, in the same thread.
 
@@ -118,17 +118,17 @@ Twelve themes come built in, with a live preview, and your own is a small JSON f
 
 ### Works with what you already use
 
-Your `~/.claude`, `~/.codex` and the rest stay where they are, and an old config folder can move in with `favo adopt work claude ~/.claude-work`. Using [T3 Code](#use-it-with-t3-code)? Press `c` on any seat to copy the path it needs.
+Your `~/.claude`, `~/.codex` and the rest stay where they are, and an old config folder can move in with `favo adopt claude work ~/.claude-work`. Using [T3 Code](#use-it-with-t3-code)? Press `c` on any seat to copy the path it needs.
 
 ## Desktop apps
 
 favo can also open the **Claude** and **ChatGPT** desktop apps as any account. Press `p` on a seat, or run:
 
 ```sh
-favo app work claude         # Claude, as work
-favo app work codex          # ChatGPT, as work
-favo app personal claude     # back to the app you always had
-favo app work claude --close # close it first if it is open
+favo app claude work         # Claude, as work
+favo app codex work          # ChatGPT, as work
+favo app claude personal     # back to the app you always had
+favo app claude work --close # close it first if it is open
 ```
 
 The first time, sign in inside the app. It remembers each account after that, and the Claude Code or Codex inside it uses the same seat as the CLI. `p` only appears when the app is installed on the computer you are at. If the app is already open, favo asks first:
@@ -218,14 +218,14 @@ T3 Code starts providers itself, so it only needs the folder. Select a seat, pre
 ```sh
 favo                         # open the comb
 favo add work                # a new cell
-favo login work claude       # sign in, with the official command
-favo logout work claude      # sign out
+favo login claude work       # sign in, with the official command
+favo logout claude work      # sign out
 favo claude work             # run Claude Code as work
-favo claude work -- --resume # everything after -- goes to the provider
-favo claude work --dir ~/app # start it in that folder
-favo resume work claude      # back to the newest thread here
-favo resume work claude 2    # back to the second one in favo threads
-favo threads work claude     # the threads a seat kept
+favo claude work --chrome    # everything after the account goes to Claude
+favo --dir ~/app claude work # start it in that folder
+favo resume claude work      # back to the newest thread here
+favo resume claude work 2    # back to the second one in favo threads
+favo threads claude work     # the threads a seat kept
 favo hooks install           # let providers tell favo their thread
 favo hooks status            # is that working, seat by seat
 favo hooks uninstall         # take favo's hook out again
@@ -235,13 +235,13 @@ favo update                  # favo and the provider CLIs, on every machine
 favo rename work client      # a new name, on this machine
 favo rm work                 # move a cell to the trash
 favo sync                    # repair shared links
-favo inspect work claude     # what is shared and what is private
-favo path work claude        # print the config path
-favo app work claude         # open the Claude app as work
+favo inspect claude work     # what is shared and what is private
+favo path claude work        # print the config path
+favo app claude work         # open the Claude app as work
 favo theme tokyo-night       # pick a theme
 ```
 
-Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--machine <machine>` to run on another computer. `favo --help` lists the rest.
+Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--machine <machine>` to run on another computer. When favo starts a provider, favo's own options go before the provider, and everything after the account goes to the provider, flags and prompt included. `favo --help` lists the rest.
 
 `favo usage` and the `u` screen ask Claude Code and Codex through their own commands, so no token is read and no thread starts. OpenCode and Antigravity show no limits for now, because neither has a source that works without a token. favo reads them once when the TUI opens, so the numbers are ready when you press `u`, and `favo usage` reads them when you run it. The bars show what is left: the thick part is yours now, the thinner part is what the next reset gives back, and the tall mark is how much of the window's time is left, so a bar that stops short of it is spending too fast.
 

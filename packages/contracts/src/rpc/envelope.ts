@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const Protocol = 5;
+export const Protocol = 6;
 
 export const RpcRequest = z.strictObject({
   id: z.number(),

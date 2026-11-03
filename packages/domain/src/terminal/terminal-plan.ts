@@ -100,12 +100,12 @@ export function favoArgumentsFor(input: {
   thread?: string;
 }) {
   const { action, account, provider, args, directory, thread } = input;
-  if (action === TerminalAction.login) return ['login', account, provider];
-  if (action === TerminalAction.logout) return ['logout', account, provider];
+  if (action === TerminalAction.login) return ['login', provider, account];
+  if (action === TerminalAction.logout) return ['logout', provider, account];
   const directoryFlag = directory ? ['--dir', directory] : [];
   const providerArguments = args.length > 0 ? ['--', ...args] : [];
   if (action === TerminalAction.resume) {
-    return ['resume', account, provider, ...(thread ? [thread] : []), ...directoryFlag, ...providerArguments];
+    return [...directoryFlag, 'resume', provider, account, ...(thread ? [thread] : []), ...providerArguments];
   }
-  return [provider, account, ...directoryFlag, ...providerArguments];
+  return [...directoryFlag, provider, account, ...providerArguments];
 }

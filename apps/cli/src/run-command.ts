@@ -116,7 +116,7 @@ export async function runCommand(parsed: Command, context: CommandContext) {
       return printUsage(context, command);
     case CommandKind.add:
       await client.call(createAccount, { name: account! }, options);
-      print(`${context.paint.accent('⬢')} ${account} is ready. Sign in with: favo login ${account} claude`);
+      print(`${context.paint.accent('⬢')} ${account} is ready. Sign in with: favo login claude ${account}`);
       return 0;
     case CommandKind.rename: {
       const { displayName } = await client.call(renameAccount, { name: account!, newName: command.name! }, options);
@@ -224,7 +224,7 @@ async function openApp(context: CommandContext, parsed: Command, command: Comman
   const { opening, label } = await client.call(openDesktopApp, { ...seat, canClose: command.canClose ?? false });
   if (opening === DesktopOpening.stillOpen) {
     const { executable } = Providers[seat.provider];
-    print(`${label} is open. To close it and reopen: favo app ${parsed.account} ${executable} --close`);
+    print(`${label} is open. To close it and reopen: favo app ${executable} ${parsed.account} --close`);
     return 1;
   }
   print(`${paint.accent('⬢')} ${label} is opening as ${parsed.account}.`);
