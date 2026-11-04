@@ -9,14 +9,15 @@ import { HelpDialog } from '@/modules/comb/screens/Comb/HelpDialog';
 import { KeyBar } from '@/modules/comb/screens/Comb/KeyBar';
 import { MachineCard } from '@/modules/comb/screens/Comb/MachineCard';
 import { SeatDetail } from '@/modules/comb/screens/Comb/SeatDetail';
-import { ToastLine } from '@/modules/comb/screens/Comb/ToastLine';
 import { useCombKeys } from '@/modules/comb/screens/Comb/useCombKeys';
 import { DirectoryPicker } from '@/modules/directories/screens/DirectoryPicker';
 import { AddMachine } from '@/modules/machines/screens/AddMachine';
 import { ThemePicker } from '@/modules/themes/screens/ThemePicker';
 import { ThreadPicker } from '@/modules/threads/screens/ThreadPicker';
+import { ProviderClis } from '@/modules/updates/screens/ProviderClis';
 import { Usage } from '@/modules/usage/screens/Usage';
 import { type Confirmation, ConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { ToastLine } from '@/shared/components/ToastLine';
 import { useError } from '@/shared/error/useError';
 import { useApp } from '@/shared/stores/app';
 
@@ -51,6 +52,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   const goBackToThread = useApp((state) => state.goBackToThread);
   const installThreadHooks = useApp((state) => state.installThreadHooks);
   const isUsageOpen = useApp((state) => state.isUsageOpen);
+  const isProviderClisOpen = useApp((state) => state.isProviderClisOpen);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const scrollRef = useRef<ScrollBoxRenderable>(null);
@@ -66,6 +68,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     isDirectoryPickerOpen ||
     isThreadPickerOpen ||
     isUsageOpen ||
+    isProviderClisOpen ||
     confirmation !== undefined;
 
   function onRemoveAccount() {
@@ -98,7 +101,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     }
     setConfirmation({
       title: 'update CLIs',
-      message: `Update the provider CLIs on ${name}? favo shows what each one is, and asks before touching one that is running.`,
+      message: `Update the provider CLIs on ${name}? favo shows what each one is, asks before touching one that is running, and lists what happened when you come back.`,
       onAccept: () => void error.handle(onUpdateAccept)(),
     });
   }
@@ -182,6 +185,9 @@ export function Comb({ onQuit }: { onQuit(): void }) {
         onGoBackToThread={onGoBackToThread}
       />
       {isUsageOpen && <Usage isEnabled={!isHelpOpen} onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} />}
+      {isProviderClisOpen && (
+        <ProviderClis isEnabled={!isHelpOpen} onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} />
+      )}
       {isHelpOpen && <HelpDialog onClose={() => setIsHelpOpen(false)} />}
       {isAddAccountOpen && <AddAccount />}
       {isRenameAccountOpen && <RenameAccount />}

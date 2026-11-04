@@ -12,6 +12,7 @@ const Keys = [
   ['c', 'copy the config path'],
   ['p', 'open the desktop app'],
   ['u', 'see what every seat has left'],
+  ['v', 'every provider CLI version'],
   ['a / n / x', 'add / rename / delete a cell'],
   ['m / X', 'add / forget a machine'],
   ['i', 'install or update favo there'],

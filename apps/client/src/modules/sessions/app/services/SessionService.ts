@@ -21,7 +21,6 @@ export type SessionService = {
   signOutSelectedSeat(): Promise<void>;
   copySelectedPath(): Promise<void>;
   repairSelectedMachine(): Promise<void>;
-  updateProviders(machineId: string): Promise<void>;
 };
 
 export const createSessionService: ServiceCreator<SessionService> = (set, get) => ({
@@ -96,16 +95,6 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
     const linked = await fleetRepository.repairMachine(selectedMachine.id);
     await refreshMachine(selectedMachine.id);
     showToast(linked > 0 ? `Mended ${linked} shared links.` : 'Every wall is sound.');
-  },
-  async updateProviders(machineId) {
-    const { machines, refreshMachine, showToast } = get();
-    const machine = machines.find(({ id }) => id === machineId);
-    if (!machine?.isOnline) return;
-    const terminalRepository = container.get('ITerminalRepository');
-    const terminalGateway = container.get('ITerminalGateway');
-    const code = await terminalGateway.run(await terminalRepository.planUpdate(machine.id));
-    await refreshMachine(machine.id);
-    if (code !== 0) showToast(`The update on ${machine.name} did not finish.`, ToastKind.error);
   },
 });
 

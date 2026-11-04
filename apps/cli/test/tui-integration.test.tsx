@@ -6,6 +6,7 @@ import { createAccount } from '@favo/contracts/rpc/accounts/create-account';
 import { listAccounts } from '@favo/contracts/rpc/accounts/list-accounts';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
 import { recordThread } from '@favo/contracts/rpc/threads/record-thread';
+import { recordProviderUpdate } from '@favo/contracts/rpc/updates/record-provider-update';
 import { LoginState } from '@favo/contracts/rpc/views';
 import { encodeArguments, type TerminalPlan } from '@favo/domain/terminal/terminal-plan';
 import { createTestServer, Home, seedClaudeBase } from '@favo/server/test/support/test-server';
@@ -64,6 +65,18 @@ describe('updating the provider CLIs from the comb', () => {
     await useApp.getState().updateProviders('local');
     expect(view.plans.at(-1)?.command).toBe('favo');
     expect(view.plans.at(-1)?.args).toEqual(['update', '--skip-favo', '--machine', 'local', '--hold']);
+  });
+  test('reads each machine on its own favo, and shows the last update recorded there', async () => {
+    const view = await openFleet();
+    view.mac.processes.reply('/usr/bin/claude --version', { stdout: '2.1.316 (Claude Code)\n' });
+    view.devbox.processes.reply('/usr/bin/claude --version', { stdout: '2.1.290 (Claude Code)\n' });
+    const outcome = { state: 'failed' as const, from: '2.1.290', reason: 'exit 1' };
+    await view.devbox.client.call(recordProviderUpdate, { provider: 'claude', outcome });
+    await useApp.getState().refreshProviderClis();
+    view.mockInput.pressKey('v');
+    await view.waitForFrame((frame) => /devbox\s+2\.1\.290 older/.test(frame));
+    expect(view.captureCharFrame()).toContain('the last update failed, exit 1');
+    expect(view.captureCharFrame()).toMatch(/macbook\s+2\.1\.316\s+own install at \/usr\/bin\/claude/);
   });
 });
 

@@ -43,8 +43,8 @@ Machines
   favo machine rm <machine>          forget a machine
 
 Updates
-  favo update                        update favo, then the provider CLIs, here
-                                     and on every machine
+  favo update                        update favo here and on every machine
+  favo update --providers            the same, then the provider CLIs on each
   favo update --machine <machine>    only there (local means this computer)
 
 Themes

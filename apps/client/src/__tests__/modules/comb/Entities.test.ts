@@ -48,6 +48,13 @@ describe('Machine', () => {
     expect(machine.withPresence(MachinePresence.needsInstall).canInstall).toBe(true);
     expect(machine.withPresence(MachinePresence.outdated).canInstall).toBe(true);
   });
+  test('can be read while it connects or once it is online, and not otherwise', () => {
+    const machine = new Machine('devbox', 'devbox', 'bee@devbox', false);
+    expect(machine.canRead).toBe(true);
+    expect(machine.withPresence(MachinePresence.online).canRead).toBe(true);
+    expect(machine.withPresence(MachinePresence.offline).canRead).toBe(false);
+    expect(machine.withPresence(MachinePresence.outdated).canRead).toBe(false);
+  });
   test('offers an update when it runs an older favo, and stays usable', () => {
     const machine = new Machine('devbox', 'devbox', 'bee@devbox', false);
     const behind = machine.withStatus({ state: 'online', version: '0.1.0', isBehind: true });

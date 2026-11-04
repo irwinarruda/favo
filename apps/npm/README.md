@@ -17,7 +17,7 @@ It runs on macOS (Apple Silicon and Intel), Linux (x64 and arm64, glibc only) an
 
 ## Updating
 
-Run `favo update`. It updates this package with the package manager that installed it, then favo on your other machines and the provider CLIs. A running favo never blocks an update, because each version keeps its own folder.
+Run `favo update`. It updates this package with the package manager that installed it, then favo on your other machines. `favo update --providers` also updates the provider CLIs. A running favo never blocks an update, because each version keeps its own folder.
 
 ## More
 

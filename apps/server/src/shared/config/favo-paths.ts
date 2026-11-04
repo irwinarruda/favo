@@ -12,6 +12,7 @@ export function favoPathsOf(input: { home: string; favoHome?: string; configHome
     accounts: `${root}/accounts`,
     threads: `${root}/threads`,
     running: `${root}/running`,
+    updates: `${root}/updates`,
     runtime: `${root}/runtime`,
     trash: `${root}/trash`,
     assets: `${root}/assets`,

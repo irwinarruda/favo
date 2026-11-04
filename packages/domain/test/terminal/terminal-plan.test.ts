@@ -3,6 +3,7 @@ import {
   decodeArguments,
   encodeArguments,
   favoArgumentsFor,
+  hasProvidersIn,
   remoteTerminalPlan,
   spawnCommandOf,
   TerminalAction,
@@ -144,13 +145,38 @@ describe('terminal plans', () => {
 });
 
 describe('the arguments of a second favo update', () => {
-  it('skips the favo that was just updated', () => {
-    expect(updateArgumentsFor({ isHereOnly: false })).toEqual(['update', '--skip-favo']);
+  it('skips the favo that was just updated and goes on to the provider CLIs, as every favo before did', () => {
+    expect(updateArgumentsFor({ isHereOnly: false, hasProviders: true })).toEqual(['update', '--skip-favo']);
   });
   it('stays on this computer when asked', () => {
-    expect(updateArgumentsFor({ isHereOnly: true })).toEqual(['update', '--skip-favo', '--machine', 'local']);
+    expect(updateArgumentsFor({ isHereOnly: true, hasProviders: true })).toEqual([
+      'update',
+      '--skip-favo',
+      '--machine',
+      'local',
+    ]);
+  });
+  it('says when favo alone was asked for', () => {
+    expect(updateArgumentsFor({ isHereOnly: false, hasProviders: false })).toEqual([
+      'update',
+      '--skip-favo',
+      '--favo-only',
+    ]);
   });
   it('can hold the report on screen', () => {
-    expect(updateArgumentsFor({ isHereOnly: true, isHeld: true }).at(-1)).toBe('--hold');
+    expect(updateArgumentsFor({ isHereOnly: true, hasProviders: true, isHeld: true }).at(-1)).toBe('--hold');
+  });
+});
+
+describe('whether an update goes on to the provider CLIs', () => {
+  it('does only when asked, when you type it', () => {
+    expect(hasProvidersIn({ isFavoSkipped: false, hasProviders: false, isFavoOnly: false })).toBe(false);
+    expect(hasProvidersIn({ isFavoSkipped: false, hasProviders: true, isFavoOnly: false })).toBe(true);
+  });
+  it('does for a second update, since an older favo asks for the provider CLIs that way', () => {
+    expect(hasProvidersIn({ isFavoSkipped: true, hasProviders: false, isFavoOnly: false })).toBe(true);
+  });
+  it('does not for a second update that was told favo alone', () => {
+    expect(hasProvidersIn({ isFavoSkipped: true, hasProviders: false, isFavoOnly: true })).toBe(false);
   });
 });

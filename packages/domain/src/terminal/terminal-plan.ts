@@ -6,6 +6,8 @@ import type { ValueOf } from '#domain/shared/value-of';
 export const EncodedArgumentsFlag = '--argv-b64';
 export const SkipFavoFlag = '--skip-favo';
 export const HoldFlag = '--hold';
+export const ProvidersFlag = '--providers';
+export const FavoOnlyFlag = '--favo-only';
 
 const EncodedArguments = z.array(z.string());
 const Base64UrlPattern = /^[A-Za-z0-9_-]+$/;
@@ -86,9 +88,14 @@ function assertSafeForCmd(argument: string, command: string) {
   );
 }
 
-export function updateArgumentsFor(input: { isHereOnly: boolean; isHeld?: boolean }) {
+export function updateArgumentsFor(input: { isHereOnly: boolean; hasProviders: boolean; isHeld?: boolean }) {
+  const favoOnly = input.hasProviders ? [] : [FavoOnlyFlag];
   const here = input.isHereOnly ? ['--machine', LocalMachineId] : [];
-  return ['update', SkipFavoFlag, ...here, ...(input.isHeld ? [HoldFlag] : [])];
+  return ['update', SkipFavoFlag, ...favoOnly, ...here, ...(input.isHeld ? [HoldFlag] : [])];
+}
+
+export function hasProvidersIn(flags: { isFavoSkipped: boolean; hasProviders: boolean; isFavoOnly: boolean }) {
+  return flags.hasProviders || (flags.isFavoSkipped && !flags.isFavoOnly);
 }
 
 export function favoArgumentsFor(input: {

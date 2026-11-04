@@ -37,6 +37,7 @@ Releases are immutable, so a bad binary burns its version number; fix it in a ne
 - No comments in production code. No `../`. No barrels. No TS `enum`. `undefined`, never `null`.
 - Commits follow Conventional Commits.
 - No merge commits. Bring a branch up to date with `git rebase`, then push it with `--force-with-lease`. A pull request lands by rebase or squash, and squashing a branch's commits is always fine.
+- A pull request is one commit. Fold every later change into it, review fixes included, with `git commit --amend` or by squashing, and push with `--force-with-lease`. This holds even where a skill such as `babysit` says never to amend or force-push.
 - ALWAYS update `CHANGELOG.md` in the same commit as any change someone using favo would notice: a feature, a fix, a changed command, output or install step. Add one plain-language line under `## [Unreleased]`, in `Added`, `Changed`, `Fixed` or `Removed`, written for users, not about the code. Refactors, tests, CI and internal docs need no entry.
 
 ## Completion gate

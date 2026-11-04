@@ -7,6 +7,7 @@ import {
   installSourceOf,
   shimTargetOf,
   upgradeArgumentsOf,
+  upgradeEnvironmentOf,
 } from '#domain/updates/install-source';
 
 describe('how something was installed', () => {
@@ -136,6 +137,16 @@ describe('updating through a package manager', () => {
       'favo-cli@latest',
     ]);
     expect(upgradeArgumentsOf({ ...source, method: InstallMethod.yarn })).toEqual(['global', 'add', 'favo-cli@latest']);
+  });
+  it('makes Homebrew read its taps first, since a third-party tap is only as new as its last fetch', () => {
+    expect(upgradeEnvironmentOf({ ...source, method: InstallMethod.homebrew })).toEqual({
+      env: { HOMEBREW_AUTO_UPDATE_SECS: '0' },
+      unsetEnv: ['HOMEBREW_NO_AUTO_UPDATE'],
+    });
+  });
+  it('leaves every other package manager and an unknown install as they are', () => {
+    expect(upgradeEnvironmentOf({ ...source, method: InstallMethod.npm })).toEqual({ env: {}, unsetEnv: [] });
+    expect(upgradeEnvironmentOf(undefined)).toEqual({ env: {}, unsetEnv: [] });
   });
   it('says plainly where something came from', () => {
     expect(installLabelOf({ ...source, method: InstallMethod.homebrew, isCask: true })).toBe('Homebrew cask favo-cli');

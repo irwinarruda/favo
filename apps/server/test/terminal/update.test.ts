@@ -37,6 +37,11 @@ describe('updating favo on this computer', () => {
       'favo-cli',
     ]);
   });
+  it('has Homebrew fetch the tap first, or a release from the last day stays out of sight', async () => {
+    const plan = await (await homebrewServer()).client.call(planFavoUpdate, {});
+    expect(plan.upgrade?.env.HOMEBREW_AUTO_UPDATE_SECS).toBe('0');
+    expect(plan.upgrade?.unsetEnv).toEqual(['HOMEBREW_NO_AUTO_UPDATE']);
+  });
   it('restarts from the link Homebrew moves, not from the old version folder', async () => {
     const plan = await (await homebrewServer()).client.call(planFavoUpdate, {});
     expect(plan.restart?.command).toBe('/opt/homebrew/bin/favo');
@@ -45,6 +50,7 @@ describe('updating favo on this computer', () => {
     const plan = await launcherServer().client.call(planFavoUpdate, {});
     expect(plan.upgrade?.command).toBe(`${Home}/.nvm/versions/node/v24.16.0/bin/npm`);
     expect(plan.upgrade?.args).toEqual(['install', '--global', 'favo-cli@latest']);
+    expect(plan.upgrade?.unsetEnv).toEqual([]);
   });
   it('restarts through the launcher, which fetches the new binary', async () => {
     const plan = await launcherServer().client.call(planFavoUpdate, {});

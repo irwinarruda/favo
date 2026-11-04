@@ -16,6 +16,7 @@ import { createServer } from '@/server';
 import { favoPathsOf } from '@/shared/config/favo-paths';
 
 export const Home = '/home/bee';
+export const UpdaterPid = 7000;
 
 type TestServerOptions = {
   hostname?: string;
@@ -81,6 +82,7 @@ export function createTestServer(options: TestServerOptions = {}) {
         directory: options.directory ?? `${Home}/projects/hive`,
       },
       callerEnv: options.callerEnv ?? {},
+      pid: UpdaterPid,
       binary: options.binary,
     }
   );

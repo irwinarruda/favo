@@ -66,6 +66,7 @@ export function createProductionServer(env: Record<string, string | undefined>) 
       paths,
       host: { hostname: name, platform: platform(), arch: arch(), home, directory: process.cwd() },
       callerEnv: env,
+      pid: process.pid,
       binary: basename(process.execPath).startsWith(FavoBinaryName) ? process.execPath : undefined,
     }
   );

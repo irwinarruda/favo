@@ -3,7 +3,15 @@ import { LocalMachineId } from '@favo/domain/machines/machine';
 import { findProvider, type ProviderId } from '@favo/domain/providers/provider';
 import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import type { ValueOf } from '@favo/domain/shared/value-of';
-import { decodeArguments, EncodedArgumentsFlag, HoldFlag, SkipFavoFlag } from '@favo/domain/terminal/terminal-plan';
+import {
+  decodeArguments,
+  EncodedArgumentsFlag,
+  FavoOnlyFlag,
+  HoldFlag,
+  hasProvidersIn,
+  ProvidersFlag,
+  SkipFavoFlag,
+} from '@favo/domain/terminal/terminal-plan';
 
 export const CommandKind = {
   tui: 'tui',
@@ -52,6 +60,7 @@ export type Command = {
   directory?: string;
   canClose?: boolean;
   isFavoSkipped?: boolean;
+  hasProviders?: boolean;
   isHeld?: boolean;
 };
 
@@ -132,7 +141,13 @@ export function parseCommand(rawArgv: string[]): Command {
         DomainErrorCode.invalidParams,
         'favo update takes no name. For one machine: favo update --machine <machine>'
       );
-      return { ...base, kind: CommandKind.update, isFavoSkipped: flags.isFavoSkipped, isHeld: flags.isHeld };
+      return {
+        ...base,
+        kind: CommandKind.update,
+        isFavoSkipped: flags.isFavoSkipped,
+        hasProviders: hasProvidersIn(flags),
+        isHeld: flags.isHeld,
+      };
     case 'machine':
       return parseMachine(base, flags.name, second, third);
     default:
@@ -189,6 +204,8 @@ function readArguments(argv: string[]) {
     isVersion: false,
     canClose: false,
     isFavoSkipped: false,
+    hasProviders: false,
+    isFavoOnly: false,
     isHeld: false,
     machine: undefined as string | undefined,
     name: undefined as string | undefined,
@@ -203,6 +220,8 @@ function readArguments(argv: string[]) {
     else if (word === '--version' || word === '-v') flags.isVersion = true;
     else if (word === '--close') flags.canClose = true;
     else if (word === SkipFavoFlag) flags.isFavoSkipped = true;
+    else if (word === ProvidersFlag) flags.hasProviders = true;
+    else if (word === FavoOnlyFlag) flags.isFavoOnly = true;
     else if (word === HoldFlag) flags.isHeld = true;
     else if (word === '--stdio') continue;
     else if (word === '--machine' || word === '-m') flags.machine = required(argv[++index], '--machine <machine>');

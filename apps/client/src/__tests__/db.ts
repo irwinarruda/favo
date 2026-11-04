@@ -5,6 +5,7 @@ import type {
   AccountView,
   DesktopAppView,
   HookView,
+  ProviderVersionView,
   SeatInspection,
   SeatStatus,
   SeatUsageView,
@@ -157,6 +158,44 @@ function seedSeatUsage(): Record<string, SeatUsageView[]> {
   };
 }
 
+function seedProviderVersions(): Record<string, ProviderVersionView[]> {
+  const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+  return {
+    local: [
+      {
+        provider: ProviderId.claude,
+        label: 'Claude Code',
+        version: '2.1.316',
+        installedWith: 'Homebrew cask claude-code',
+      },
+      { provider: ProviderId.codex, label: 'Codex', version: '0.166.0', installedWith: 'Homebrew cask codex' },
+      {
+        provider: ProviderId.opencode,
+        label: 'OpenCode',
+        version: '2.2.5',
+        installedWith: 'Homebrew formula opencode',
+        lastUpdate: { state: 'leftAlone', reason: 'it is pinned in Homebrew', at: hoursAgo(3) },
+      },
+    ],
+    devbox: [
+      {
+        provider: ProviderId.claude,
+        label: 'Claude Code',
+        version: '2.1.290',
+        installedWith: 'npm in /home/bee/.nvm/versions/node/v24.16.0',
+        lastUpdate: { state: 'failed', from: '2.1.290', reason: 'exit 1', at: hoursAgo(26) },
+      },
+      { provider: ProviderId.codex, label: 'Codex', version: '0.166.0', installedWith: 'npm in /usr/local' },
+      {
+        provider: ProviderId.antigravity,
+        label: 'Antigravity',
+        version: '1.4.12',
+        installedWith: 'own install at /home/bee/.local/bin/antigravity',
+      },
+    ],
+  };
+}
+
 function hookOf(provider: ProviderId, state: HookView['state'], overrides: Partial<HookView> = {}): HookView {
   const { label, hook } = Providers[provider];
   return {
@@ -273,6 +312,10 @@ export const mockDb = {
   usageFailures: {} as Record<string, Error>,
   usageReads: [] as string[],
   usageHold: undefined as Promise<void> | undefined,
+  providerVersions: seedProviderVersions(),
+  providerVersionFailures: {} as Record<string, Error>,
+  providerVersionReads: [] as string[],
+  providerVersionHold: undefined as Promise<void> | undefined,
   threads: seedThreads(),
   hooks: seedHooks(),
   threadFailures: {} as Record<string, Error>,
@@ -301,6 +344,10 @@ export const mockDb = {
     this.usageFailures = {};
     this.usageReads = [];
     this.usageHold = undefined;
+    this.providerVersions = seedProviderVersions();
+    this.providerVersionFailures = {};
+    this.providerVersionReads = [];
+    this.providerVersionHold = undefined;
     this.threads = seedThreads();
     this.hooks = seedHooks();
     this.threadFailures = {};

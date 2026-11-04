@@ -27,6 +27,10 @@ export class Machine {
     return this.presence === MachinePresence.online;
   }
 
+  get canRead() {
+    return this.isOnline || this.presence === MachinePresence.connecting;
+  }
+
   get canUpdate() {
     return this.presence === MachinePresence.outdated || (this.isOnline && this.isBehind);
   }
