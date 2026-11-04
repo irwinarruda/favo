@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-04
+
 ### Added
 
 - The comb now shows whether each seat's Claude app is signed in, apart from its Claude Code, because the two sign in separately. A local Claude seat shows `app ⬢` when the app is signed in, `app ⬡` when it is not, and `app ?` when favo can't tell, as from the first time favo opens the app until you sign in there. The cell says so in words. When the app and Claude Code are signed in to different accounts, the comb marks it in red: the app's Code tab then spends the app's account. ChatGPT signs in through the seat's Codex, so it needs nothing new.
@@ -88,7 +90,8 @@
 - A TUI that shows every machine, account and login, plus a command for everything it does.
 - Native on macOS, Linux and Windows, installed with `npm install --global favo-cli`.
 
-[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/irwinarruda/favo-cli/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/irwinarruda/favo-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/irwinarruda/favo-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/irwinarruda/favo-cli/compare/v0.3.0...v0.4.0

@@ -1,1 +1,1 @@
-export const FavoVersion = '0.6.0';
+export const FavoVersion = '0.7.0';
