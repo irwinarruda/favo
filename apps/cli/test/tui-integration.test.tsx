@@ -254,6 +254,30 @@ describe('the TUI on a real backend', () => {
     await waitForFrame((frame) => frame.includes('Claude is opening as work.'));
     expect(mac.desktopApps.opened[0]?.launch.env.CLAUDE_CONFIG_DIR).toBe(`${Home}/.favo/accounts/work/claude`);
   });
+  test('shows the app signed in on another account, from what the app left in the seat', async () => {
+    const { mac, flush, waitForFrame } = await openFleet();
+    const app = JSON.stringify({ windowSizeWasSignedIn: true, lastKnownAccountUuid: 'uuid-app' });
+    const cli = JSON.stringify({ oauthAccount: { accountUuid: 'uuid-cli' } });
+    await mac.fileSystem.writePrivateText(`${Home}/.favo/accounts/work/claude-app/config.json`, app);
+    await mac.fileSystem.writePrivateText(`${Home}/.favo/accounts/work/claude/.claude.json`, cli);
+    mac.desktopApps.install('claude');
+    await useApp.getState().refreshMachine('local');
+    useApp.getState().selectRow('seat:local/work/claude');
+    await flush();
+    const frame = await waitForFrame((current) => current.includes('Claude app on another account'));
+    expect(frame).toMatch(/mac@bee\.dev\s+app ⬢/);
+    expect(frame).toMatch(/mac@bee\.dev\s+app \?/);
+  });
+  test('removes an account while the Claude app is installed, and says where it went', async () => {
+    const { mac, flush, waitForFrame } = await openFleet();
+    mac.desktopApps.install('claude');
+    await useApp.getState().refreshMachine('local');
+    useApp.getState().selectRow('seat:local/work/claude');
+    await flush();
+    await useApp.getState().removeSelectedAccount();
+    await waitForFrame((frame) => frame.includes('work moved to'));
+    expect((await mac.client.call(listAccounts, {})).map(({ name }) => name)).not.toContain('work');
+  });
   test('carries a confirmed close all the way to the backend', async () => {
     const { mac, mockInput, flush, waitForFrame, waitFor } = await openFleet();
     mac.desktopApps.install('claude');

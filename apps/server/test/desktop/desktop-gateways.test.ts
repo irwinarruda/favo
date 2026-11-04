@@ -17,6 +17,7 @@ const PowerShell = 'powershell.exe -NoProfile -NonInteractive -Command';
 const ClaudeBundle = '/Applications/Claude.app';
 const ClaudeMain = `${ClaudeBundle}/Contents/MacOS/Claude`;
 const WindowsClaude = 'C:\\Program Files\\WindowsApps\\Claude_4_x64__pzs8sxrjxfjjc';
+const ConfigHome = '/home/bee/.config';
 
 class EndingProcessRunner extends ScriptedProcessRunner {
   override async run(request: ProcessRequest) {
@@ -115,6 +116,11 @@ describe('on macOS', () => {
     expect(await new MacDesktopApps(processes, '/Users/bee', 1000).quit(macApp())).toBe(true);
     expect(commandsOf(processes)).toContain('kill -TERM 11');
   });
+  it('knows where the app keeps the default account', () => {
+    const gateway = new MacDesktopApps(new ScriptedProcessRunner(), '/Users/bee');
+    expect(gateway.defaultProfile(claude)).toBe('/Users/bee/Library/Application Support/Claude');
+    expect(gateway.defaultProfile(chatgpt)).toBeUndefined();
+  });
   it('reports an app that will not quit, and never forces it', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(ProcessList, { stdout: ` 11 ${ClaudeMain}\n` });
@@ -129,7 +135,7 @@ describe('on Linux', () => {
   it('finds the app at its official path', async () => {
     const fileSystem = new MemoryFileSystem();
     await fileSystem.writePrivateText(executable, '');
-    const app = await new LinuxDesktopApps(new ScriptedProcessRunner(), fileSystem).find(claude);
+    const app = await new LinuxDesktopApps(new ScriptedProcessRunner(), fileSystem, ConfigHome).find(claude);
     expect(app).toEqual({
       spec: claude,
       launcher: executable,
@@ -139,13 +145,13 @@ describe('on Linux', () => {
   it('finds nothing without it, even with the same command on the PATH', async () => {
     const processes = new ScriptedProcessRunner();
     processes.install('claude-desktop');
-    expect(await new LinuxDesktopApps(processes, new MemoryFileSystem()).find(claude)).toBeUndefined();
+    expect(await new LinuxDesktopApps(processes, new MemoryFileSystem(), ConfigHome).find(claude)).toBeUndefined();
   });
   it('sees an app started from the menu, under its short name', async () => {
     const processes = new ScriptedProcessRunner();
     const fileSystem = new MemoryFileSystem();
     await fileSystem.writePrivateText(executable, '');
-    const gateway = new LinuxDesktopApps(processes, fileSystem);
+    const gateway = new LinuxDesktopApps(processes, fileSystem, ConfigHome);
     const app = await gateway.find(claude);
     processes.reply(ProcessList, { stdout: ' 40 claude-desktop\n' });
     expect(await gateway.isRunning(app!)).toBe(true);
@@ -154,7 +160,7 @@ describe('on Linux', () => {
     const processes = new ScriptedProcessRunner();
     const fileSystem = new MemoryFileSystem();
     await fileSystem.writePrivateText(chatgpt.linux.executable, '');
-    const gateway = new LinuxDesktopApps(processes, fileSystem);
+    const gateway = new LinuxDesktopApps(processes, fileSystem, ConfigHome);
     const app = await gateway.find(chatgpt);
     processes.reply(ProcessList, { stdout: ' 40 chatgpt ask hello\n 41 /home/bee/.local/bin/chatgpt\n' });
     expect(await gateway.isRunning(app!)).toBe(false);
@@ -163,14 +169,19 @@ describe('on Linux', () => {
     const processes = new ScriptedProcessRunner();
     const launch = { args: ['--user-data-dir=/p'], env: { CLAUDE_CONFIG_DIR: '/seat' } };
     const app = { spec: claude, launcher: executable, executables: [executable] };
-    await new LinuxDesktopApps(processes, new MemoryFileSystem()).open(app, launch);
+    await new LinuxDesktopApps(processes, new MemoryFileSystem(), ConfigHome).open(app, launch);
     expect(processes.calls).toEqual([{ command: executable, ...launch }]);
+  });
+  it('keeps the default account where Electron does, in the config folder', () => {
+    const gateway = new LinuxDesktopApps(new ScriptedProcessRunner(), new MemoryFileSystem(), ConfigHome);
+    expect(gateway.defaultProfile(claude)).toBe('/home/bee/.config/Claude');
+    expect(gateway.defaultProfile(chatgpt)).toBeUndefined();
   });
   it('says so when the app will not start', async () => {
     const processes = new ScriptedProcessRunner();
     processes.failToDetach(executable);
     const app = { spec: claude, launcher: executable, executables: [executable] };
-    const gateway = new LinuxDesktopApps(processes, new MemoryFileSystem());
+    const gateway = new LinuxDesktopApps(processes, new MemoryFileSystem(), ConfigHome);
     await expect(gateway.open(app, { args: [], env: {} })).rejects.toMatchObject({ code: 'desktopAppFailed' });
   });
 });
@@ -227,6 +238,11 @@ describe('on Windows', () => {
     expect(await new WindowsDesktopApps(processes, localAppData, 0, 0).quit(app)).toBe(false);
     expect(commandsOf(processes)).toContain(`${PowerShell} ${processesOfClaude} | Stop-Process -Force`);
   });
+  it('knows the folder the app moves the default account to', () => {
+    const gateway = new WindowsDesktopApps(new ScriptedProcessRunner(), 'C:\\Users\\bee\\AppData\\Local');
+    expect(gateway.defaultProfile(claude)).toBe('C:/Users/bee/AppData/Local/Claude-Data/claude_pzs8sxrjxfjjc');
+    expect(gateway.defaultProfile(chatgpt)).toBeUndefined();
+  });
   it('turns favo paths into Windows paths for the app', async () => {
     const processes = new ScriptedProcessRunner();
     await new WindowsDesktopApps(processes, localAppData).open(app, {
@@ -246,6 +262,7 @@ describe('on Windows', () => {
 describe('with no screen to open a window on', () => {
   it('finds nothing, so favo offers nothing', async () => {
     expect(await new HeadlessDesktopApps().find()).toBeUndefined();
+    expect(new HeadlessDesktopApps().defaultProfile()).toBeUndefined();
   });
 });
 
@@ -253,7 +270,7 @@ describe.skipIf(process.platform === 'win32')('with real processes', () => {
   it('starts a process apart from favo, sees it, and stops it', async () => {
     const processes = new BunProcessRunner(process.env, false);
     const duration = `${30 + Math.random()}`;
-    const gateway = new LinuxDesktopApps(processes, new MemoryFileSystem(), 3000);
+    const gateway = new LinuxDesktopApps(processes, new MemoryFileSystem(), ConfigHome, 3000);
     const app = { spec: claude, launcher: '/bin/sleep', executables: [`/bin/sleep ${duration}`] };
     await gateway.open(app, { args: [duration], env: {} });
     await Bun.sleep(100);

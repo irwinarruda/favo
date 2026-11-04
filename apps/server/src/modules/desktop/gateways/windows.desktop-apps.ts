@@ -53,6 +53,11 @@ export class WindowsDesktopApps extends DesktopApps {
     assertDomain(isDetached, DomainErrorCode.desktopAppFailed, `Could not start ${spec.label}.`);
   }
 
+  defaultProfile({ windows }: DesktopAppSpec) {
+    if (!windows.defaultProfile) return undefined;
+    return `${this.localAppData.replaceAll('\\', '/')}/${windows.defaultProfile}`;
+  }
+
   private powershell(script: string) {
     return this.processes.run({
       command: 'powershell.exe',

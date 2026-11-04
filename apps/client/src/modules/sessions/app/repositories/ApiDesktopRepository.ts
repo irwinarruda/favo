@@ -1,4 +1,5 @@
 import type { RpcClient } from '@favo/contracts/rpc/client';
+import { getAppLogin } from '@favo/contracts/rpc/desktop/get-app-login';
 import { listDesktopApps } from '@favo/contracts/rpc/desktop/list-desktop-apps';
 import { openDesktopApp } from '@favo/contracts/rpc/desktop/open-desktop-app';
 import type { Seat } from '@/modules/comb/app/entities/Seat';
@@ -13,5 +14,9 @@ export class ApiDesktopRepository implements IDesktopRepository {
 
   open(seat: Seat, canClose: boolean) {
     return this.client.call(openDesktopApp, { account: seat.account, provider: seat.provider, canClose });
+  }
+
+  getLogin(seat: Seat) {
+    return this.client.call(getAppLogin, { account: seat.account, provider: seat.provider });
   }
 }

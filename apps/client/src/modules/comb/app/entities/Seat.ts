@@ -1,11 +1,13 @@
-import { LoginState, type SeatStatus, type SeatView } from '@favo/contracts/rpc/views';
+import { type AppLoginStatus, LoginState, type SeatStatus, type SeatView } from '@favo/contracts/rpc/views';
+import { AppLoginState } from '@favo/domain/desktop/desktop-app';
 import { LoginScope, Providers } from '@favo/domain/providers/provider';
 
 export class Seat {
   constructor(
     readonly machineId: string,
     readonly view: SeatView,
-    readonly status?: SeatStatus
+    readonly status?: SeatStatus,
+    readonly appLogin?: AppLoginStatus
   ) {}
 
   static fromJSON(machineId: string, view: SeatView) {
@@ -72,6 +74,25 @@ export class Seat {
     return this.status?.plan;
   }
 
+  get hasAppLogin() {
+    return this.appLogin !== undefined;
+  }
+
+  get isAppSignedIn() {
+    return this.appLogin?.login === AppLoginState.signedIn;
+  }
+
+  get isOtherAccount() {
+    return this.isSignedIn && this.isAppSignedIn && this.appLogin?.isOtherAccount === true;
+  }
+
+  get appLoginLabel() {
+    if (this.isOtherAccount) return 'on another account';
+    if (this.isAppSignedIn) return 'signed in';
+    if (this.appLogin?.login === AppLoginState.unknown) return 'sign-in unknown';
+    return 'signed out';
+  }
+
   get headline() {
     if (!this.status) return 'checking';
     if (this.status.login === LoginState.signedIn) return this.status.identity ?? 'signed in';
@@ -80,10 +101,14 @@ export class Seat {
   }
 
   withStatus(status: SeatStatus) {
-    return new Seat(this.machineId, this.view, status);
+    return new Seat(this.machineId, this.view, status, this.appLogin);
+  }
+
+  withAppLogin(appLogin?: AppLoginStatus) {
+    return new Seat(this.machineId, this.view, this.status, appLogin);
   }
 
   withProvisioned() {
-    return new Seat(this.machineId, { ...this.view, isProvisioned: true }, this.status);
+    return new Seat(this.machineId, { ...this.view, isProvisioned: true }, this.status, this.appLogin);
   }
 }

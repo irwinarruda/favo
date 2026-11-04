@@ -210,6 +210,26 @@ describe('commands', () => {
     expect(lines).toEqual(['⬢ ChatGPT is opening as work.']);
     expect(desktopApps.opened[0]?.provider).toBe('codex');
   });
+  it('says the app signs in apart from Claude Code when that seat is signed out', async () => {
+    const { run, lines, client, desktopApps, clis } = harness();
+    desktopApps.install('claude');
+    clis.claude.login = { login: LoginState.signedOut };
+    await client.call(createAccount, { name: 'work' });
+    expect(await run('app', 'claude', 'work')).toBe(0);
+    expect(lines).toEqual([
+      '⬢ Claude is opening as work.',
+      'Claude and Claude Code sign in separately, and Claude Code is signed out as work.',
+      'To sign it in too: favo login claude work',
+    ]);
+  });
+  it('says nothing more when that seat is signed in', async () => {
+    const { run, lines, client, desktopApps, clis } = harness();
+    desktopApps.install('claude');
+    clis.claude.login = { login: LoginState.signedIn, identity: 'bee@work.dev' };
+    await client.call(createAccount, { name: 'work' });
+    expect(await run('app', 'claude', 'work')).toBe(0);
+    expect(lines).toEqual(['⬢ Claude is opening as work.']);
+  });
   it('says so when the app is not installed', async () => {
     const { run, client } = harness();
     await client.call(createAccount, { name: 'work' });

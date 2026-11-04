@@ -41,7 +41,7 @@ describe('the comb', () => {
   });
   test('flags a seat with broken links', async () => {
     const { captureCharFrame } = await open();
-    expect(captureCharFrame()).toMatch(/bee@work\.dev\s+!/);
+    expect(captureCharFrame()).toMatch(/bee@work\.dev\s+app ⬡ !/);
   });
   test('shows the config path of the selected seat', async () => {
     const { captureCharFrame, press, waitForFrame } = await open();
@@ -722,6 +722,71 @@ describe('opening a desktop app', () => {
     mockDb.desktopFailure = new DomainError('desktopAppStuck', 'Claude did not close.');
     await press('y');
     await waitForFrame((frame) => frame.includes('Claude did not close.'));
+  });
+});
+
+describe('the app login', () => {
+  const signedIn = { login: 'signedIn', isOtherAccount: false } as const;
+  const otherAccount = { login: 'signedIn', isOtherAccount: true } as const;
+
+  async function openWith(appLogins: typeof mockDb.appLogins, screen?: Parameters<typeof renderApp>[0]) {
+    const view = await open(screen);
+    Object.assign(mockDb.appLogins, appLogins);
+    await view.app.state.refreshMachine('local');
+    await view.flush();
+    await view.renderOnce();
+    return view;
+  }
+
+  function colorOf(frame: ReturnType<Awaited<ReturnType<typeof renderApp>>['captureSpans']>, text: string) {
+    return frame.lines
+      .flatMap((line) => line.spans)
+      .find((span) => span.text.includes(text))
+      ?.fg.toString();
+  }
+
+  test('marks each seat here whose app signs in on its own, apart from its CLI', async () => {
+    const { captureCharFrame } = await openWith({ 'seat:local/personal/claude': signedIn });
+    const frame = captureCharFrame();
+    expect(frame).toMatch(/bee@hive\.dev\s+app ⬢/);
+    expect(frame).toMatch(/bee@work\.dev\s+app ⬡ !/);
+  });
+  test('marks no app on another machine, or for a provider whose app is not here', async () => {
+    const { captureCharFrame } = await openWith({});
+    expect(captureCharFrame().match(/app [⬢⬡?]/g)).toHaveLength(2);
+  });
+  test('says in the cell whether the app is signed in', async () => {
+    const { select, waitForFrame } = await openWith({ 'seat:local/personal/claude': signedIn });
+    await waitForFrame((frame) => frame.includes('⬢ Claude app signed in'));
+    await select('seat:local/work/claude');
+    await waitForFrame((frame) => frame.includes('⬡ Claude app signed out'));
+  });
+  test('warns in red when the app is on another account than the CLI', async () => {
+    const { select, waitForFrame, captureSpans } = await openWith({ 'seat:local/work/claude': otherAccount });
+    await select('seat:local/work/claude');
+    await waitForFrame((frame) => frame.includes('⬢ Claude app on another account'));
+    const spans = captureSpans();
+    expect(colorOf(spans, 'on another account')).toBe(colorOf(spans, ' !'));
+    expect(colorOf(spans, 'app ⬢')).toBe(colorOf(spans, ' !'));
+  });
+  test('keeps the warning in a small terminal, and leaves out the rest the row already shows', async () => {
+    const { select, waitForFrame, captureCharFrame } = await openWith(
+      { 'seat:local/personal/claude': signedIn, 'seat:local/work/claude': otherAccount },
+      { width: 80, height: 24 }
+    );
+    expect(captureCharFrame()).toContain('app ⬢');
+    expect(captureCharFrame()).toContain('CONFIG PATH');
+    expect(captureCharFrame()).not.toContain('Claude app signed in');
+    await select('seat:local/work/claude');
+    const frame = await waitForFrame((current) => current.includes('Claude app on another account'));
+    expect(frame).toContain('CONFIG PATH');
+  });
+  test('marks an unknown app login the same way in the row and the cell', async () => {
+    const { waitForFrame } = await openWith({
+      'seat:local/personal/claude': { login: 'unknown', isOtherAccount: false },
+    });
+    const frame = await waitForFrame((current) => current.includes('? Claude app sign-in unknown'));
+    expect(frame).toMatch(/bee@hive\.dev\s+app \?/);
   });
 });
 

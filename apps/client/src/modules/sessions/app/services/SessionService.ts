@@ -1,5 +1,5 @@
 import type { DesktopAppView, ThreadView } from '@favo/contracts/rpc/views';
-import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
+import { DesktopLogin, DesktopOpening } from '@favo/domain/desktop/desktop-app';
 import { ownValue } from '@favo/domain/shared/own-value';
 import { TerminalAction } from '@favo/domain/terminal/terminal-plan';
 import { compute } from '@/libs/zustand';
@@ -13,6 +13,7 @@ export type SessionService = {
   selectedDesktopApp?: DesktopAppView;
   isDesktopAppBusy: boolean;
   loadDesktopApps(): Promise<void>;
+  loadAppLogin(seat: Seat): Promise<void>;
   openDesktopApp(seat: Seat, canClose?: boolean): Promise<DesktopOpening | undefined>;
   openSelectedSeat(): Promise<void>;
   launchSelectedSeat(): Promise<void>;
@@ -32,8 +33,25 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
   desktopApps: [],
   isDesktopAppBusy: false,
   async loadDesktopApps() {
+    const { desktopApps: previousApps } = get();
     const desktopRepository = container.get('IDesktopRepository');
-    set({ desktopApps: await desktopRepository.getApps() });
+    const desktopApps = await desktopRepository.getApps();
+    set({ desktopApps });
+    if (_ownLoginProviders(desktopApps).join() === _ownLoginProviders(previousApps).join()) return;
+    const { accounts, loadAppLogin } = get();
+    await Promise.all(accounts.flatMap((account) => account.visibleSeats).map((seat) => loadAppLogin(seat)));
+  },
+  async loadAppLogin(seat) {
+    const { machines, desktopApps, updateSeat } = get();
+    const isLocal = machines.some((machine) => machine.id === seat.machineId && machine.isLocal);
+    const hasOwnLogin = isLocal && _ownLoginProviders(desktopApps).includes(seat.provider);
+    if (!hasOwnLogin) {
+      if (seat.hasAppLogin) updateSeat(seat.key, (current) => current.withAppLogin(undefined));
+      return;
+    }
+    const desktopRepository = container.get('IDesktopRepository');
+    const appLogin = await desktopRepository.getLogin(seat);
+    updateSeat(seat.key, (current) => current.withAppLogin(appLogin));
   },
   async openDesktopApp(seat, canClose = false) {
     const { accounts, isDesktopAppBusy, refreshSeat, showToast } = get();
@@ -78,12 +96,12 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
     if (selectedSeat) await _runInTerminal(selectedSeat, TerminalAction.logout, get().refreshSeat);
   },
   async copySelectedPath() {
-    const { selectedSeat, replaceSeat, showToast } = get();
+    const { selectedSeat, updateSeat, showToast } = get();
     if (!selectedSeat) return;
     const fleetRepository = container.get('IFleetRepository');
     const clipboardGateway = container.get('IClipboardGateway');
     await fleetRepository.provisionSeat(selectedSeat);
-    replaceSeat(selectedSeat.withProvisioned());
+    updateSeat(selectedSeat.key, (seat) => seat.withProvisioned());
     const isCopied = await clipboardGateway.copy(selectedSeat.path);
     if (isCopied) showToast(`Copied. Paste it into T3 Code as ${selectedSeat.pathHint}.`);
     else showToast(`Could not reach the clipboard: ${selectedSeat.path}`, ToastKind.error);
@@ -97,6 +115,10 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
     showToast(linked > 0 ? `Mended ${linked} shared links.` : 'Every wall is sound.');
   },
 });
+
+function _ownLoginProviders(desktopApps: DesktopAppView[]) {
+  return desktopApps.filter((app) => app.login === DesktopLogin.separate).map((app) => app.provider);
+}
 
 async function _runInTerminal(
   seat: Seat,

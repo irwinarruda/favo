@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import type { Machine } from '@/modules/comb/app/entities/Machine';
 import type { Seat } from '@/modules/comb/app/entities/Seat';
 import { shortPath } from '@/modules/comb/parsers/shortPath';
+import { appColorOf, appMarkOf } from '@/modules/comb/screens/Comb/appMark';
 import { KeyHint } from '@/shared/components/KeyHint';
 import { useError } from '@/shared/error/useError';
 import { useApp } from '@/shared/stores/app';
@@ -92,6 +93,22 @@ function LastThread({ onGoBackToThread }: Pick<CellProps, 'onGoBackToThread'>) {
   );
 }
 
+function AppLogin({ seat }: { seat: Seat }) {
+  const colors = useApp((state) => state.colors);
+  const selectedDesktopApp = useApp((state) => state.selectedDesktopApp);
+  const color = appColorOf(seat, colors);
+
+  return (
+    <text wrapMode="none" truncate>
+      <span fg={color}>{appMarkOf(seat)}</span>
+      <span fg={seat.isAppSignedIn && !seat.isOtherAccount ? colors.text : color}>
+        {' '}
+        {selectedDesktopApp?.label} app {seat.appLoginLabel}
+      </span>
+    </text>
+  );
+}
+
 function CellActions({ isCompact, onRemoveAccount }: Omit<CellProps, 'onGoBackToThread'>) {
   const selectedAccount = useApp((state) => state.selectedAccount);
   const openRenameAccount = useApp((state) => state.openRenameAccount);
@@ -116,6 +133,7 @@ function SeatPanel({ seat, isCompact, onRemoveAccount, onGoBackToThread }: SeatP
   const error = useError();
   const items = inspection?.items.filter((item) => item.state !== SharedItemState.notInBase) ?? [];
   const absent = (inspection?.items.length ?? 0) - items.length;
+  const isPlanReplaced = isCompact && seat.isOtherAccount;
 
   useEffect(() => {
     void error.handle(inspectSelectedSeat)();
@@ -136,7 +154,8 @@ function SeatPanel({ seat, isCompact, onRemoveAccount, onGoBackToThread }: SeatP
       <text fg={seat.isSignedIn ? colors.text : colors.faint} wrapMode="none" truncate>
         {seat.identity ?? (seat.isSignedIn ? 'signed in' : 'not signed in')}
       </text>
-      {!!seat.plan && <text fg={colors.muted}>{seat.plan}</text>}
+      {!!seat.plan && !isPlanReplaced && <text fg={colors.muted}>{seat.plan}</text>}
+      {seat.hasAppLogin && (!isCompact || seat.isOtherAccount) && <AppLogin seat={seat} />}
       <CellActions isCompact={isCompact} onRemoveAccount={onRemoveAccount} />
       <LaunchDirectory />
       {canKeepThreads && <LastThread onGoBackToThread={onGoBackToThread} />}

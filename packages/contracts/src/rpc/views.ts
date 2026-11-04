@@ -1,3 +1,4 @@
+import { AppLoginState, DesktopLogin } from '@favo/domain/desktop/desktop-app';
 import { HookState } from '@favo/domain/hooks/provider-hook';
 import { LoginScope, ProviderId } from '@favo/domain/providers/provider';
 import type { ValueOf } from '@favo/domain/shared/value-of';
@@ -31,8 +32,15 @@ export type SeatView = z.infer<typeof SeatView>;
 export const DesktopAppView = z.strictObject({
   provider: z.enum(ProviderId),
   label: z.string(),
+  login: z.enum(DesktopLogin),
 });
 export type DesktopAppView = z.infer<typeof DesktopAppView>;
+
+export const AppLoginStatus = z.strictObject({
+  login: z.enum(AppLoginState),
+  isOtherAccount: z.boolean(),
+});
+export type AppLoginStatus = z.infer<typeof AppLoginStatus>;
 
 export const AccountView = z.strictObject({
   name: z.string(),

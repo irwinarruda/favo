@@ -14,4 +14,8 @@ export class HeadlessDesktopApps extends DesktopApps {
   }
 
   async open() {}
+
+  defaultProfile() {
+    return undefined;
+  }
 }

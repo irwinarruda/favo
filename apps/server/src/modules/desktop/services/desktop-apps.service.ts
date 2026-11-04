@@ -1,7 +1,12 @@
 import type { OpenDesktopAppParams } from '@favo/contracts/rpc/desktop/open-desktop-app';
+import type { SeatParams } from '@favo/contracts/rpc/seats/seat-params';
 import {
+  AppLoginState,
+  appLoginFilesOf,
+  appLoginOf,
   type DesktopAppSpec,
   DesktopAppSpecs,
+  DesktopLogin,
   DesktopOpening,
   desktopLaunchOf,
   desktopProfileOf,
@@ -26,7 +31,28 @@ export class DesktopAppsService {
   async list() {
     const specs = ProviderOrder.flatMap((provider) => DesktopAppSpecs[provider] ?? []);
     const found = await Promise.all(specs.map((spec) => this.desktopApps.find(spec)));
-    return found.flatMap((app) => (app ? [{ provider: app.spec.provider, label: app.spec.label }] : []));
+    return found.flatMap((app) =>
+      app ? [{ provider: app.spec.provider, label: app.spec.label, login: app.spec.login }] : []
+    );
+  }
+
+  async login({ account, provider }: SeatParams) {
+    const spec = this.requireSpec(provider);
+    assertDomain(
+      spec.login === DesktopLogin.separate,
+      DomainErrorCode.desktopAppMissing,
+      `${spec.label} has no login of its own: it signs in through ${Providers[provider].label}.`
+    );
+    await this.seats.assertAccount(account);
+    const profile = desktopProfileOf(this.paths, account, spec) ?? this.desktopApps.defaultProfile(spec);
+    if (!profile) return { login: AppLoginState.unknown, isOtherAccount: false };
+    const files = appLoginFilesOf(this.paths, account, spec, profile);
+    const [hasProfile, settings, cliConfig] = await Promise.all([
+      this.fileSystem.isDirectory(profile),
+      this.fileSystem.readText(files.settings),
+      this.fileSystem.readText(files.cliConfig),
+    ]);
+    return appLoginOf({ account, hasProfile, settings, cliConfig });
   }
 
   async open({ account, provider, canClose }: OpenDesktopAppParams) {

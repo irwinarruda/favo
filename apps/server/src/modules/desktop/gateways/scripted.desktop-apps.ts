@@ -9,6 +9,10 @@ export class ScriptedDesktopApps extends DesktopApps {
   private readonly running = new Set<ProviderId>();
   private readonly stuck = new Set<ProviderId>();
 
+  constructor(private readonly configHome: string) {
+    super();
+  }
+
   install(provider: ProviderId) {
     this.installed.add(provider);
   }
@@ -40,5 +44,10 @@ export class ScriptedDesktopApps extends DesktopApps {
   async open({ spec }: InstalledDesktopApp, launch: DesktopLaunch) {
     this.opened.push({ provider: spec.provider, launch });
     this.running.add(spec.provider);
+  }
+
+  defaultProfile({ linux }: DesktopAppSpec) {
+    if (!linux.defaultProfile) return undefined;
+    return `${this.configHome}/${linux.defaultProfile}`;
   }
 }

@@ -3,6 +3,7 @@ import { BuiltInThemes } from '@favo/domain/themes/built-in-themes';
 import { createAccount } from '#contracts/rpc/accounts/create-account';
 import { listAccounts } from '#contracts/rpc/accounts/list-accounts';
 import { createRpcClient } from '#contracts/rpc/client';
+import { getAppLogin } from '#contracts/rpc/desktop/get-app-login';
 import { listDesktopApps } from '#contracts/rpc/desktop/list-desktop-apps';
 import { openDesktopApp } from '#contracts/rpc/desktop/open-desktop-app';
 import type { RpcResponse } from '#contracts/rpc/envelope';
@@ -139,6 +140,7 @@ describe('desktop apps', () => {
   it('run on the computer you are at, because that is where the window opens', () => {
     expect(listDesktopApps.routing).toBe('hub');
     expect(openDesktopApp.routing).toBe('hub');
+    expect(getAppLogin.routing).toBe('hub');
   });
   it('accepts an open request and refuses one for an unknown provider', () => {
     const params = { account: 'work', provider: 'claude', canClose: false };
@@ -149,8 +151,20 @@ describe('desktop apps', () => {
     expect(openDesktopApp.params.safeParse({ account: 'work', provider: 'claude' }).success).toBe(false);
   });
   it('parses the apps found and refuses one with no label', () => {
-    expect(listDesktopApps.result.safeParse([{ provider: 'codex', label: 'ChatGPT' }]).success).toBe(true);
-    expect(listDesktopApps.result.safeParse([{ provider: 'codex' }]).success).toBe(false);
+    const chatgpt = { provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli' };
+    expect(listDesktopApps.result.safeParse([chatgpt]).success).toBe(true);
+    expect(listDesktopApps.result.safeParse([{ provider: 'codex', login: 'sharedWithCli' }]).success).toBe(false);
+  });
+  it('says whether an app signs in on its own', () => {
+    const claude = { provider: 'claude', label: 'Claude', login: 'separate' };
+    expect(listDesktopApps.result.safeParse([claude]).success).toBe(true);
+    expect(listDesktopApps.result.safeParse([{ ...claude, login: 'sometimes' }]).success).toBe(false);
+  });
+  it('asks for the login of a seat app and parses it', () => {
+    expect(getAppLogin.params.safeParse({ account: 'work', provider: 'claude' }).success).toBe(true);
+    expect(getAppLogin.params.safeParse({ account: 'work', provider: 'claude', token: 'x' }).success).toBe(false);
+    expect(getAppLogin.result.safeParse({ login: 'signedIn', isOtherAccount: true }).success).toBe(true);
+    expect(getAppLogin.result.safeParse({ login: 'notInstalled', isOtherAccount: false }).success).toBe(false);
   });
 });
 

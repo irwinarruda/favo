@@ -26,7 +26,7 @@ import { listThreads } from '@favo/contracts/rpc/threads/list-threads';
 import { type HookView, LoginState, type ThreadView } from '@favo/contracts/rpc/views';
 import { FavoVersion } from '@favo/contracts/version';
 import { PersonalAccount } from '@favo/domain/accounts/account';
-import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
+import { DesktopAppSpecs, DesktopLogin, DesktopOpening } from '@favo/domain/desktop/desktop-app';
 import { HookState } from '@favo/domain/hooks/provider-hook';
 import { isOlderFavoError, type Machine, MachineState } from '@favo/domain/machines/machine';
 import { Providers } from '@favo/domain/providers/provider';
@@ -228,6 +228,12 @@ async function openApp(context: CommandContext, parsed: Command, command: Comman
     return 1;
   }
   print(`${paint.accent('⬢')} ${label} is opening as ${parsed.account}.`);
+  if (DesktopAppSpecs[seat.provider]?.login !== DesktopLogin.separate) return 0;
+  const { login } = await client.call(getSeatStatus, seat);
+  if (login !== LoginState.signedOut) return 0;
+  const { label: cli, executable } = Providers[seat.provider];
+  print(`${label} and ${cli} sign in separately, and ${cli} is signed out as ${parsed.account}.`);
+  print(`To sign it in too: favo login ${executable} ${parsed.account}`);
   return 0;
 }
 

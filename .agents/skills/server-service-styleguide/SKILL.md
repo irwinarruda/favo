@@ -13,7 +13,7 @@ description: Use when writing or changing a backend use case, a gateway or its t
 - A service never reads the environment, spawns a process or touches a file directly. It receives what it needs in its constructor. There is no container on the server; `server.ts` wires everything by hand.
 - Every external thing has a gateway: an abstract class in `gateways/`, its real implementation and its test double beside it (`ssh.ts`, `open.ssh.ts`, `scripted.ssh.ts`). Production never reads a flag to switch them; only the composition root chooses.
 - A real gateway owns the mapping from an external failure to a `DomainError`.
-- favo never reads a token. Identity comes from the official status commands, and a login runs the official command with the right folder set.
+- favo never reads a token's value. Identity comes from the official status commands, and a login runs the official command with the right folder set.
 
 ## Tests
 
