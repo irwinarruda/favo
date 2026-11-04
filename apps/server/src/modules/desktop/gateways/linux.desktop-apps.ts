@@ -10,6 +10,7 @@ export class LinuxDesktopApps extends UnixDesktopApps {
   constructor(
     processes: ProcessRunner,
     private readonly fileSystem: FileSystem,
+    private readonly configHome: string,
     quitTimeoutMs?: number
   ) {
     super(processes, quitTimeoutMs);
@@ -25,5 +26,10 @@ export class LinuxDesktopApps extends UnixDesktopApps {
   async open({ spec, launcher }: InstalledDesktopApp, { args, env }: DesktopLaunch) {
     const isDetached = this.processes.detach({ command: launcher, args, env });
     assertDomain(isDetached, DomainErrorCode.desktopAppFailed, `Could not start ${spec.label}.`);
+  }
+
+  defaultProfile({ linux }: DesktopAppSpec) {
+    if (!linux.defaultProfile) return undefined;
+    return `${this.configHome}/${linux.defaultProfile}`;
   }
 }

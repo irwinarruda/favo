@@ -66,7 +66,7 @@ describe('SessionService', () => {
   });
   test('offers the app of the selected seat on this machine', async () => {
     const app = await getApp();
-    expect(app.state.selectedDesktopApp).toEqual({ provider: 'claude', label: 'Claude' });
+    expect(app.state.selectedDesktopApp).toEqual({ provider: 'claude', label: 'Claude', login: 'separate' });
   });
   test('offers nothing for a provider whose app is not installed', async () => {
     const app = await getApp();
@@ -81,7 +81,7 @@ describe('SessionService', () => {
   test('notices an app installed later, on a refresh of this machine', async () => {
     const app = await getApp();
     app.state.selectRow('seat:local/personal/codex');
-    mockDb.desktopApps.push({ provider: 'codex', label: 'ChatGPT' });
+    mockDb.desktopApps.push({ provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli' });
     await app.state.refreshMachine('local');
     expect(app.state.selectedDesktopApp?.label).toBe('ChatGPT');
   });
@@ -97,6 +97,61 @@ describe('SessionService', () => {
     repository.getApps = () => Promise.reject(new Error('no lookup'));
     await expect(app.state.loadFleet()).rejects.toThrow('no lookup');
     expect(app.state.accounts.length).toBeGreaterThan(0);
+  });
+  test('reads the app login of each seat here whose app signs in on its own', async () => {
+    const app = await getApp({ isLoaded: false });
+    mockDb.appLogins['seat:local/work/claude'] = { login: 'signedIn', isOtherAccount: false };
+    await app.state.loadFleet();
+    const seat = (key: string) => app.state.accounts.flatMap((account) => account.seats).find((s) => s.key === key);
+    expect(seat('seat:local/work/claude')?.isAppSignedIn).toBe(true);
+    expect(seat('seat:local/personal/claude')?.appLogin?.login).toBe('signedOut');
+    expect(seat('seat:devbox/personal/claude')?.hasAppLogin).toBe(false);
+    expect(mockDb.appLoginReads).not.toContain('seat:local/work/codex');
+  });
+  test('reads each app login once per refresh, through the seat it belongs to', async () => {
+    const app = await getApp();
+    mockDb.appLoginReads = [];
+    await app.state.refreshMachine('local');
+    expect(mockDb.appLoginReads.toSorted()).toEqual(['seat:local/personal/claude', 'seat:local/work/claude']);
+  });
+  test('reads no app login for an app that shares the CLI login', async () => {
+    const app = await getApp({ isLoaded: false });
+    mockDb.desktopApps = [{ provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli' }];
+    await app.state.loadFleet();
+    expect(mockDb.appLoginReads).toEqual([]);
+    expect(app.state.accounts.flatMap((account) => account.seats).some((seat) => seat.hasAppLogin)).toBe(false);
+  });
+  test('drops the app login once the app is gone', async () => {
+    const app = await getApp();
+    mockDb.desktopApps = [];
+    await app.state.refreshMachine('local');
+    expect(app.state.selectedSeat?.hasAppLogin).toBe(false);
+  });
+  test('reads the app login again with the seat', async () => {
+    const app = await getApp();
+    app.state.selectRow('seat:local/work/claude');
+    mockDb.appLogins['seat:local/work/claude'] = { login: 'signedIn', isOtherAccount: false };
+    await app.state.refreshSeat(app.state.selectedSeat!);
+    expect(app.state.selectedSeat?.isAppSignedIn).toBe(true);
+  });
+  test('keeps the status of a seat when its app login arrives late', async () => {
+    const app = await getApp({ isLoaded: false });
+    const repository = container.get('IDesktopRepository');
+    const getLogin = repository.getLogin.bind(repository);
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    repository.getLogin = async (seat) => {
+      await held;
+      return getLogin(seat);
+    };
+    const loading = app.state.loadFleet();
+    await Bun.sleep(10);
+    release();
+    await loading;
+    expect(app.state.selectedSeat?.isChecking).toBe(false);
+    expect(app.state.selectedSeat?.hasAppLogin).toBe(true);
   });
   test('opens the app as the given account and says so', async () => {
     const app = await getApp();

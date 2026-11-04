@@ -38,6 +38,11 @@ export class MacDesktopApps extends UnixDesktopApps {
     assertDomain(code === 0, DomainErrorCode.desktopAppFailed, `macOS could not open ${spec.label}.`);
   }
 
+  defaultProfile({ mac }: DesktopAppSpec) {
+    if (!mac.defaultProfile) return undefined;
+    return `${this.home}/Library/Application Support/${mac.defaultProfile}`;
+  }
+
   private async hasBundleId(bundle: string, bundleId: string) {
     const { code, stdout } = await this.processes.run({
       command: 'plutil',

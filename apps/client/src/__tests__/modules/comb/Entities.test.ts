@@ -35,6 +35,29 @@ describe('Seat', () => {
   test('flags a provider whose login favo could not verify as separate', () => {
     expect(Seat.fromJSON('local', { ...view, loginScope: 'unverified' }).hasSharedLogin).toBe(true);
   });
+  test('says how the app is signed in, apart from the CLI', () => {
+    const seat = Seat.fromJSON('local', view).withStatus({ login: 'signedOut', problems: 0 });
+    expect(seat.hasAppLogin).toBe(false);
+    expect(seat.withAppLogin({ login: 'signedIn', isOtherAccount: false }).appLoginLabel).toBe('signed in');
+    expect(seat.withAppLogin({ login: 'signedOut', isOtherAccount: false }).appLoginLabel).toBe('signed out');
+    expect(seat.withAppLogin({ login: 'unknown', isOtherAccount: false }).appLoginLabel).toBe('sign-in unknown');
+  });
+  test('calls it another account only while the CLI is signed in too', () => {
+    const appLogin = { login: 'signedIn', isOtherAccount: true } as const;
+    const signedOut = Seat.fromJSON('local', view).withStatus({ login: 'signedOut', problems: 0 });
+    const signedIn = signedOut.withStatus({ login: 'signedIn', problems: 0 });
+    expect(signedOut.withAppLogin(appLogin).isOtherAccount).toBe(false);
+    expect(signedIn.withAppLogin(appLogin).isOtherAccount).toBe(true);
+    expect(signedIn.withAppLogin(appLogin).appLoginLabel).toBe('on another account');
+  });
+  test('keeps the app login through a new status, and the status through a new app login', () => {
+    const seat = Seat.fromJSON('local', view)
+      .withAppLogin({ login: 'signedIn', isOtherAccount: false })
+      .withStatus({ login: 'signedIn', identity: 'a@b', problems: 0 })
+      .withProvisioned();
+    expect(seat.isAppSignedIn).toBe(true);
+    expect(seat.withAppLogin(undefined).identity).toBe('a@b');
+  });
 });
 
 describe('Machine', () => {

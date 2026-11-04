@@ -19,7 +19,7 @@ It is a smaller, TypeScript take on [Ditto CLI](https://github.com/reyanshgupta/
 - An account spans providers. `work` can hold Claude and Codex; the provider folder appears on first use.
 - An item is either shared or private. Shared is a named allowlist per provider; everything else is private, so a new credential file can never leak between accounts. Settings are shared.
 - Links are reconciled at launch and on demand, never on a schedule. A symlink cannot go stale; only a missing or broken link can drift, and that only matters when a tool starts. A real file where a link belongs is reported, never overwritten.
-- favo never reads a token. Logins run the official commands with the right folder set, and identity comes from the official status commands.
+- favo never reads a token's value. Logins run the official commands with the right folder set, and identity comes from the official status commands.
 - favo may add its own hook to a provider's base config, only when asked, by `favo hooks install` or a yes in the TUI. A hook handles thread IDs and folders and nothing else, and it does nothing outside a provider favo started. It keeps the user's own hooks, and `favo hooks uninstall` removes it. favo never answers a provider's own approval, such as Codex's trust prompt, for the user.
 - One binary. `favo serve --stdio` is the backend for another machine; the local backend reaches it through `ssh`, so there are no ports, tunnels or daemons, and Tailscale SSH handles identity.
 

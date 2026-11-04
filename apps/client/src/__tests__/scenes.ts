@@ -108,9 +108,13 @@ function stageHive() {
     ),
   };
   mockDb.desktopApps = [
-    { provider: ProviderId.claude, label: 'Claude' },
-    { provider: ProviderId.codex, label: 'ChatGPT' },
+    { provider: ProviderId.claude, label: 'Claude', login: 'separate' },
+    { provider: ProviderId.codex, label: 'ChatGPT', login: 'sharedWithCli' },
   ];
+  mockDb.appLogins = {
+    'seat:local/personal/claude': { login: 'signedIn', isOtherAccount: false },
+    'seat:local/work/claude': { login: 'signedIn', isOtherAccount: false },
+  };
 }
 
 function stageThreads() {

@@ -75,7 +75,7 @@ export function createProductionServer(env: Record<string, string | undefined>) 
     if (isOverSsh) return new HeadlessDesktopApps();
     if (platform() === 'darwin') return new MacDesktopApps(processes, home);
     if (isWindows) return new WindowsDesktopApps(processes, env.LOCALAPPDATA ?? `${home}/AppData/Local`);
-    if (env.DISPLAY || env.WAYLAND_DISPLAY) return new LinuxDesktopApps(processes, fileSystem);
+    if (env.DISPLAY || env.WAYLAND_DISPLAY) return new LinuxDesktopApps(processes, fileSystem, paths.configHome);
     return new HeadlessDesktopApps();
   }
 }

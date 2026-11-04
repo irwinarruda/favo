@@ -27,8 +27,8 @@ export class Account {
     return this.seats.filter((seat) => seat.isSignedIn).length;
   }
 
-  withSeat(seat: Seat) {
-    const seats = this.seats.map((candidate) => (candidate.key === seat.key ? seat : candidate));
+  withSeat(key: string, change: (seat: Seat) => Seat) {
+    const seats = this.seats.map((candidate) => (candidate.key === key ? change(candidate) : candidate));
     return new Account(this.machineId, this.name, this.displayName, this.isPersonal, seats);
   }
 }

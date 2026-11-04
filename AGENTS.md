@@ -33,7 +33,7 @@ Releases are immutable, so a bad binary burns its version number; fix it in a ne
 - `packages/domain` is pure: no I/O, no framework, no implicit clock.
 - Every external thing on the backend goes through a gateway with a test double beside it.
 - Views call services, services call ports. `apps/client/**/app/` knows nothing about OpenTUI, so a web front end can reuse it.
-- Shared is an allowlist. favo never reads a token.
+- Shared is an allowlist. favo never reads a token's value.
 - No comments in production code. No `../`. No barrels. No TS `enum`. `undefined`, never `null`.
 - Commits follow Conventional Commits.
 - No merge commits. Bring a branch up to date with `git rebase`, then push it with `--force-with-lease`. A pull request lands by rebase or squash, and squashing a branch's commits is always fine.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { createAccount } from '@favo/contracts/rpc/accounts/create-account';
+import { getAppLogin } from '@favo/contracts/rpc/desktop/get-app-login';
 import { listDesktopApps } from '@favo/contracts/rpc/desktop/list-desktop-apps';
 import { openDesktopApp } from '@favo/contracts/rpc/desktop/open-desktop-app';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
@@ -23,7 +24,9 @@ describe('which apps favo offers', () => {
   it('offers only the ones it found', async () => {
     const { client, desktopApps } = createTestServer();
     desktopApps.install('codex');
-    expect(await client.call(listDesktopApps, {})).toEqual([{ provider: 'codex', label: 'ChatGPT' }]);
+    expect(await client.call(listDesktopApps, {})).toEqual([
+      { provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli' },
+    ]);
   });
   it('never offers one for a provider that has no app', async () => {
     const { client, desktopApps } = createTestServer();
@@ -36,7 +39,7 @@ describe('which apps favo offers', () => {
     desktopApps.install('claude');
     await client.call(addMachine, { target: 'bee@devbox' });
     const apps = await client.call(listDesktopApps, {}, { machineId: 'devbox' });
-    expect(apps).toEqual([{ provider: 'claude', label: 'Claude' }]);
+    expect(apps).toEqual([{ provider: 'claude', label: 'Claude', login: 'separate' }]);
   });
 });
 
@@ -137,5 +140,78 @@ describe('opening an app', () => {
     desktopApps.run('codex');
     await client.call(openDesktopApp, { ...openWork, canClose: true });
     expect(desktopApps.quitCalls).toEqual([]);
+  });
+});
+
+describe('the login of a seat app', () => {
+  const workProfile = `${Home}/.favo/accounts/work/claude-app`;
+  const workLogin = { account: 'work', provider: 'claude' } as const;
+
+  function appSettings(isSignedIn: boolean, accountUuid = 'uuid-work') {
+    const tokens = { 'oauth:tokenCache': 'v10sealed', 'oauth:tokenCacheV2': 'v10sealed' };
+    return JSON.stringify({ ...tokens, windowSizeWasSignedIn: isSignedIn, lastKnownAccountUuid: accountUuid });
+  }
+
+  function cliConfig(accountUuid: string) {
+    return JSON.stringify({ oauthAccount: { accountUuid, emailAddress: 'bee@work.dev' }, projects: {} });
+  }
+
+  it('is signed in when the app in that seat says so, and keeps nothing else from its settings', async () => {
+    const { client, fileSystem } = await serverWithWork();
+    await fileSystem.writePrivateText(`${workProfile}/config.json`, appSettings(true));
+    await fileSystem.writePrivateText(`${Home}/.favo/accounts/work/claude/.claude.json`, cliConfig('uuid-work'));
+    expect(await client.call(getAppLogin, workLogin)).toEqual({ login: 'signedIn', isOtherAccount: false });
+  });
+  it('is signed out after a sign-out in the app', async () => {
+    const { client, fileSystem } = await serverWithWork();
+    await fileSystem.writePrivateText(`${workProfile}/config.json`, appSettings(false));
+    expect(await client.call(getAppLogin, workLogin)).toEqual({ login: 'signedOut', isOtherAccount: false });
+  });
+  it('is signed out for a seat the app never opened as', async () => {
+    const { client } = await serverWithWork();
+    expect(await client.call(getAppLogin, workLogin)).toEqual({ login: 'signedOut', isOtherAccount: false });
+  });
+  it('is unknown when the app left no flag to read', async () => {
+    const { client, fileSystem } = await serverWithWork();
+    await fileSystem.ensureDirectory(workProfile);
+    expect((await client.call(getAppLogin, workLogin)).login).toBe('unknown');
+  });
+  it('says so when the app and Claude Code are signed in to different accounts', async () => {
+    const { client, fileSystem } = await serverWithWork();
+    await fileSystem.writePrivateText(`${workProfile}/config.json`, appSettings(true, 'uuid-personal'));
+    await fileSystem.writePrivateText(`${Home}/.favo/accounts/work/claude/.claude.json`, cliConfig('uuid-work'));
+    expect(await client.call(getAppLogin, workLogin)).toEqual({ login: 'signedIn', isOtherAccount: true });
+  });
+  it('reads personal from the default folder and the .claude.json in the home folder', async () => {
+    const { client, fileSystem } = await serverWithWork();
+    await fileSystem.writePrivateText(`${Home}/.config/Claude/config.json`, appSettings(true, 'uuid-personal'));
+    await fileSystem.writePrivateText(`${Home}/.claude.json`, cliConfig('uuid-work'));
+    const login = await client.call(getAppLogin, { ...workLogin, account: 'personal' });
+    expect(login).toEqual({ login: 'signedIn', isOtherAccount: true });
+  });
+  it('cannot tell for personal while the app default folder is missing', async () => {
+    const { client } = await serverWithWork();
+    const login = await client.call(getAppLogin, { ...workLogin, account: 'personal' });
+    expect(login).toEqual({ login: 'unknown', isOtherAccount: false });
+  });
+  it('creates nothing while it reads', async () => {
+    const { client, fileSystem } = await serverWithWork();
+    await client.call(getAppLogin, workLogin);
+    expect((await fileSystem.entry(workProfile)).kind).toBe(EntryKind.missing);
+  });
+  it('refuses ChatGPT, whose login is the one Codex shows', async () => {
+    const { client } = await serverWithWork();
+    const params = { ...workLogin, provider: 'codex' } as const;
+    await expect(client.call(getAppLogin, params)).rejects.toMatchObject({ code: 'desktopAppMissing' });
+  });
+  it('refuses a provider that has no app', async () => {
+    const { client } = await serverWithWork();
+    const params = { ...workLogin, provider: 'opencode' } as const;
+    await expect(client.call(getAppLogin, params)).rejects.toMatchObject({ code: 'desktopAppMissing' });
+  });
+  it('refuses an account that does not exist', async () => {
+    const { client } = await serverWithWork();
+    const params = { ...workLogin, account: 'ghost' };
+    await expect(client.call(getAppLogin, params)).rejects.toMatchObject({ code: 'accountNotFound' });
   });
 });

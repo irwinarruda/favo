@@ -1,4 +1,4 @@
-import { DesktopOpening } from '@favo/domain/desktop/desktop-app';
+import { AppLoginState, DesktopAppSpecs, DesktopLogin, DesktopOpening } from '@favo/domain/desktop/desktop-app';
 import { DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { mockDb } from '@/__tests__/db';
 import type { Seat } from '@/modules/comb/app/entities/Seat';
@@ -18,5 +18,18 @@ export class TestDesktopRepository implements IDesktopRepository {
     mockDb.runningDesktopApps = [...mockDb.runningDesktopApps.filter((name) => name !== seat.provider), seat.provider];
     mockDb.desktopOpenings.push(seat.key);
     return { opening: DesktopOpening.opened, label: app.label };
+  }
+
+  async getLogin(seat: Seat) {
+    const spec = DesktopAppSpecs[seat.provider];
+    if (spec?.login !== DesktopLogin.separate) {
+      throw new DomainError(DomainErrorCode.desktopAppMissing, `${seat.label} has no app with a login of its own.`);
+    }
+    const accounts = mockDb.accounts[seat.machineId] ?? [];
+    if (!accounts.some(({ name }) => name === seat.account)) {
+      throw new DomainError(DomainErrorCode.accountNotFound, `No account named "${seat.account}".`);
+    }
+    mockDb.appLoginReads.push(seat.key);
+    return mockDb.appLogins[seat.key] ?? { login: AppLoginState.signedOut, isOtherAccount: false };
   }
 }

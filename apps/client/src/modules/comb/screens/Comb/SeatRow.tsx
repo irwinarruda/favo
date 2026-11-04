@@ -1,4 +1,5 @@
 import type { Seat } from '@/modules/comb/app/entities/Seat';
+import { appColorOf, appMarkOf } from '@/modules/comb/screens/Comb/appMark';
 import { Spinner } from '@/shared/components/Spinner';
 import { useError } from '@/shared/error/useError';
 import { useApp } from '@/shared/stores/app';
@@ -13,6 +14,7 @@ export function SeatRow({ seat }: { seat: Seat }) {
   const openSelectedSeat = useApp((state) => state.openSelectedSeat);
   const error = useError();
   const headlineColor = seat.isSignedIn ? colors.text : colors.faint;
+  const appColor = appColorOf(seat, colors);
 
   async function onSeatClick() {
     if (isSelected) await openSelectedSeat();
@@ -40,6 +42,7 @@ export function SeatRow({ seat }: { seat: Seat }) {
       <text fg={headlineColor} flexGrow={1} flexShrink={1} wrapMode="none" truncate>
         {seat.headline}
       </text>
+      {seat.hasAppLogin && <text fg={appColor}>{` app ${appMarkOf(seat)}`}</text>}
       {seat.problems > 0 && <text fg={colors.danger}> !</text>}
     </box>
   );

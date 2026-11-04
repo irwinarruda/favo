@@ -11,4 +11,5 @@ export abstract class DesktopApps {
   abstract isRunning(app: InstalledDesktopApp): Promise<boolean>;
   abstract quit(app: InstalledDesktopApp): Promise<boolean>;
   abstract open(app: InstalledDesktopApp, launch: DesktopLaunch): Promise<void>;
+  abstract defaultProfile(spec: DesktopAppSpec): string | undefined;
 }

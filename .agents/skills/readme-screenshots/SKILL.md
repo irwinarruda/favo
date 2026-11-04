@@ -21,23 +21,26 @@ Each scene reports `changed` or `unchanged`, and only a changed picture is writt
 
 `apps/client/src/__tests__/scenes.ts` is the table of pictures: each scene names its theme, the keys to press, and any change to the demo data. The scene name is the file name in `docs/assets`.
 
-`bun run dev:mock <scene>` starts favo on `mockDb`, swaps in the demo data, and plays the keys through the renderer's real input. `scripts/screenshots.ts` opens that in a private Ghostty and shoots the window. A launch is the one thing that reliably takes focus, and only a launch through `open`: Ghostty's binary started directly stays behind whichever app is in front. `scripts/screenshot-tools.swift` checks the red traffic light in each shot, and a grey one means closing that Ghostty and launching a new one. The script then fails if the image is the wrong size, and replaces the picture only if it changed.
+`bun run dev:mock <scene>` starts favo on `mockDb`, swaps in the demo data, and plays the keys through the renderer's real input. `scripts/screenshots.ts` opens that in a private Ghostty and shoots the window. A launch is the one thing that reliably takes focus, and only a launch through `open`: Ghostty's binary started directly stays behind whichever app is in front. `scripts/screenshot-tools.swift` checks the red traffic light in each shot, and a grey one means closing that Ghostty and launching a new one. The script then fails if the image is out of proportion, and replaces the picture only if it changed.
 
 The demo data is not `mockDb`'s seed: tests depend on that seed, so the showcase lives in `scenes.ts` and never changes `db.ts`.
 
 ## The standard
 
-These live in `StandardConfig` in `scripts/screenshots.ts`, and were measured from the first set of pictures. Change them only to change every picture at once.
+These live in `StandardConfig` and `ScaleConfig` in `scripts/screenshots.ts`, and were measured from the first set of pictures. Change them only to change every picture at once.
 
-| What                | Value                                                                 |
-| ------------------- | --------------------------------------------------------------------- |
-| Image               | 2240×1572 PNG at 2x, the window alone, no shadow, transparent corners |
-| Terminal            | 129 columns by 36 rows (`window-width=128` is what yields 129)        |
-| Font                | FiraCode Nerd Font Mono Med, 14pt, cell height +20%                   |
-| Padding             | 8pt across, 4pt down                                                  |
-| Chrome              | Ghostty defaults, title `favo`, focused traffic lights, no cursor     |
-| Background          | The theme on screen, so the title bar matches the app                 |
-| Your Ghostty config | Ignored, by `--config-default-files=false`                            |
+| What                | Value                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| Image               | PNG of the window alone, no shadow, transparent corners, in the 2240:1572 proportion  |
+| Size                | 2240×1572 on a Retina screen, 1177×832 on a 1x one                                    |
+| Terminal            | 129 columns by 36 rows (on Retina, `window-width=128` is what yields 129)             |
+| Font                | FiraCode Nerd Font Mono Med, 14pt, cell height +20% on Retina and +30% on a 1x screen |
+| Padding             | 8pt across, 4pt down                                                                  |
+| Chrome              | Ghostty defaults, title `favo`, focused traffic lights, no cursor                     |
+| Background          | The theme on screen, so the title bar matches the app                                 |
+| Your Ghostty config | Ignored, by `--config-default-files=false`                                            |
+
+The size follows the screen; the proportion does not. On a 1x screen Ghostty rounds each cell to whole pixels, 9×20 instead of 8.5×20.5 points, which makes the picture wider and shorter, so the taller cells and the extra column bring it back within 1% of the proportion. A Retina screen gives sharper pictures, so prefer one when you can.
 
 Demo data: four machines (macbook, devbox, studio, pi offline), six accounts, twelve logins, all under `bee@`. Keep it fictional.
 
@@ -64,8 +67,8 @@ Read each changed image, and check:
 
 ## Requirements
 
-macOS on a Retina display, Ghostty in `/Applications`, Xcode Command Line Tools for `swift`, FiraCode Nerd Font (`brew install --cask font-fira-code-nerd-font`), and Screen Recording access for the terminal you run it from.
+macOS, Ghostty in `/Applications`, Xcode Command Line Tools for `swift`, FiraCode Nerd Font (`brew install --cask font-fira-code-nerd-font`), and Screen Recording access for the terminal you run it from.
 
 A full run opens one window per scene and takes over the screen for about 30 seconds. Warn whoever is at the computer, run it once, and never loop it. Anything typed or clicked during a run lands in the window and can change the shot, which shows up as an unexpected `changed`.
 
-A Ghostty or macOS update can change the window chrome, and every picture with it. When that happens, retake all of them in one commit so the set stays the same.
+A Ghostty or macOS update can change the window chrome, and every picture with it, and so does a run on a screen of a different scale than the last one. When that happens, retake all of them in one commit so the set stays the same.

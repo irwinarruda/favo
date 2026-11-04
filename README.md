@@ -131,7 +131,7 @@ favo app claude personal     # back to the app you always had
 favo app claude work --close # close it first if it is open
 ```
 
-The first time, sign in inside the app. It remembers each account after that, and the Claude Code or Codex inside it uses the same seat as the CLI. `p` only appears when the app is installed on the computer you are at. If the app is already open, favo asks first:
+The first time, sign in inside the app. It remembers each account after that, and the Claude Code or Codex inside it uses the same seat as the CLI, so it sees the same settings and its threads land in the same place. `p` only appears when the app is installed on the computer you are at. If the app is already open, favo asks first:
 
 <p align="center">
   <img src="docs/assets/favo-desktop.png" alt="favo asking before it closes the Claude desktop app to reopen it as the work account" width="760">
@@ -139,6 +139,10 @@ The first time, sign in inside the app. It remembers each account after that, an
 
 > [!WARNING]
 > **This is unofficial.** Neither app documents running several accounts, so an update could break it. Your apps themselves stay as they were, and `personal` always opens the default one.
+
+ChatGPT signs in through the Codex in the seat, so it shares the CLI's login. Claude does not: the Claude app and Claude Code sign in separately, even in the same seat. So each Claude seat on the computer you are at shows both in the comb, `⬢ claude` for Claude Code and `app ⬢` for the app, and the cell says which is signed in. `app ⬡` means the app is signed out there, and `app ?` means favo can't tell, which is how a seat looks from the first time favo opens its app until you sign in. `s` signs in Claude Code, and `p` opens the app to sign in there.
+
+If the app and Claude Code are signed in to different accounts, the comb marks it in red, because it costs you: the Code tab in the app spends the app's account, while its threads land in the seat. favo tells them apart by reading two settings the app keeps in its own folder, which an app update could rename. If the sign-in setting is renamed, the comb shows `app ?` rather than signed out. If the account setting is renamed, the comb still shows the app signed in, but it can no longer warn you about another account.
 
 - One account at a time, per app. favo closes the app to switch, and anything running in it stops.
 - Opening the app from the Dock or Start menu uses your default account, not the last one favo opened.
@@ -181,7 +185,7 @@ Inside a cell, an item is either shared or private. Shared items are a named lis
 No. favo starts the official CLI with the right folder set, then gets out of the way. Your requests go straight from that CLI to its provider, and you always choose which account runs.
 
 **Can favo see my tokens?**
-favo never reads them. Logins run each provider's own command, and credentials stay wherever that provider keeps them. One thing to watch: settings are shared, so an API key you put in `settings.json` or `config.toml` is visible to every account.
+favo never reads them. Logins run each provider's own command, and credentials stay wherever that provider keeps them. To tell whether the Claude app is signed in, favo reads two settings from the app's own `config.json`, whether it is signed in and which account, and the account id from Claude Code's `.claude.json`. It keeps nothing else from either file, and the token in `config.json` is encrypted with your system's key. One thing to watch: settings are shared, so an API key you put in `settings.json` or `config.toml` is visible to every account.
 
 **What happens to my existing config?**
 It stays where it is and becomes your `personal` account. Shared items in other accounts are links to it, so editing one edits your original. favo changes it in one case, and only when you ask: `favo hooks install` adds its own hook, leaves yours alone, and `favo hooks uninstall` takes it out again.

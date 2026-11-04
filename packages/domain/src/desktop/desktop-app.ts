@@ -1,5 +1,7 @@
-import { isPersonalAccount } from '#domain/accounts/account';
+import { z } from 'zod';
+import { isPersonalAccount, seatHomeOf } from '#domain/accounts/account';
 import { isolationEnvironment, ProviderId, Providers } from '#domain/providers/provider';
+import { parseJson } from '#domain/shared/parse-json';
 import type { ValueOf } from '#domain/shared/value-of';
 
 export const DesktopOpening = {
@@ -8,14 +10,28 @@ export const DesktopOpening = {
 } as const;
 export type DesktopOpening = ValueOf<typeof DesktopOpening>;
 
+export const DesktopLogin = {
+  sharedWithCli: 'sharedWithCli',
+  separate: 'separate',
+} as const;
+export type DesktopLogin = ValueOf<typeof DesktopLogin>;
+
+export const AppLoginState = {
+  signedIn: 'signedIn',
+  signedOut: 'signedOut',
+  unknown: 'unknown',
+} as const;
+export type AppLoginState = ValueOf<typeof AppLoginState>;
+
 export type DesktopAppSpec = {
   provider: ProviderId;
   label: string;
   profileFolder: string;
   userDataVariable?: string;
-  mac: { bundleId: string; appNames: string[] };
-  linux: { executable: string; processNames: string[] };
-  windows: { packageName: string; alias: string; executable: string };
+  login: DesktopLogin;
+  mac: { bundleId: string; appNames: string[]; defaultProfile?: string };
+  linux: { executable: string; processNames: string[]; defaultProfile?: string };
+  windows: { packageName: string; alias: string; executable: string; defaultProfile?: string };
 };
 
 export type DesktopLaunch = {
@@ -28,18 +44,26 @@ export const DesktopAppSpecs: Partial<Record<ProviderId, DesktopAppSpec>> = {
     provider: ProviderId.claude,
     label: 'Claude',
     profileFolder: 'claude-app',
-    mac: { bundleId: 'com.anthropic.claudefordesktop', appNames: ['Claude'] },
+    login: DesktopLogin.separate,
+    mac: { bundleId: 'com.anthropic.claudefordesktop', appNames: ['Claude'], defaultProfile: 'Claude' },
     linux: {
       executable: '/usr/lib/claude-desktop/claude-desktop',
       processNames: ['/usr/lib/claude-desktop/claude-desktop', '/usr/bin/claude-desktop', 'claude-desktop'],
+      defaultProfile: 'Claude',
     },
-    windows: { packageName: 'Claude', alias: 'claude-desktop.exe', executable: 'app\\claude.exe' },
+    windows: {
+      packageName: 'Claude',
+      alias: 'claude-desktop.exe',
+      executable: 'app\\claude.exe',
+      defaultProfile: 'Claude-Data/claude_pzs8sxrjxfjjc',
+    },
   },
   codex: {
     provider: ProviderId.codex,
     label: 'ChatGPT',
     profileFolder: 'chatgpt-app',
     userDataVariable: 'CODEX_ELECTRON_USER_DATA_PATH',
+    login: DesktopLogin.sharedWithCli,
     mac: { bundleId: 'com.openai.codex', appNames: ['ChatGPT', 'Codex'] },
     linux: { executable: '/usr/lib/chatgpt/ChatGPT', processNames: ['/usr/lib/chatgpt/ChatGPT'] },
     windows: { packageName: 'OpenAI.Codex', alias: 'chatgpt-desktop.exe', executable: 'app\\ChatGPT.exe' },
@@ -49,6 +73,35 @@ export const DesktopAppSpecs: Partial<Record<ProviderId, DesktopAppSpec>> = {
 export function desktopProfileOf(paths: { accounts: string }, account: string, spec: DesktopAppSpec) {
   if (isPersonalAccount(account)) return undefined;
   return `${paths.accounts}/${account}/${spec.profileFolder}`;
+}
+
+export function appLoginFilesOf(
+  paths: { home: string; accounts: string },
+  account: string,
+  spec: DesktopAppSpec,
+  profile: string
+) {
+  const cliHome = isPersonalAccount(account) ? paths.home : seatHomeOf(paths, account, spec.provider);
+  return { settings: `${profile}/config.json`, cliConfig: `${cliHome}/.claude.json` };
+}
+
+const AppSettings = z.object({
+  windowSizeWasSignedIn: z.boolean().optional(),
+  lastKnownAccountUuid: z.string().optional().catch(undefined),
+});
+
+const CliConfig = z.object({ oauthAccount: z.object({ accountUuid: z.string() }).optional() });
+
+export function appLoginOf(observed: { account: string; hasProfile: boolean; settings?: string; cliConfig?: string }) {
+  const isUnopenedSeat = !observed.hasProfile && !isPersonalAccount(observed.account);
+  if (isUnopenedSeat) return { login: AppLoginState.signedOut, isOtherAccount: false };
+  const app = AppSettings.safeParse(parseJson(observed.settings ?? '')).data;
+  if (app?.windowSizeWasSignedIn === undefined) return { login: AppLoginState.unknown, isOtherAccount: false };
+  if (!app.windowSizeWasSignedIn) return { login: AppLoginState.signedOut, isOtherAccount: false };
+  const cliAccount = CliConfig.safeParse(parseJson(observed.cliConfig ?? '')).data?.oauthAccount?.accountUuid;
+  const appAccount = app.lastKnownAccountUuid;
+  const isOtherAccount = appAccount !== undefined && cliAccount !== undefined && appAccount !== cliAccount;
+  return { login: AppLoginState.signedIn, isOtherAccount };
 }
 
 export function desktopLaunchOf(spec: DesktopAppSpec, seatHome: string, profile?: string): DesktopLaunch {

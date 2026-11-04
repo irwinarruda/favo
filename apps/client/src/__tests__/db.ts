@@ -3,6 +3,7 @@ import type { MachineStatus } from '@favo/contracts/rpc/machines/get-machine-sta
 import type { ThemeList } from '@favo/contracts/rpc/themes/list-themes';
 import type {
   AccountView,
+  AppLoginStatus,
   DesktopAppView,
   HookView,
   ProviderVersionView,
@@ -293,7 +294,7 @@ function seedDirectoryTrees(): Record<string, Record<string, string[]>> {
 }
 
 function seedDesktopApps(): DesktopAppView[] {
-  return [{ provider: ProviderId.claude, label: 'Claude' }];
+  return [{ provider: ProviderId.claude, label: 'Claude', login: 'separate' }];
 }
 
 function seedDiscovered(): DiscoveredMachine[] {
@@ -327,6 +328,8 @@ export const mockDb = {
   runningDesktopApps: [] as ProviderId[],
   desktopOpenings: [] as string[],
   desktopFailure: undefined as DomainError | undefined,
+  appLogins: {} as Record<string, AppLoginStatus>,
+  appLoginReads: [] as string[],
   unreachableTargets: ['down@host'],
   clipboard: [] as string[],
   terminalRuns: [] as TerminalPlan[],
@@ -359,6 +362,8 @@ export const mockDb = {
     this.runningDesktopApps = [];
     this.desktopOpenings = [];
     this.desktopFailure = undefined;
+    this.appLogins = {};
+    this.appLoginReads = [];
     this.unreachableTargets = ['down@host'];
     this.clipboard = [];
     this.terminalRuns = [];

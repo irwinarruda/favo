@@ -7,18 +7,20 @@ import { $ } from 'bun';
 const GhosttyApp = '/Applications/Ghostty.app';
 const GhosttyBinary = 'MacOS/ghostty';
 const Tools = 'scripts/screenshot-tools.swift';
-const ImageWidth = 2240;
-const ImageHeight = 1572;
+const ImageRatio = 2240 / 1572;
+const RatioTolerance = 0.01;
 const FocusAttempts = 5;
 const PollMs = 100;
 const ReadyTimeoutMs = 15_000;
 const WindowSettleMs = 1_000;
+const ScaleConfig: Record<number, string[]> = {
+  1: ['--window-width=129', '--adjust-cell-height=30%'],
+  2: ['--window-width=128', '--adjust-cell-height=20%'],
+};
 const StandardConfig = [
   '--config-default-files=false',
   '--font-family=FiraCode Nerd Font Mono Med',
   '--font-size=14',
-  '--adjust-cell-height=20%',
-  '--window-width=128',
   '--window-height=36',
   '--window-padding-x=8',
   '--window-padding-y=4',
@@ -50,18 +52,27 @@ async function windowIdOf(pid: string) {
   return id.trim() || undefined;
 }
 
-async function hasFocusedChrome(shot: string) {
-  const check = await $`swift ${Tools} has-focused-chrome ${shot}`.nothrow().quiet();
+type Screen = { scale: number; config: string[] };
+
+async function screenConfig(): Promise<Screen> {
+  const scale = Number(await $`swift ${Tools} scale`.text());
+  const config = ScaleConfig[scale];
+  if (!config) throw new Error(`No Ghostty settings for a ${scale}x screen.`);
+  return { scale, config };
+}
+
+async function hasFocusedChrome(shot: string, scale: number) {
+  const check = await $`swift ${Tools} has-focused-chrome ${shot} ${scale}`.nothrow().quiet();
   return check.exitCode === 0;
 }
 
-function assertImageSize(file: string) {
+function assertImageRatio(file: string) {
   const png = readFileSync(file);
   const width = png.readUInt32BE(16);
   const height = png.readUInt32BE(20);
-  if (width === ImageWidth && height === ImageHeight) return;
+  if (Math.abs(width / height / ImageRatio - 1) <= RatioTolerance) return;
   throw new Error(
-    `${file} is ${width}x${height}, not ${ImageWidth}x${ImageHeight}. Is the display Retina, and is FiraCode Nerd Font installed?`
+    `${file} is ${width}x${height}, out of the ${ImageRatio.toFixed(3)} proportion. Is FiraCode Nerd Font installed?`
   );
 }
 
@@ -71,7 +82,7 @@ async function isSameImage(file: string, shot: string) {
   return comparison.exitCode === 0;
 }
 
-async function capture(name: string, shot: string, readyFile: string) {
+async function capture(name: string, shot: string, readyFile: string, config: string[]) {
   const scene = Scenes[name];
   if (!scene) throw new Error(`No scene called ${name}. Scenes: ${Object.keys(Scenes).join(', ')}`);
   const colors = windowColorsOf(scene);
@@ -84,6 +95,7 @@ async function capture(name: string, shot: string, readyFile: string) {
       GhosttyApp,
       '--args',
       ...StandardConfig,
+      ...config,
       `--background=${colors.background}`,
       `--foreground=${colors.text}`,
       `--working-directory=${process.cwd()}`,
@@ -104,14 +116,14 @@ async function capture(name: string, shot: string, readyFile: string) {
   }
 }
 
-async function shoot(name: string, outputFolder: string, workFolder: string) {
+async function shoot(name: string, outputFolder: string, workFolder: string, screen: Screen) {
   const shot = join(workFolder, `${name}.png`);
   const readyFile = join(workFolder, `${name}.ready`);
   let isFocused = false;
   for (let attempt = 0; attempt < FocusAttempts && !isFocused; attempt++) {
-    await capture(name, shot, readyFile);
-    assertImageSize(shot);
-    isFocused = await hasFocusedChrome(shot);
+    await capture(name, shot, readyFile, screen.config);
+    assertImageRatio(shot);
+    isFocused = await hasFocusedChrome(shot, screen.scale);
   }
   if (!isFocused) throw new Error(`${name} never had focus. Leave the keyboard and mouse alone during the run.`);
   const file = join(outputFolder, `${name}.png`);
@@ -126,10 +138,11 @@ async function shoot(name: string, outputFolder: string, workFolder: string) {
 const outputFolder = process.env.FAVO_SCREENSHOTS_DIR ?? 'docs/assets';
 const requested = process.argv.slice(2);
 const names = requested.length > 0 ? requested : Object.keys(Scenes);
+const screen = await screenConfig();
 const workFolder = mkdtempSync(join(tmpdir(), 'favo-screenshots-'));
 mkdirSync(outputFolder, { recursive: true });
 try {
-  for (const name of names) await shoot(name, outputFolder, workFolder);
+  for (const name of names) await shoot(name, outputFolder, workFolder, screen);
 } finally {
   rmSync(workFolder, { recursive: true });
 }

@@ -20,7 +20,7 @@ export type FleetService = {
   refreshMachine(machineId: string): Promise<void>;
   loadMachine(machine: Machine): Promise<void>;
   refreshSeat(seat: Seat): Promise<void>;
-  replaceSeat(seat: Seat): void;
+  updateSeat(key: string, change: (seat: Seat) => Seat): void;
   setMachinePresence(machineId: string, presence: MachinePresence, message?: string): void;
 };
 
@@ -74,12 +74,14 @@ export const createFleetService: ServiceCreator<FleetService> = (set, get) => ({
     await Promise.all(seats.map((seat) => get().refreshSeat(seat)));
   },
   async refreshSeat(seat) {
+    const { updateSeat, loadAppLogin } = get();
     const fleetRepository = container.get('IFleetRepository');
     const status = await fleetRepository.getSeatStatus(seat);
-    get().replaceSeat(seat.withStatus(status));
+    updateSeat(seat.key, (current) => current.withStatus(status));
+    await loadAppLogin(seat);
   },
-  replaceSeat(seat) {
-    set((state) => ({ accounts: state.accounts.map((account) => account.withSeat(seat)) }));
+  updateSeat(key, change) {
+    set((state) => ({ accounts: state.accounts.map((account) => account.withSeat(key, change)) }));
   },
   setMachinePresence(machineId, presence, message) {
     set((state) => ({

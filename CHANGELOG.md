@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- The comb now shows whether each seat's Claude app is signed in, apart from its Claude Code, because the two sign in separately. A local Claude seat shows `app ⬢` when the app is signed in, `app ⬡` when it is not, and `app ?` when favo can't tell, as from the first time favo opens the app until you sign in there. The cell says so in words. When the app and Claude Code are signed in to different accounts, the comb marks it in red: the app's Code tab then spends the app's account. ChatGPT signs in through the seat's Codex, so it needs nothing new.
+- `favo app claude <account>` says when that seat's Claude Code is signed out, and how to sign it in, since signing in to the app does not sign in Claude Code.
+
 ## [0.6.0] - 2026-11-04
 
 ### Added
