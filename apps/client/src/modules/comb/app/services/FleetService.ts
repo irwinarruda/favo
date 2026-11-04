@@ -47,6 +47,7 @@ export const createFleetService: ServiceCreator<FleetService> = (set, get) => ({
         machines.map(async (machine) => {
           await get().refreshMachine(machine.id);
           void get().preloadUsage(machine.id);
+          void get().preloadProviderClis(machine.id);
         })
       );
     } finally {

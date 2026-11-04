@@ -1,4 +1,4 @@
-import type { ProviderUpdateView } from '@favo/contracts/rpc/views';
+import type { ProviderUpdateView, ProviderVersionView } from '@favo/contracts/rpc/views';
 import { versionFrom } from '@favo/domain/machines/machine';
 import {
   canUpdateItself,
@@ -17,9 +17,13 @@ import {
   PackageManagers,
   shimTargetOf,
   upgradeArgumentsOf,
+  upgradeEnvironmentOf,
 } from '@favo/domain/updates/install-source';
+import { settledRecordOf, type UpdateOutcome, UpdateState } from '@favo/domain/updates/update-outcome';
 import type { ProviderRunRepository } from '@/modules/providers/repositories/provider-run.repository';
+import type { ProviderUpdateRepository } from '@/modules/providers/repositories/provider-update.repository';
 import type { ProvidersService } from '@/modules/providers/services/providers.service';
+import type { Clock } from '@/modules/system/gateways/clock';
 import type { FileSystem } from '@/modules/system/gateways/file-system';
 import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 import type { ShellEnvironment } from '@/modules/system/gateways/shell-environment';
@@ -33,18 +37,34 @@ export class ProviderUpdatesService {
   constructor(
     private readonly providers: ProvidersService,
     private readonly runs: ProviderRunRepository,
+    private readonly updates: ProviderUpdateRepository,
     private readonly processes: ProcessRunner,
     private readonly fileSystem: FileSystem,
     private readonly shell: ShellEnvironment,
     private readonly config: ConfigRepository,
     private readonly paths: FavoPaths,
-    private readonly callerEnv: Record<string, string | undefined>
+    private readonly clock: Clock,
+    private readonly callerEnv: Record<string, string | undefined>,
+    private readonly pid: number
   ) {}
 
   async list(provider?: ProviderId) {
-    const chosen = ProviderOrder.filter((id) => provider === undefined || id === provider);
-    const views = await Promise.all(chosen.map((id) => this.viewOf(id)));
+    const views = await Promise.all(this.chosen(provider).map((id) => this.viewOf(id)));
     return views.filter((view) => view !== undefined);
+  }
+
+  async versions(provider?: ProviderId) {
+    const views = await Promise.all(this.chosen(provider).map((id) => this.versionOf(id)));
+    return views.filter((view) => view !== undefined);
+  }
+
+  async record(provider: ProviderId, outcome?: UpdateOutcome) {
+    if (!outcome) await this.updates.clear(provider);
+    else {
+      const pid = outcome.state === UpdateState.updating ? this.pid : undefined;
+      await this.updates.save(provider, { ...outcome, at: this.clock.now().toISOString(), pid });
+    }
+    return {};
   }
 
   async upgradeStep(source: InstallSource): Promise<TerminalPlan | undefined> {
@@ -52,7 +72,7 @@ export class ProviderUpdatesService {
     const path = await this.shell.path();
     const command = this.processes.which(manager, this.ownFolders(source)) ?? this.processes.which(manager, path);
     if (!command) return undefined;
-    return { command, args: upgradeArgumentsOf(source), env: await this.environmentOf(source), unsetEnv: [] };
+    return { command, args: upgradeArgumentsOf(source), ...(await this.stepEnvironmentOf(source)) };
   }
 
   async isPinned(source: InstallSource) {
@@ -68,7 +88,36 @@ export class ProviderUpdatesService {
     return pinned.stdout.split(/\s+/).includes(source.packageName);
   }
 
+  private chosen(provider?: ProviderId) {
+    return ProviderOrder.filter((id) => provider === undefined || id === provider);
+  }
+
   private async viewOf(provider: ProviderId): Promise<ProviderUpdateView | undefined> {
+    const install = await this.installOf(provider);
+    if (!install) return undefined;
+    const { spec, binary, realPath, source } = install;
+    return {
+      provider,
+      label: spec.label,
+      version: install.version,
+      installedWith: install.installedWith,
+      otherCopies: await this.otherCopies(spec.executable, realPath),
+      runningAccounts: await this.runningNames(provider),
+      heldBack: await this.heldBack(provider, source),
+      steps: await this.stepsOf(spec, binary, source),
+    };
+  }
+
+  private async versionOf(provider: ProviderId): Promise<ProviderVersionView | undefined> {
+    const [install, saved] = await Promise.all([this.installOf(provider), this.updates.last(provider)]);
+    if (!install) return undefined;
+    const { label } = install.spec;
+    const isUpdaterAlive = saved?.pid !== undefined && this.processes.isAlive(saved.pid);
+    const lastUpdate = saved && settledRecordOf(saved, isUpdaterAlive);
+    return { provider, label, version: install.version, installedWith: install.installedWith, lastUpdate };
+  }
+
+  private async installOf(provider: ProviderId) {
     const binary = await this.providers.binaryOf(provider);
     if (!binary) return undefined;
     const spec = Providers[provider];
@@ -76,16 +125,8 @@ export class ProviderUpdatesService {
     const source = await this.sourceFor(spec, realPath);
     const env = await this.environmentOf(source);
     const check = await this.processes.run({ command: binary, args: ['--version'], env, timeoutMs: CheckTimeoutMs });
-    return {
-      provider,
-      label: spec.label,
-      version: versionFrom(check.stdout),
-      installedWith: source ? installLabelOf(source) : `own install at ${realPath}`,
-      otherCopies: await this.otherCopies(spec.executable, realPath),
-      runningAccounts: await this.runningNames(provider),
-      heldBack: await this.heldBack(provider, source),
-      steps: await this.stepsOf(spec, binary, source),
-    };
+    const installedWith = source ? installLabelOf(source) : `own install at ${realPath}`;
+    return { spec, binary, realPath, source, version: versionFrom(check.stdout), installedWith };
   }
 
   private async sourceFor(spec: ProviderSpec, realPath: string) {
@@ -109,7 +150,7 @@ export class ProviderUpdatesService {
 
   private async stepsOf(spec: ProviderSpec, binary: string, source?: InstallSource) {
     const args = spec.update.arguments ?? [];
-    const own = { command: binary, args, env: await this.environmentOf(source), unsetEnv: [] };
+    const own = { command: binary, args, ...(await this.stepEnvironmentOf(source)) };
     const manager = source ? await this.upgradeStep(source) : undefined;
     return [...(canUpdateItself(spec, source) ? [own] : []), ...(manager ? [manager] : [])];
   }
@@ -128,6 +169,11 @@ export class ProviderUpdatesService {
   private async environmentOf(source?: InstallSource) {
     const path = await this.shell.path();
     return { PATH: source ? [this.ownFolders(source), path].join(this.delimiter) : path };
+  }
+
+  private async stepEnvironmentOf(source?: InstallSource) {
+    const { env, unsetEnv } = upgradeEnvironmentOf(source);
+    return { env: { ...(await this.environmentOf(source)), ...env }, unsetEnv };
   }
 
   private ownFolders({ root }: InstallSource) {

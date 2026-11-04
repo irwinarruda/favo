@@ -187,7 +187,7 @@ favo never reads them. Logins run each provider's own command, and credentials s
 It stays where it is and becomes your `personal` account. Shared items in other accounts are links to it, so editing one edits your original. favo changes it in one case, and only when you ask: `favo hooks install` adds its own hook, leaves yours alone, and `favo hooks uninstall` takes it out again.
 
 **Does favo phone home?**
-There is no telemetry, and favo never checks for updates by itself. Its own network use is downloading its release from GitHub: on the npm package's first run, and when it installs itself on another machine. Reaching your machines goes over your own ssh. `favo update` runs your package manager and the providers' own update commands, and only when you run it.
+There is no telemetry, and favo never checks for updates by itself. Its own network use is downloading its release from GitHub: on the npm package's first run, and when it installs itself on another machine. Reaching your machines goes over your own ssh. `favo update` runs your package manager, and with `--providers` the providers' own update commands, only when you run it. The versions in the comb come from the binaries on each machine, never from the internet.
 
 **Why not a shell alias with `CLAUDE_CONFIG_DIR`?**
 That gives you a second login, and it's how many of us started. The new folder starts empty, though, so you maintain your setup twice, and it stops at one machine and one provider. favo keeps the setup shared and does the same for all four providers, across your computers.
@@ -207,7 +207,7 @@ Run `favo hooks uninstall` first, so no hook stays behind in your provider confi
 
 The npm package is a small launcher with no dependencies and no install scripts. The first run downloads the right binary, about 40 MB, from [GitHub Releases](https://github.com/irwinarruda/favo-cli/releases) and checks it against the hashes published in the npm package. After that, favo starts with no network. Homebrew installs the same binary directly, with no launcher and no Node.
 
-To update, run `favo update`. It updates favo here, then on every other machine, then the provider CLIs everywhere. favo marks a machine on an older version as `older favo` and keeps it working until you do. favo 0.4.0 and earlier have no such command, so update those once by hand: `npm install --global favo-cli@latest` or `brew upgrade favo-cli`.
+To update, run `favo update`. It updates favo here, then on every other machine. `favo update --providers` does that too, then updates the provider CLIs everywhere. favo marks a machine on an older version as `older favo` and keeps it working until you do. favo 0.4.0 and earlier have no such command, so update those once by hand: `npm install --global favo-cli@latest`, or `brew update` and then `brew upgrade favo-cli`.
 
 ### Use it with T3 Code
 
@@ -231,7 +231,8 @@ favo hooks status            # is that working, seat by seat
 favo hooks uninstall         # take favo's hook out again
 favo list                    # every machine, account and login
 favo usage                   # what every seat has left, and when it comes back
-favo update                  # favo and the provider CLIs, on every machine
+favo update                  # favo, on every machine
+favo update --providers      # favo, then the provider CLIs, on every machine
 favo rename work client      # a new name, on this machine
 favo rm work                 # move a cell to the trash
 favo sync                    # repair shared links
@@ -258,6 +259,7 @@ Providers are `claude`, `codex`, `agy` and `opencode`. Most commands take `--mac
 | `s` / `o`           | sign in / sign out                  |
 | `c`                 | copy its config path                |
 | `u`                 | see what every seat has left        |
+| `v`                 | see every provider CLI version      |
 | `d`                 | choose the folder it launches in    |
 | `a`                 | add an account                      |
 | `n`                 | rename the selected cell            |
@@ -354,8 +356,12 @@ A machine on an older favo keeps working and shows `older favo` with its version
 It works in this order, because a machine gets favo from the release of the favo that installs it:
 
 1. It updates favo on this computer, with whatever installed it: `brew upgrade --formula favo-cli`, or `npm install --global favo-cli@latest` for the npm package. If that fails, it stops and touches nothing else. A favo that came from another machine stays as it is and the rest goes on.
-2. It starts the new favo, which refreshes any provider hooks already there and updates favo on the other machines. A machine that fails or is offline is reported, and the others go on.
-3. It updates each provider once per machine, in your terminal, so a password prompt reaches you, and over ssh on your other machines. It uses the binary favo launches and reports any other copy on your `PATH`.
+2. It starts the new favo, which refreshes any provider hooks already there and updates favo on the other machines. A machine that fails or is offline is reported, and the others go on. Plain `favo update` stops here.
+3. With `--providers`, it updates each provider once per machine, in your terminal, so a password prompt reaches you, and over ssh on your other machines. It uses the binary favo launches and reports any other copy on your `PATH`.
+
+Homebrew only reads a tap such as `irwinarruda/tap` when it updates itself, and before an upgrade it skips that if it already did in the last day. So favo has it update first, the way `brew update` would, even when `HOMEBREW_NO_AUTO_UPDATE` is set.
+
+In the comb, `v` lists every provider CLI on every machine: its version and how it was installed. A version older than on another machine is marked. When an update there did not go through, whether it ran here, over ssh or from `P`, it says why: still updating, failed, stopped, or left alone. An update that worked leaves nothing behind. `P` runs the update for the selected machine in your terminal and opens that list when you come back. favo reads the versions in the background when the comb opens, from the binaries themselves, and never asks the internet what the latest one is.
 
 | Provider    | How it updates                                                                                                                                                  |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |

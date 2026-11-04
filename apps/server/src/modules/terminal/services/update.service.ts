@@ -35,7 +35,7 @@ export class UpdateService {
   }
 
   async planOn({ machineId, isHeld }: PlanUpdateParams) {
-    const args = updateArgumentsFor({ isHereOnly: true, isHeld });
+    const args = updateArgumentsFor({ isHereOnly: true, hasProviders: true, isHeld });
     if (machineId === undefined || machineId === LocalMachineId) return this.planOf(this.binary ?? FavoCommand, args);
     const machine = await this.machines.requireRemote(machineId);
     const { state, isBehind, message } = await this.machines.status(machine.id);

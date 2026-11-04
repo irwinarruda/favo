@@ -24,6 +24,7 @@ import { InstallerService } from '@/modules/machines/services/installer.service'
 import { MachinesService } from '@/modules/machines/services/machines.service';
 import type { ProviderCli } from '@/modules/providers/gateways/provider-cli';
 import { ProviderRunRepository } from '@/modules/providers/repositories/provider-run.repository';
+import { ProviderUpdateRepository } from '@/modules/providers/repositories/provider-update.repository';
 import { ProviderUpdatesService } from '@/modules/providers/services/provider-updates.service';
 import { ProvidersService } from '@/modules/providers/services/providers.service';
 import { registerSystemController } from '@/modules/system/controllers/system.controller';
@@ -60,13 +61,14 @@ export type ServerOptions = {
   paths: FavoPaths;
   host: HostFacts;
   callerEnv: Record<string, string | undefined>;
+  pid: number;
   binary?: string;
 };
 
 export function createServer(gateways: ServerGateways, options: ServerOptions) {
   const { fileSystem, processes, shell, clock, clis, ssh, tailscale, remotes, releaseAssets, desktopApps, herdr } =
     gateways;
-  const { paths, host, callerEnv, binary } = options;
+  const { paths, host, callerEnv, pid, binary } = options;
   const router = new RpcRouter();
   const providers = new ProvidersService(clis, processes, shell, paths);
   const config = new ConfigRepository(fileSystem, paths);
@@ -115,12 +117,15 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
   const providerUpdates = new ProviderUpdatesService(
     providers,
     providerRuns,
+    new ProviderUpdateRepository(fileSystem, paths),
     processes,
     fileSystem,
     shell,
     config,
     paths,
-    callerEnv
+    clock,
+    callerEnv,
+    pid
   );
   const terminal = new TerminalService(
     providers,

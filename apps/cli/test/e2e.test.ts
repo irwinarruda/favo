@@ -75,16 +75,29 @@ afterEach(() => removeFolder(root));
 describe('favo update', () => {
   it('runs the provider command with the terminal attached, and reports the result', async () => {
     writeFileSync(`${root}/codex-version`, '0.1.0');
-    const { stdout, code } = await favo(['update', '--skip-favo', '--machine', 'local'], {
+    const { stdout, code } = await favo(['update', '--skip-favo', '--providers', '--machine', 'local'], {
       FAKE_CODEX_VERSION_FILE: `${root}/codex-version`,
     });
     expect(code).toBe(0);
     expect(stdout).toContain('Codex 0.1.0, own install at');
     expect(stdout).toContain('fake codex updating');
     expect(stdout).toContain('Codex 0.1.0 → 0.2.0');
+    expect(existsSync(`${home}/.favo/updates/codex.json`)).toBe(false);
+    expect(JSON.parse(readFileSync(`${home}/.favo/updates/antigravity.json`, 'utf8'))).toMatchObject({
+      state: 'leftAlone',
+      reason: 'it updates itself, or through whatever installed it',
+    });
+  });
+  it('updates favo alone unless the provider CLIs are asked for', async () => {
+    const { stdout, code } = await favo(['update', '--machine', 'local']);
+    expect(code).toBe(0);
+    expect(stdout).not.toContain('fake codex updating');
+    expect(stdout).toContain('favo update --providers');
   });
   it('leaves a provider whose updates are off, reporting why', async () => {
-    const { stdout, code } = await favo(['update', '--skip-favo', '--machine', 'local'], { DISABLE_UPDATES: '1' });
+    const { stdout, code } = await favo(['update', '--skip-favo', '--providers', '--machine', 'local'], {
+      DISABLE_UPDATES: '1',
+    });
     expect(code).toBe(0);
     expect(stdout).toContain('its updates are turned off by DISABLE_UPDATES');
     expect(stdout).not.toContain('fake claude updating');
@@ -104,7 +117,7 @@ describe('favo update', () => {
     const folder = `${home}/.favo/running/personal/codex`;
     for (let attempt = 0; attempt < 200 && !existsSync(folder); attempt++) await Bun.sleep(25);
     for (let attempt = 0; attempt < 200 && readdirSync(folder).length === 0; attempt++) await Bun.sleep(25);
-    const { stdout } = await favo(['update', '--skip-favo', '--machine', 'local']);
+    const { stdout } = await favo(['update', '--skip-favo', '--providers', '--machine', 'local']);
     writeFileSync(`${root}/codex-release`, '');
     await launch.exited;
     expect(stdout).toContain('it is running');
@@ -578,19 +591,28 @@ describe.skipIf(isWindows)('favo with another machine', () => {
   });
   it('updates the provider CLIs here, then over there through a real terminal', async () => {
     await joinRemote();
-    const { stdout, code } = await favo(['update', '--skip-favo']);
+    const { stdout, code } = await favo(['update', '--skip-favo', '--providers']);
     expect(code).toBe(0);
     expect(stdout).toContain('Provider CLIs on remote');
     expect(stdout.match(/fake codex updating/g)).toHaveLength(2);
     expect(readFileSync(`${root}/ssh.log`, 'utf8')).toMatch(
       /-t -- bee@remote ~\/\.favo\/bin\/favo --argv-b64 [A-Za-z0-9_-]+\n/
     );
+    expect(existsSync(`${remoteHome}/.favo/updates/antigravity.json`)).toBe(true);
+    expect(existsSync(`${remoteHome}/.favo/updates/codex.json`)).toBe(false);
   });
   it('updates only the machine you name', async () => {
     await joinRemote();
-    const { stdout, code } = await favo(['update', '--machine', 'remote']);
+    const { stdout, code } = await favo(['update', '--providers', '--machine', 'remote']);
     expect(code).toBe(0);
     expect(stdout.match(/fake codex updating/g)).toHaveLength(1);
+    expect(existsSync(`${home}/.favo/updates/antigravity.json`)).toBe(false);
+  });
+  it('leaves the provider CLIs on every machine alone unless asked', async () => {
+    await joinRemote();
+    const { stdout, code } = await favo(['update']);
+    expect(code).toBe(0);
+    expect(stdout).not.toContain('fake codex updating');
   });
   it('launches over ssh with a real terminal', async () => {
     await joinRemote();

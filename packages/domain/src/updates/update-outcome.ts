@@ -1,0 +1,34 @@
+import { z } from 'zod';
+import type { ValueOf } from '#domain/shared/value-of';
+
+export const UpdateState = {
+  updating: 'updating',
+  failed: 'failed',
+  stopped: 'stopped',
+  leftAlone: 'leftAlone',
+} as const;
+export type UpdateState = ValueOf<typeof UpdateState>;
+
+export const UpdateOutcome = z.strictObject({
+  state: z.enum(UpdateState),
+  from: z.string().optional(),
+  reason: z.string().optional(),
+});
+export type UpdateOutcome = z.infer<typeof UpdateOutcome>;
+
+export const UpdateRecord = z.strictObject({
+  ...UpdateOutcome.shape,
+  at: z.string(),
+});
+export type UpdateRecord = z.infer<typeof UpdateRecord>;
+
+export const SavedUpdate = z.strictObject({
+  ...UpdateRecord.shape,
+  pid: z.number().optional(),
+});
+export type SavedUpdate = z.infer<typeof SavedUpdate>;
+
+export function settledRecordOf({ pid: _, ...record }: SavedUpdate, isUpdaterAlive: boolean): UpdateRecord {
+  if (record.state !== UpdateState.updating || isUpdaterAlive) return record;
+  return { ...record, state: UpdateState.stopped };
+}

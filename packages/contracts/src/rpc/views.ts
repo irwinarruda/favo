@@ -3,6 +3,7 @@ import { LoginScope, ProviderId } from '@favo/domain/providers/provider';
 import type { ValueOf } from '@favo/domain/shared/value-of';
 import { SharedItemState } from '@favo/domain/sharing/shared-item';
 import { TerminalPlan } from '@favo/domain/terminal/terminal-plan';
+import { UpdateRecord } from '@favo/domain/updates/update-outcome';
 import { SeatUsage } from '@favo/domain/usage/seat-usage';
 import { z } from 'zod';
 
@@ -112,3 +113,12 @@ export const ProviderUpdateView = z.strictObject({
   steps: z.array(TerminalPlan),
 });
 export type ProviderUpdateView = z.infer<typeof ProviderUpdateView>;
+
+export const ProviderVersionView = z.strictObject({
+  provider: z.enum(ProviderId),
+  label: z.string(),
+  version: z.string().optional(),
+  installedWith: z.string(),
+  lastUpdate: UpdateRecord.optional(),
+});
+export type ProviderVersionView = z.infer<typeof ProviderVersionView>;

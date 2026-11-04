@@ -71,7 +71,7 @@ export const createUsageService: ServiceCreator<UsageService> = (set, get) => ({
   },
   async refreshUsage() {
     const { machines, machineUsage, readMachineUsage } = get();
-    const due = machines.filter((machine) => _canRead(machine) && !ownValue(machineUsage, machine.id)?.isReading);
+    const due = machines.filter((machine) => machine.canRead && !ownValue(machineUsage, machine.id)?.isReading);
     await Promise.all(due.map(readMachineUsage));
   },
   tickUsage() {
@@ -97,13 +97,9 @@ export const createUsageService: ServiceCreator<UsageService> = (set, get) => ({
   },
 });
 
-function _canRead(machine: Machine) {
-  return machine.isOnline || machine.presence === MachinePresence.connecting;
-}
-
 function _isDue(machine: Machine, machineUsage: Record<string, MachineUsage>) {
   const usage = ownValue(machineUsage, machine.id);
-  return _canRead(machine) && (!usage || Date.now() - usage.readAt >= UsageFreshForMs);
+  return machine.canRead && (!usage || Date.now() - usage.readAt >= UsageFreshForMs);
 }
 
 function _sameSeat(left: SeatUsageView, right: SeatUsageView) {

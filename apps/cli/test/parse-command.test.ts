@@ -166,6 +166,10 @@ describe('parseCommand', () => {
     expect(parseCommand(['update'])).toMatchObject({ kind: CommandKind.update, isFavoSkipped: false, isHeld: false });
     expect(parseCommand(['update', '--machine', 'devbox']).machineId).toBe('devbox');
     expect(parseCommand(['update', '--skip-favo', '--hold'])).toMatchObject({ isFavoSkipped: true, isHeld: true });
+    expect(parseCommand(['update']).hasProviders).toBe(false);
+    expect(parseCommand(['update', '--providers']).hasProviders).toBe(true);
+    expect(parseCommand(['update', '--skip-favo', '--machine', 'local']).hasProviders).toBe(true);
+    expect(parseCommand(['update', '--skip-favo', '--favo-only']).hasProviders).toBe(false);
     expect(() => parseCommand(['update', 'claude'])).toThrow('favo update --machine <machine>');
     expect(parseCommand(['rename', 'work', 'side'])).toMatchObject({
       kind: CommandKind.rename,

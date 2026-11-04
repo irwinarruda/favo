@@ -63,6 +63,13 @@ export function upgradeArgumentsOf({ method, packageName, isCask }: InstallSourc
   return ['add', '--global', latest];
 }
 
+export type UpgradeEnvironment = { env: Record<string, string>; unsetEnv: string[] };
+
+export function upgradeEnvironmentOf(source?: InstallSource): UpgradeEnvironment {
+  if (source?.method !== InstallMethod.homebrew) return { env: {}, unsetEnv: [] };
+  return { env: { HOMEBREW_AUTO_UPDATE_SECS: '0' }, unsetEnv: ['HOMEBREW_NO_AUTO_UPDATE'] };
+}
+
 export function installLabelOf({ method, packageName, root, isCask }: InstallSource) {
   if (method === InstallMethod.homebrew) return `Homebrew ${isCask ? 'cask' : 'formula'} ${packageName}`;
   return method === InstallMethod.npm ? `npm in ${root}` : method;

@@ -22,8 +22,10 @@ import { listThreads } from '#contracts/rpc/threads/list-threads';
 import { recordThread } from '#contracts/rpc/threads/record-thread';
 import { reportThread } from '#contracts/rpc/threads/report-thread';
 import { listProviderUpdates } from '#contracts/rpc/updates/list-provider-updates';
+import { listProviderVersions } from '#contracts/rpc/updates/list-provider-versions';
 import { planFavoUpdate } from '#contracts/rpc/updates/plan-favo-update';
 import { planUpdate } from '#contracts/rpc/updates/plan-update';
+import { recordProviderUpdate } from '#contracts/rpc/updates/record-provider-update';
 
 const seat = {
   account: 'work',
@@ -262,6 +264,23 @@ describe('updates', () => {
     expect(planUpdate.routing).toBe('hub');
     expect(planUpdate.params.safeParse({ machineId: 'devbox', isHeld: true }).success).toBe(true);
     expect(planUpdate.params.safeParse({ machine: 'devbox' }).success).toBe(false);
+  });
+  it('show the installed version of each provider on the machine that has it', () => {
+    const version = { provider: 'claude', label: 'Claude Code', version: '2.1.316', installedWith: 'npm in /usr' };
+    const lastUpdate = { state: 'failed', from: '2.1.300', reason: 'exit 1', at: '2026-11-04T12:00:00.000Z' };
+    expect(listProviderVersions.routing).toBe('machine');
+    expect(listProviderVersions.params.safeParse({}).success).toBe(true);
+    expect(listProviderVersions.result.safeParse([version, { ...version, lastUpdate }]).success).toBe(true);
+    expect(listProviderVersions.result.safeParse([{ ...version, lastUpdate: { state: 'done' } }]).success).toBe(false);
+  });
+  it('are recorded by the favo that ran them, never forwarded', () => {
+    expect(recordProviderUpdate.routing).toBe('hub');
+    const outcome = { state: 'leftAlone', from: '2.1.316', reason: 'it is pinned in Homebrew' };
+    expect(recordProviderUpdate.params.safeParse({ provider: 'claude', outcome }).success).toBe(true);
+    expect(recordProviderUpdate.params.safeParse({ provider: 'claude' }).success).toBe(true);
+    expect(
+      recordProviderUpdate.params.safeParse({ provider: 'claude', outcome: { ...outcome, at: 'now' } }).success
+    ).toBe(false);
   });
   it('refresh hooks on the machine that has them', () => {
     expect(refreshHooks.routing).toBe('machine');

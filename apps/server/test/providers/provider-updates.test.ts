@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { listProviderUpdates } from '@favo/contracts/rpc/updates/list-provider-updates';
-import { createTestServer, Home } from '#test/support/test-server';
+import { listProviderVersions } from '@favo/contracts/rpc/updates/list-provider-versions';
+import { recordProviderUpdate } from '@favo/contracts/rpc/updates/record-provider-update';
+import { createTestServer, Home, UpdaterPid } from '#test/support/test-server';
 import { ProviderRunRepository } from '@/modules/providers/repositories/provider-run.repository';
 
 const Brew = '/opt/homebrew/bin/brew';
@@ -72,6 +74,14 @@ describe('the way each provider updates', () => {
     const server = await serverWith({ claude: CaskClaude });
     const [claude] = await server.client.call(listProviderUpdates, {});
     expect(stepsOf(claude)).toEqual([`${Brew} upgrade --cask claude-code@latest`]);
+  });
+  it('has Homebrew fetch its taps first, for the provider command and for Homebrew itself', async () => {
+    const server = await serverWith({ opencode: FormulaOpencode });
+    const [opencode] = await server.client.call(listProviderUpdates, {});
+    for (const step of opencode?.steps ?? []) {
+      expect(step.env.HOMEBREW_AUTO_UPDATE_SECS).toBe('0');
+      expect(step.unsetEnv).toEqual(['HOMEBREW_NO_AUTO_UPDATE']);
+    }
   });
   it('keeps the package manager as the fallback', async () => {
     const server = await serverWith({ opencode: FormulaOpencode });
@@ -214,5 +224,84 @@ describe('a provider running through favo', () => {
     const [claude, codex] = await server.client.call(listProviderUpdates, {});
     expect(claude?.runningAccounts).toEqual(['work']);
     expect(codex?.runningAccounts).toEqual(['side']);
+  });
+});
+
+describe('the versions the comb shows', () => {
+  it('reads each installed version and how it got there, and nothing about pins or steps', async () => {
+    const server = await serverWith({ claude: CaskClaude, opencode: FormulaOpencode });
+    server.processes.reply('/opt/homebrew/bin/claude --version', { stdout: '2.1.316 (Claude Code)\n' });
+    server.processes.reply('/opt/homebrew/bin/opencode --version', { stdout: 'opencode v2.2.5\n' });
+    expect(await server.client.call(listProviderVersions, {})).toEqual([
+      {
+        provider: 'claude',
+        label: 'Claude Code',
+        version: '2.1.316',
+        installedWith: 'Homebrew cask claude-code@latest',
+      },
+      { provider: 'opencode', label: 'OpenCode', version: '2.2.5', installedWith: 'Homebrew formula opencode-v2' },
+    ]);
+    expect(server.processes.calls.map(({ args }) => args.join(' '))).toEqual(['--version', '--version']);
+  });
+  it('reads one provider when asked', async () => {
+    const server = await serverWith({ claude: CaskClaude, opencode: FormulaOpencode });
+    const versions = await server.client.call(listProviderVersions, { provider: 'opencode' });
+    expect(versions.map(({ provider }) => provider)).toEqual(['opencode']);
+  });
+  it('carries the last update, stamped when it was recorded', async () => {
+    const server = await serverWith({ claude: CaskClaude });
+    const outcome = { state: 'failed' as const, from: '2.1.300', reason: 'exit 1' };
+    await server.client.call(recordProviderUpdate, { provider: 'claude', outcome });
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate).toEqual({ ...outcome, at: '2026-10-31T12:00:00.000Z' });
+  });
+  it('forgets the last update when there is nothing left to report', async () => {
+    const server = await serverWith({ claude: CaskClaude });
+    await server.client.call(recordProviderUpdate, { provider: 'claude', outcome: { state: 'updating' } });
+    await server.client.call(recordProviderUpdate, { provider: 'claude' });
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate).toBeUndefined();
+    expect(await server.fileSystem.readText(`${server.paths.updates}/claude.json`)).toBeUndefined();
+  });
+  it('has nothing to forget for a provider never updated', async () => {
+    const server = await serverWith({ claude: CaskClaude });
+    expect(await server.client.call(recordProviderUpdate, { provider: 'claude' })).toEqual({});
+  });
+  it('replaces the last update with the next one', async () => {
+    const server = await serverWith({ claude: CaskClaude });
+    await server.client.call(recordProviderUpdate, { provider: 'claude', outcome: { state: 'updating' } });
+    const outcome = { state: 'leftAlone' as const, reason: 'it is running' };
+    await server.client.call(recordProviderUpdate, { provider: 'claude', outcome });
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate).toMatchObject(outcome);
+  });
+  it('shows an update as going while the favo that runs it is alive', async () => {
+    const server = await serverWith({ claude: CaskClaude });
+    await server.client.call(recordProviderUpdate, { provider: 'claude', outcome: { state: 'updating' } });
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate?.state).toBe('updating');
+  });
+  it('shows an update as stopped once the favo that ran it is gone', async () => {
+    const server = await serverWith({ claude: CaskClaude });
+    await server.client.call(recordProviderUpdate, { provider: 'claude', outcome: { state: 'updating' } });
+    server.processes.gone.add(UpdaterPid);
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate?.state).toBe('stopped');
+  });
+  it('keeps the record of each provider apart', async () => {
+    const server = await serverWith({ claude: CaskClaude, opencode: FormulaOpencode });
+    await server.client.call(recordProviderUpdate, {
+      provider: 'claude',
+      outcome: { state: 'failed', reason: 'exit 1' },
+    });
+    const [claude, opencode] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate?.state).toBe('failed');
+    expect(opencode?.lastUpdate).toBeUndefined();
+  });
+  it('ignores a record it cannot read', async () => {
+    const server = await serverWith({ claude: CaskClaude });
+    await server.fileSystem.writePrivateText(`${server.paths.updates}/claude.json`, '{"state":');
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate).toBeUndefined();
   });
 });

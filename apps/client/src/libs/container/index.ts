@@ -5,6 +5,7 @@ import type { IDesktopRepository } from '@/modules/sessions/app/repositories/IDe
 import type { ITerminalRepository } from '@/modules/sessions/app/repositories/ITerminalRepository';
 import type { IThemeRepository } from '@/modules/themes/app/repositories/IThemeRepository';
 import type { IThreadRepository } from '@/modules/threads/app/repositories/IThreadRepository';
+import type { IProviderCliRepository } from '@/modules/updates/app/repositories/IProviderCliRepository';
 import type { IUsageRepository } from '@/modules/usage/app/repositories/IUsageRepository';
 import type { IClipboardGateway } from '@/shared/app/gateways/IClipboardGateway';
 import type { ITerminalGateway } from '@/shared/app/gateways/ITerminalGateway';
@@ -17,6 +18,7 @@ export interface InjectableItems {
   IThemeRepository: IThemeRepository;
   IThreadRepository: IThreadRepository;
   IUsageRepository: IUsageRepository;
+  IProviderCliRepository: IProviderCliRepository;
   IDirectoryRepository: IDirectoryRepository;
   IClipboardGateway: IClipboardGateway;
   ITerminalGateway: ITerminalGateway;
