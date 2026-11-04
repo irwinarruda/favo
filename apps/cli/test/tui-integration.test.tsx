@@ -50,8 +50,13 @@ async function openFleet(callerEnv?: Record<string, string>) {
   const view = await testRender(<App onQuit={() => {}} />, { width: 130, height: 36, useMouse: true });
   dispose = view.dispose;
   await view.waitForFrame((frame) => frame.includes('devbox@bee.dev') && frame.includes('mac@bee.dev'));
+  await readsSettled();
   await view.flush();
   return { ...view, mac, devbox, copied, plans };
+}
+
+async function readsSettled() {
+  while (useApp.getState().isUsageReading || useApp.getState().isProviderClisReading) await Bun.sleep(1);
 }
 
 afterEach(async () => {
@@ -141,6 +146,7 @@ describe('usage on a real backend', () => {
     mockInput.pressKey('u');
     await flush();
     mockInput.pressKey('r');
+    await readsSettled();
     await waitForFrame((frame) => frame.includes('81% left') && frame.includes('devbox read'));
   });
   test('shows a machine with no such method as older favo, and keeps the rest', async () => {
@@ -157,6 +163,7 @@ describe('usage on a real backend', () => {
     mockInput.pressKey('u');
     await flush();
     mockInput.pressKey('r');
+    await readsSettled();
     await waitForFrame((frame) => frame.includes('devbox older favo') && frame.includes('68% left'));
   });
 });
