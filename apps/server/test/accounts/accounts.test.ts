@@ -43,54 +43,10 @@ describe('accounts', () => {
     expect(personal!.seats.find((seat) => seat.provider === 'antigravity')?.canLogout).toBe(false);
     expect(personal!.seats.find((seat) => seat.provider === 'claude')?.canLogout).toBe(true);
   });
-  it('says every Antigravity cell on a desktop shares one login, and every other provider keeps its own', async () => {
+  it('keeps every login in its own cell, Antigravity included', async () => {
     const { client } = createTestServer();
     const [personal] = await client.call(listAccounts, {});
-    expect(personal!.seats.map((seat) => seat.loginScope)).toEqual([
-      'perAccount',
-      'perAccount',
-      'perComputer',
-      'perAccount',
-    ]);
-  });
-  it('keeps the Antigravity login in each cell where agy skips the keychain, as over SSH', async () => {
-    const { client } = createTestServer({ callerEnv: { SSH_CONNECTION: '10.0.0.2 51000 10.0.0.3 22' } });
-    const [personal] = await client.call(listAccounts, {});
-    expect(personal!.seats.find((seat) => seat.provider === 'antigravity')?.loginScope).toBe('perAccount');
-  });
-  it('reads the kernel to tell WSL, where agy keeps the login in each cell', async () => {
-    const { client, fileSystem } = createTestServer({
-      platform: 'linux',
-      callerEnv: { DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus' },
-    });
-    await fileSystem.writePrivateText('/proc/sys/kernel/osrelease', '6.6.87.2-microsoft-standard-WSL2\n');
-    const [personal] = await client.call(listAccounts, {});
-    expect(personal!.seats.find((seat) => seat.provider === 'antigravity')?.loginScope).toBe('perAccount');
-  });
-  it('finds the session bus a Linux desktop reaches the keychain through', async () => {
-    const { client, fileSystem } = createTestServer({
-      platform: 'linux',
-      callerEnv: { XDG_RUNTIME_DIR: '/run/user/1000' },
-    });
-    await fileSystem.writePrivateText('/run/user/1000/bus', '');
-    const [personal] = await client.call(listAccounts, {});
-    expect(personal!.seats.find((seat) => seat.provider === 'antigravity')?.loginScope).toBe('perComputer');
-  });
-  it('finds the session bus under the user id when no runtime folder is set, as agy does', async () => {
-    const { client, fileSystem } = createTestServer({ platform: 'linux', uid: 1000 });
-    await fileSystem.writePrivateText('/run/user/1000/bus', '');
-    const [personal] = await client.call(listAccounts, {});
-    expect(personal!.seats.find((seat) => seat.provider === 'antigravity')?.loginScope).toBe('perComputer');
-  });
-  it('trusts the runtime folder over the user id, so a bus elsewhere does not count', async () => {
-    const { client, fileSystem } = createTestServer({
-      platform: 'linux',
-      uid: 1000,
-      callerEnv: { XDG_RUNTIME_DIR: '/tmp/runtime' },
-    });
-    await fileSystem.writePrivateText('/run/user/1000/bus', '');
-    const [personal] = await client.call(listAccounts, {});
-    expect(personal!.seats.find((seat) => seat.provider === 'antigravity')?.loginScope).toBe('perAccount');
+    expect(personal!.seats.every((seat) => seat.loginScope === 'perAccount')).toBe(true);
   });
   it('moves a removed account to the trash instead of deleting it', async () => {
     const { client, fileSystem } = createTestServer();

@@ -4,6 +4,7 @@ import { getAppLogin } from '@favo/contracts/rpc/desktop/get-app-login';
 import { listDesktopApps } from '@favo/contracts/rpc/desktop/list-desktop-apps';
 import { openDesktopApp } from '@favo/contracts/rpc/desktop/open-desktop-app';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
+import { LoginState } from '@favo/contracts/rpc/views';
 import { EntryKind } from '@favo/domain/sharing/shared-item';
 import { createTestServer, Home, seedClaudeBase } from '#test/support/test-server';
 
@@ -41,11 +42,11 @@ describe('which apps favo offers', () => {
     desktopApps.install('opencode');
     expect(await client.call(listDesktopApps, {})).toEqual([]);
   });
-  it('offers the Antigravity app, which signs in through the same login as agy', async () => {
+  it('offers the Antigravity app, which keeps a login of its own in each cell', async () => {
     const { client, desktopApps } = createTestServer();
     desktopApps.install('antigravity');
     expect(await client.call(listDesktopApps, {})).toEqual([
-      { provider: 'antigravity', label: 'Antigravity', login: 'sharedWithCli', canOpen: true },
+      { provider: 'antigravity', label: 'Antigravity', login: 'separate', canOpen: true },
     ]);
   });
   it('lists the apps of the machine asked about, on that machine', async () => {
@@ -125,7 +126,7 @@ describe('opening an app', () => {
         provider: 'antigravity',
         launch: {
           args: [`--user-data-dir=${Home}/.favo/accounts/work/antigravity-app`],
-          env: { HOME: seat, USERPROFILE: seat },
+          env: { HOME: seat, USERPROFILE: seat, WSL_INTEROP: 'favo' },
         },
       },
     ]);
@@ -273,5 +274,29 @@ describe('the login of a seat app', () => {
     const { client } = await serverWithWork();
     const params = { ...workLogin, account: 'ghost' };
     await expect(client.call(getAppLogin, params)).rejects.toMatchObject({ code: 'accountNotFound' });
+  });
+});
+
+describe('the login of the Antigravity app', () => {
+  const workLogin = { account: 'work', provider: 'antigravity' } as const;
+  const tokenFile = `${Home}/.favo/accounts/work/antigravity/.gemini/jetski-standalone-oauth-token`;
+
+  it('is signed in when the cell holds its login file, which favo never opens', async () => {
+    const { client, fileSystem } = await serverWithWork();
+    await fileSystem.writePrivateText(tokenFile, '{"token":"secret"}');
+    expect(await client.call(getAppLogin, workLogin)).toEqual({ login: 'signedIn', isOtherAccount: false });
+  });
+  it('is signed out without that file, whatever agy says', async () => {
+    const { client, clis } = await serverWithWork();
+    clis.antigravity.login = { login: LoginState.signedIn };
+    expect(await client.call(getAppLogin, workLogin)).toEqual({ login: 'signedOut', isOtherAccount: false });
+  });
+  it('follows agy for personal, because both read your login from the keychain', async () => {
+    const { client, clis } = await serverWithWork();
+    clis.antigravity.login = { login: LoginState.signedIn };
+    const personal = { ...workLogin, account: 'personal' };
+    expect(await client.call(getAppLogin, personal)).toEqual({ login: 'signedIn', isOtherAccount: false });
+    clis.antigravity.login = { login: LoginState.unknown };
+    expect((await client.call(getAppLogin, personal)).login).toBe('unknown');
   });
 });

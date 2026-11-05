@@ -3,6 +3,7 @@ import { isPersonalAccount, seatHomeOf } from '#domain/accounts/account';
 import { isolationEnvironment, ProviderId, Providers } from '#domain/providers/provider';
 import { parseJson } from '#domain/shared/parse-json';
 import type { ValueOf } from '#domain/shared/value-of';
+import { type Entry, EntryKind } from '#domain/sharing/shared-item';
 
 export const DesktopOpening = {
   opened: 'opened',
@@ -29,6 +30,7 @@ export type DesktopAppSpec = {
   profileFolder: string;
   userDataVariable?: string;
   login: DesktopLogin;
+  loginFile?: string;
   mac: { bundleId: string; appNames: string[]; requiredFile?: string; defaultProfile?: string };
   linux?: { executable: string; processNames: string[]; defaultProfile?: string };
   windows: WindowsPackagedApp | WindowsFolderApp;
@@ -75,7 +77,8 @@ export const DesktopAppSpecs: Partial<Record<ProviderId, DesktopAppSpec>> = {
     provider: ProviderId.antigravity,
     label: 'Antigravity',
     profileFolder: 'antigravity-app',
-    login: DesktopLogin.sharedWithCli,
+    login: DesktopLogin.separate,
+    loginFile: '.gemini/jetski-standalone-oauth-token',
     mac: {
       bundleId: 'com.google.antigravity',
       appNames: ['Antigravity'],
@@ -121,6 +124,11 @@ export function appLoginOf(observed: { account: string; hasProfile: boolean; set
   const appAccount = app.lastKnownAccountUuid;
   const isOtherAccount = appAccount !== undefined && cliAccount !== undefined && appAccount !== cliAccount;
   return { login: AppLoginState.signedIn, isOtherAccount };
+}
+
+export function fileAppLoginOf(entry: Entry) {
+  const isSignedIn = entry.kind === EntryKind.file || entry.kind === EntryKind.link;
+  return { login: isSignedIn ? AppLoginState.signedIn : AppLoginState.signedOut, isOtherAccount: false };
 }
 
 export function desktopLaunchOf(spec: DesktopAppSpec, seatHome: string, profile?: string): DesktopLaunch {

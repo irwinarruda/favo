@@ -1,5 +1,7 @@
 import type { OpenDesktopAppParams } from '@favo/contracts/rpc/desktop/open-desktop-app';
 import type { SeatParams } from '@favo/contracts/rpc/seats/seat-params';
+import { LoginState } from '@favo/contracts/rpc/views';
+import { isPersonalAccount } from '@favo/domain/accounts/account';
 import {
   AppLoginState,
   appLoginFilesOf,
@@ -10,6 +12,7 @@ import {
   DesktopOpening,
   desktopLaunchOf,
   desktopProfileOf,
+  fileAppLoginOf,
 } from '@favo/domain/desktop/desktop-app';
 import { type ProviderId, ProviderOrder, Providers } from '@favo/domain/providers/provider';
 import { assertDomain, DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
@@ -47,6 +50,7 @@ export class DesktopAppsService {
       `${spec.label} has no login of its own: it signs in through ${Providers[provider].label}.`
     );
     await this.seats.assertAccount(account);
+    if (spec.loginFile) return this.fileLoginOf(account, provider, spec.loginFile);
     const profile = desktopProfileOf(this.paths, account, spec) ?? this.desktopApps.defaultProfile(spec);
     if (!profile) return { login: AppLoginState.unknown, isOtherAccount: false };
     const files = appLoginFilesOf(this.paths, account, spec, profile);
@@ -88,6 +92,17 @@ export class DesktopAppsService {
     }
     await this.desktopApps.open(app, desktopLaunchOf(spec, this.providers.seatHome(account, provider), profile));
     return { opening: DesktopOpening.opened, label };
+  }
+
+  private async fileLoginOf(account: string, provider: ProviderId, loginFile: string) {
+    if (isPersonalAccount(account)) {
+      const { login } = await this.providers.loginOf(account, provider);
+      if (login === LoginState.signedIn) return { login: AppLoginState.signedIn, isOtherAccount: false };
+      if (login === LoginState.signedOut) return { login: AppLoginState.signedOut, isOtherAccount: false };
+      return { login: AppLoginState.unknown, isOtherAccount: false };
+    }
+    const seatHome = this.providers.seatHome(account, provider);
+    return fileAppLoginOf(await this.fileSystem.entry(`${seatHome}/${loginFile}`));
   }
 
   private requireSpec(provider: ProviderId): DesktopAppSpec {

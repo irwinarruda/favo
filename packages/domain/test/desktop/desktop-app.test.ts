@@ -7,9 +7,11 @@ import {
   DesktopLogin,
   desktopLaunchOf,
   desktopProfileOf,
+  fileAppLoginOf,
   mainProcessIds,
 } from '#domain/desktop/desktop-app';
 import { Providers } from '#domain/providers/provider';
+import { EntryKind } from '#domain/sharing/shared-item';
 
 const paths = { home: '/h', accounts: '/h/.favo/accounts' };
 const claude = DesktopAppSpecs.claude!;
@@ -41,8 +43,15 @@ describe('the login of an app', () => {
     expect(chatgpt.login).toBe(DesktopLogin.sharedWithCli);
     expect(claude.login).toBe(DesktopLogin.separate);
   });
-  it('is the CLI login for Antigravity, whose app and agy read the same keychain entry', () => {
-    expect(antigravity.login).toBe(DesktopLogin.sharedWithCli);
+  it('is its own for Antigravity, whose app keeps a login file apart from agy in each cell', () => {
+    expect(antigravity.login).toBe(DesktopLogin.separate);
+    expect(antigravity.loginFile).toBe('.gemini/jetski-standalone-oauth-token');
+  });
+  it('is read from whether that file exists, never from what it holds', () => {
+    expect(fileAppLoginOf({ kind: EntryKind.file })).toEqual({ login: AppLoginState.signedIn, isOtherAccount: false });
+    expect(fileAppLoginOf({ kind: EntryKind.link }).login).toBe(AppLoginState.signedIn);
+    expect(fileAppLoginOf({ kind: EntryKind.missing }).login).toBe(AppLoginState.signedOut);
+    expect(fileAppLoginOf({ kind: EntryKind.brokenLink }).login).toBe(AppLoginState.signedOut);
   });
   it('is read from the app folder and from the CLI file that holds the account, never a token', () => {
     expect(appLoginFilesOf(paths, 'work', claude, '/p')).toEqual({
@@ -125,7 +134,7 @@ describe('a launch', () => {
   it('moves the home of Antigravity, where the app and its language server keep conversations', () => {
     expect(desktopLaunchOf(antigravity, '/seat', '/profile')).toEqual({
       args: ['--user-data-dir=/profile'],
-      env: { HOME: '/seat', USERPROFILE: '/seat' },
+      env: { HOME: '/seat', USERPROFILE: '/seat', WSL_INTEROP: 'favo' },
     });
     expect(desktopLaunchOf(antigravity, '/seat')).toEqual({ args: [], env: {} });
   });

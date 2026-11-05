@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Each Antigravity account now keeps its own Google login on a Mac, Windows or Linux desktop, in `agy` and in the Antigravity app. Before, every account used the one login in the system keychain, so they all signed in as your base account. Sign in once more in each account; your base account keeps its login.
+
+### Changed
+
+- The Antigravity app signs in on its own in each account, apart from that account's `agy`, like the Claude app, and the comb shows its `app` tag.
+
 ## [0.10.0] - 2026-11-05
 
 ### Added

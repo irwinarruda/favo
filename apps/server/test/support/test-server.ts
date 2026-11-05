@@ -25,7 +25,6 @@ type TestServerOptions = {
   isWindows?: boolean;
   peers?: TailscalePeer[];
   callerEnv?: Record<string, string | undefined>;
-  uid?: number;
   installed?: string[];
   binary?: string;
   shellVariables?: Record<string, string>;
@@ -85,7 +84,6 @@ export function createTestServer(options: TestServerOptions = {}) {
       },
       callerEnv: options.callerEnv ?? {},
       pid: UpdaterPid,
-      uid: options.uid,
       binary: options.binary,
     }
   );

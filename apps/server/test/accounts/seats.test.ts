@@ -139,6 +139,26 @@ describe('seat status', () => {
     expect(clis.codex.sessions).toHaveLength(0);
     expect(clis.claude.sessions.at(-1)?.env.CLAUDE_CONFIG_DIR).toBeUndefined();
   });
+  it('runs agy in a cell with WSL_INTEROP, so it keeps the login in the cell instead of the keychain', async () => {
+    const { client, clis } = await provisionedServer();
+    await client.call(provisionSeat, { account: 'work', provider: 'antigravity' });
+    await client.call(getSeatStatus, { account: 'work', provider: 'antigravity' });
+    const { env } = clis.antigravity.sessions.at(-1)!;
+    expect(env.HOME).toBe(`${Home}/.favo/accounts/work/antigravity`);
+    expect(env.WSL_INTEROP).toBe('favo');
+  });
+  it('keeps the real WSL_INTEROP inside WSL, where Windows programs need it', async () => {
+    const server = createTestServer({ callerEnv: { WSL_INTEROP: '/run/WSL/12_interop' } });
+    await server.client.call(createAccount, { name: 'work' });
+    await server.client.call(provisionSeat, { account: 'work', provider: 'antigravity' });
+    await server.client.call(getSeatStatus, { account: 'work', provider: 'antigravity' });
+    expect(server.clis.antigravity.sessions.at(-1)?.env.WSL_INTEROP).toBe('/run/WSL/12_interop');
+  });
+  it('leaves the base cell of Antigravity on the keychain, where your own agy keeps it', async () => {
+    const { client, clis } = await provisionedServer();
+    await client.call(getSeatStatus, { account: 'personal', provider: 'antigravity' });
+    expect(clis.antigravity.sessions.at(-1)?.env.WSL_INTEROP).toBeUndefined();
+  });
   it('says signed out without running anything when the seat has no folder', async () => {
     const { client, clis } = await provisionedServer();
     const status = await client.call(getSeatStatus, { account: 'work', provider: 'codex' });

@@ -15,10 +15,22 @@ describe('providers', () => {
     expect(isolationEnvironment(Providers.codex, '/a/codex')).toEqual({ CODEX_HOME: '/a/codex' });
   });
   it('gives Antigravity a private home because it only follows HOME', () => {
-    expect(isolationEnvironment(Providers.antigravity, '/a/antigravity')).toEqual({
-      HOME: '/a/antigravity',
-      USERPROFILE: '/a/antigravity',
-    });
+    const environment = isolationEnvironment(Providers.antigravity, '/a/antigravity');
+    expect(environment.HOME).toBe('/a/antigravity');
+    expect(environment.USERPROFILE).toBe('/a/antigravity');
+  });
+  it('sets WSL_INTEROP for Antigravity, so agy keeps the login in the cell instead of the one keychain entry', () => {
+    expect(isolationEnvironment(Providers.antigravity, '/a/antigravity').WSL_INTEROP).toBe('favo');
+    expect(Object.keys(isolationEnvironment(Providers.antigravity, '/a/antigravity'))[0]).toBe('HOME');
+  });
+  it('keeps a real WSL_INTEROP, which Windows programs need inside WSL', () => {
+    const inherited = { WSL_INTEROP: '/run/WSL/12_interop' };
+    expect(isolationEnvironment(Providers.antigravity, '/a', inherited).WSL_INTEROP).toBe('/run/WSL/12_interop');
+  });
+  it('adds nothing for the providers whose own variable already keeps the login in the cell', () => {
+    for (const spec of [Providers.claude, Providers.codex, Providers.opencode]) {
+      expect(isolationEnvironment(spec, '/a').WSL_INTEROP).toBeUndefined();
+    }
   });
   it('moves OpenCode data and state and leaves its config alone', () => {
     const environment = isolationEnvironment(Providers.opencode, '/a/opencode');

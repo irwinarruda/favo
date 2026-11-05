@@ -222,6 +222,17 @@ describe('commands', () => {
       'To sign it in too: favo login claude work',
     ]);
   });
+  it('names agy when the Antigravity app and its CLI share a name', async () => {
+    const { run, lines, client, desktopApps } = harness();
+    desktopApps.install('antigravity');
+    await client.call(createAccount, { name: 'work' });
+    expect(await run('app', 'agy', 'work')).toBe(0);
+    expect(lines).toEqual([
+      '⬢ Antigravity is opening as work.',
+      'Antigravity and agy sign in separately, and agy is signed out as work.',
+      'To sign it in too: favo login agy work',
+    ]);
+  });
   it('says nothing more when that seat is signed in', async () => {
     const { run, lines, client, desktopApps, clis } = harness();
     desktopApps.install('claude');

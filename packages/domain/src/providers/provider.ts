@@ -54,6 +54,7 @@ export type ProviderSpec = {
   aliases: string[];
   homeKind: ProviderHomeKind;
   homeVariable?: string;
+  seatVariables?: Record<string, string>;
   personalHome: string;
   shared: string[];
   private: string[];
@@ -138,6 +139,7 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
     executable: 'agy',
     aliases: ['antigravity', 'agy'],
     homeKind: ProviderHomeKind.privateHome,
+    seatVariables: { WSL_INTEROP: 'favo' },
     personalHome: '.gemini/antigravity-cli',
     shared: [
       '.gemini/GEMINI.md',
@@ -149,7 +151,7 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
     ],
     private: ['.gemini/antigravity-cli/conversations', '.gemini/antigravity-cli/brain'],
     mirrorsHome: true,
-    loginScope: LoginScope.perComputer,
+    loginScope: LoginScope.perAccount,
     pathHint: 'HOME for agy',
     resumeArguments: ['--conversation'],
     hook: {
@@ -221,12 +223,17 @@ export function canUpdateItself({ update }: ProviderSpec, source?: InstallSource
   return source === undefined || !update.refusedOn?.includes(source.method);
 }
 
-export function loginScopeOf({ loginScope }: ProviderSpec, isKeychainSkipped: boolean) {
-  return loginScope === LoginScope.perComputer && isKeychainSkipped ? LoginScope.perAccount : loginScope;
-}
-
-export function isolationEnvironment(spec: ProviderSpec, seatHome: string): Record<string, string> {
-  if (spec.homeKind === ProviderHomeKind.variable) return { [spec.homeVariable!]: seatHome };
-  if (spec.homeKind === ProviderHomeKind.privateHome) return { HOME: seatHome, USERPROFILE: seatHome };
-  return { XDG_DATA_HOME: seatHome, XDG_STATE_HOME: `${seatHome}/state` };
+export function isolationEnvironment(
+  spec: ProviderSpec,
+  seatHome: string,
+  inherited: Record<string, string | undefined> = {}
+): Record<string, string> {
+  const seatVariables = Object.fromEntries(
+    Object.entries(spec.seatVariables ?? {}).map(([name, value]) => [name, inherited[name] ?? value])
+  );
+  if (spec.homeKind === ProviderHomeKind.variable) return { [spec.homeVariable!]: seatHome, ...seatVariables };
+  if (spec.homeKind === ProviderHomeKind.privateHome) {
+    return { HOME: seatHome, USERPROFILE: seatHome, ...seatVariables };
+  }
+  return { XDG_DATA_HOME: seatHome, XDG_STATE_HOME: `${seatHome}/state`, ...seatVariables };
 }

@@ -231,7 +231,8 @@ async function openApp(context: CommandContext, parsed: Command, command: Comman
   if (DesktopAppSpecs[seat.provider]?.login !== DesktopLogin.separate) return 0;
   const { login } = await client.call(getSeatStatus, seat);
   if (login !== LoginState.signedOut) return 0;
-  const { label: cli, executable } = Providers[seat.provider];
+  const { label: provider, executable } = Providers[seat.provider];
+  const cli = provider === label ? executable : provider;
   print(`${label} and ${cli} sign in separately, and ${cli} is signed out as ${parsed.account}.`);
   print(`To sign it in too: favo login ${executable} ${parsed.account}`);
   return 0;
