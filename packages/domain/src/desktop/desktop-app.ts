@@ -29,10 +29,13 @@ export type DesktopAppSpec = {
   profileFolder: string;
   userDataVariable?: string;
   login: DesktopLogin;
-  mac: { bundleId: string; appNames: string[]; defaultProfile?: string };
-  linux: { executable: string; processNames: string[]; defaultProfile?: string };
-  windows: { packageName: string; alias: string; executable: string; defaultProfile?: string };
+  mac: { bundleId: string; appNames: string[]; requiredFile?: string; defaultProfile?: string };
+  linux?: { executable: string; processNames: string[]; defaultProfile?: string };
+  windows: WindowsPackagedApp | WindowsFolderApp;
 };
+
+export type WindowsPackagedApp = { packageName: string; alias: string; executable: string; defaultProfile?: string };
+export type WindowsFolderApp = { folder: string; executable: string; requiredFile: string; defaultProfile?: string };
 
 export type DesktopLaunch = {
   args: string[];
@@ -67,6 +70,22 @@ export const DesktopAppSpecs: Partial<Record<ProviderId, DesktopAppSpec>> = {
     mac: { bundleId: 'com.openai.codex', appNames: ['ChatGPT', 'Codex'] },
     linux: { executable: '/usr/lib/chatgpt/ChatGPT', processNames: ['/usr/lib/chatgpt/ChatGPT'] },
     windows: { packageName: 'OpenAI.Codex', alias: 'chatgpt-desktop.exe', executable: 'app\\ChatGPT.exe' },
+  },
+  antigravity: {
+    provider: ProviderId.antigravity,
+    label: 'Antigravity',
+    profileFolder: 'antigravity-app',
+    login: DesktopLogin.sharedWithCli,
+    mac: {
+      bundleId: 'com.google.antigravity',
+      appNames: ['Antigravity'],
+      requiredFile: 'Contents/Resources/bin/language_server',
+    },
+    windows: {
+      folder: 'Programs/antigravity',
+      executable: 'Antigravity.exe',
+      requiredFile: 'resources/bin/language_server.exe',
+    },
   },
 };
 

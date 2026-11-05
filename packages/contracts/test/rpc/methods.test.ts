@@ -102,6 +102,19 @@ describe('method descriptors', () => {
     const { path: _path, ...withoutPath } = seat;
     expect(listAccounts.result.safeParse([{ ...account, seats: [withoutPath] }]).success).toBe(false);
   });
+  it('takes a login shared by the whole computer, and still the unverified one older machines send', () => {
+    for (const loginScope of ['perComputer', 'unverified']) {
+      const account = { name: 'work', displayName: 'work', isPersonal: false, seats: [{ ...seat, loginScope }] };
+      expect(listAccounts.result.safeParse([account]).success).toBe(true);
+    }
+    const account = {
+      name: 'work',
+      displayName: 'work',
+      isPersonal: false,
+      seats: [{ ...seat, loginScope: 'shared' }],
+    };
+    expect(listAccounts.result.safeParse([account]).success).toBe(false);
+  });
   it('requires a target to add a machine', () => {
     expect(addMachine.params.safeParse({ target: 'bee@devbox' }).success).toBe(true);
     expect(addMachine.params.safeParse({}).success).toBe(false);

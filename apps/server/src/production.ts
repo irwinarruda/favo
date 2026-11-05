@@ -68,6 +68,7 @@ export function createProductionServer(env: Record<string, string | undefined>) 
       host: { hostname: name, platform: platform(), arch: arch(), home, directory: process.cwd() },
       callerEnv: env,
       pid: process.pid,
+      uid: process.getuid?.(),
       binary: basename(process.execPath).startsWith(FavoBinaryName) ? process.execPath : undefined,
     }
   );
@@ -78,8 +79,8 @@ export function createProductionServer(env: Record<string, string | undefined>) 
   }
 
   function installedDesktopApps(isOverSsh: boolean) {
-    if (platform() === 'darwin') return new MacDesktopApps(processes, home);
-    if (isWindows) return new WindowsDesktopApps(processes, env.LOCALAPPDATA ?? `${home}/AppData/Local`);
+    if (platform() === 'darwin') return new MacDesktopApps(processes, fileSystem, home);
+    if (isWindows) return new WindowsDesktopApps(processes, fileSystem, env.LOCALAPPDATA ?? `${home}/AppData/Local`);
     if (isOverSsh || env.DISPLAY || env.WAYLAND_DISPLAY) {
       return new LinuxDesktopApps(processes, fileSystem, paths.configHome);
     }

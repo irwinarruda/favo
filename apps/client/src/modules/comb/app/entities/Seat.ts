@@ -59,7 +59,18 @@ export class Seat {
   }
 
   get hasSharedLogin() {
-    return this.view.loginScope === LoginScope.unverified;
+    return this.view.loginScope !== LoginScope.perAccount;
+  }
+
+  get sharedLoginNote() {
+    if (this.view.loginScope === LoginScope.perComputer) {
+      return `Every ${this.label} cell on this computer shares one login.`;
+    }
+    return 'Threads are separate, but this login may be shared across accounts.';
+  }
+
+  get sealedItems() {
+    return this.view.loginScope === LoginScope.perComputer ? 'threads, history' : 'login, threads, history';
   }
 
   get problems() {

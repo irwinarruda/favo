@@ -17,8 +17,9 @@ Accounts
   favo login <provider> <account>    sign in, with the official command
   favo logout <provider> <account>   sign out
   favo path <provider> <account>     print the config path, for T3 Code
-  favo app <provider> <account>      open the Claude or ChatGPT app as an account
-                                     (claude, codex), on this computer
+  favo app <provider> <account>      open the Claude, ChatGPT or Antigravity app
+                                     as an account, on this computer (claude,
+                                     codex, and antigravity on macOS or Windows)
                                      --close closes it first if it is open
   favo sync [account]                repair shared links
   favo inspect <provider> <account>  show what is shared and what is private

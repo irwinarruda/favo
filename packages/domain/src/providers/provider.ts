@@ -19,6 +19,7 @@ export type ProviderHomeKind = ValueOf<typeof ProviderHomeKind>;
 
 export const LoginScope = {
   perAccount: 'perAccount',
+  perComputer: 'perComputer',
   unverified: 'unverified',
 } as const;
 export type LoginScope = ValueOf<typeof LoginScope>;
@@ -148,7 +149,7 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
     ],
     private: ['.gemini/antigravity-cli/conversations', '.gemini/antigravity-cli/brain'],
     mirrorsHome: true,
-    loginScope: LoginScope.unverified,
+    loginScope: LoginScope.perComputer,
     pathHint: 'HOME for agy',
     resumeArguments: ['--conversation'],
     hook: {
@@ -218,6 +219,10 @@ export function requireProvider(name: string) {
 export function canUpdateItself({ update }: ProviderSpec, source?: InstallSource) {
   if (!update.arguments) return false;
   return source === undefined || !update.refusedOn?.includes(source.method);
+}
+
+export function loginScopeOf({ loginScope }: ProviderSpec, isKeychainSkipped: boolean) {
+  return loginScope === LoginScope.perComputer && isKeychainSkipped ? LoginScope.perAccount : loginScope;
 }
 
 export function isolationEnvironment(spec: ProviderSpec, seatHome: string): Record<string, string> {

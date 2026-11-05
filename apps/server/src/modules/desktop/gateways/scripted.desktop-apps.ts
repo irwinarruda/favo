@@ -32,7 +32,7 @@ export class ScriptedDesktopApps extends DesktopApps {
 
   async find(spec: DesktopAppSpec) {
     if (!this.installed.has(spec.provider)) return undefined;
-    return { spec, launcher: spec.linux.executable, executables: spec.linux.processNames };
+    return { spec, launcher: spec.label, executables: [spec.label] };
   }
 
   async isRunning({ spec }: InstalledDesktopApp) {
@@ -52,7 +52,7 @@ export class ScriptedDesktopApps extends DesktopApps {
   }
 
   defaultProfile({ linux }: DesktopAppSpec) {
-    if (!linux.defaultProfile) return undefined;
+    if (!linux?.defaultProfile) return undefined;
     return `${this.configHome}/${linux.defaultProfile}`;
   }
 }

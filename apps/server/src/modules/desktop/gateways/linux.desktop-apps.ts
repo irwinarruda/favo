@@ -17,6 +17,7 @@ export class LinuxDesktopApps extends UnixDesktopApps {
   }
 
   async find(spec: DesktopAppSpec) {
+    if (!spec.linux) return undefined;
     const { executable, processNames } = spec.linux;
     const entry = await this.fileSystem.entry(executable);
     if (entry.kind === EntryKind.missing) return undefined;
@@ -29,7 +30,7 @@ export class LinuxDesktopApps extends UnixDesktopApps {
   }
 
   defaultProfile({ linux }: DesktopAppSpec) {
-    if (!linux.defaultProfile) return undefined;
+    if (!linux?.defaultProfile) return undefined;
     return `${this.configHome}/${linux.defaultProfile}`;
   }
 }

@@ -62,15 +62,16 @@ export type ServerOptions = {
   host: HostFacts;
   callerEnv: Record<string, string | undefined>;
   pid: number;
+  uid?: number;
   binary?: string;
 };
 
 export function createServer(gateways: ServerGateways, options: ServerOptions) {
   const { fileSystem, processes, shell, clock, clis, ssh, tailscale, remotes, releaseAssets, desktopApps, herdr } =
     gateways;
-  const { paths, host, callerEnv, pid, binary } = options;
+  const { paths, host, callerEnv, pid, uid, binary } = options;
   const router = new RpcRouter();
-  const providers = new ProvidersService(clis, processes, shell, paths);
+  const providers = new ProvidersService(clis, processes, shell, fileSystem, paths, host, callerEnv, uid);
   const config = new ConfigRepository(fileSystem, paths);
   const accountRepository = new AccountRepository(fileSystem, paths);
   const seats = new SeatsService(fileSystem, accountRepository, providers, paths);
@@ -140,7 +141,7 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
   );
   const updates = new UpdateService(providerUpdates, machines, fileSystem, paths, callerEnv, FavoVersion, binary);
   const themes = new ThemesService(new ThemeRepository(fileSystem, paths), config);
-  const desktop = new DesktopAppsService(desktopApps, seats, providers, fileSystem, paths);
+  const desktop = new DesktopAppsService(desktopApps, seats, providers, fileSystem, paths, host);
   registerSystemController(router, host);
   registerAccountsController(router, accounts, seats, usage, threads, hooks);
   registerMachinesController(router, machines, installer);
