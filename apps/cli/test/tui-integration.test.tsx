@@ -246,7 +246,7 @@ describe('the TUI on a real backend', () => {
     await renderOnce();
     expect(captureCharFrame()).not.toContain('p open');
     mac.desktopApps.install('claude');
-    await useApp.getState().loadDesktopApps();
+    await useApp.getState().loadDesktopApps('local');
     await flush();
     await renderOnce();
     expect(captureCharFrame()).toContain('p open Claude');
@@ -265,8 +265,22 @@ describe('the TUI on a real backend', () => {
     useApp.getState().selectRow('seat:local/work/claude');
     await flush();
     const frame = await waitForFrame((current) => current.includes('Claude app on another account'));
-    expect(frame).toMatch(/mac@bee\.dev\s+app ⬢/);
-    expect(frame).toMatch(/mac@bee\.dev\s+app \?/);
+    expect(frame).toMatch(/mac@bee\.dev\s+app(?!\?)/);
+    expect(frame).toMatch(/mac@bee\.dev\s+app\?/);
+  });
+  test('shows the Claude app of a seat on another machine, read there, without offering to open it', async () => {
+    const { devbox, flush, waitForFrame } = await openFleet();
+    const account = JSON.stringify({ oauthAccount: { accountUuid: 'uuid-devbox' } });
+    const app = JSON.stringify({ windowSizeWasSignedIn: true, lastKnownAccountUuid: 'uuid-devbox' });
+    await devbox.fileSystem.writePrivateText(`${Home}/.config/Claude/config.json`, app);
+    await devbox.fileSystem.writePrivateText(`${Home}/.claude.json`, account);
+    devbox.desktopApps.install('claude');
+    await useApp.getState().refreshMachine('devbox');
+    useApp.getState().selectRow('seat:devbox/personal/claude');
+    await flush();
+    const frame = await waitForFrame((current) => current.includes('Claude app signed in'));
+    expect(frame).toMatch(/devbox@bee\.dev\s+app /);
+    expect(frame).not.toContain('p open');
   });
   test('removes an account while the Claude app is installed, and says where it went', async () => {
     const { mac, flush, waitForFrame } = await openFleet();
@@ -282,7 +296,7 @@ describe('the TUI on a real backend', () => {
     const { mac, mockInput, flush, waitForFrame, waitFor } = await openFleet();
     mac.desktopApps.install('claude');
     mac.desktopApps.run('claude');
-    await useApp.getState().loadDesktopApps();
+    await useApp.getState().loadDesktopApps('local');
     useApp.getState().selectRow('seat:local/work/claude');
     await flush();
     mockInput.pressKey('p');

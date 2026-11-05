@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { DomainError } from '@favo/domain/shared/domain-error';
+import { DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { mockDb } from '@/__tests__/db';
 import { getApp } from '@/__tests__/utils/getApp';
 import { container } from '@/shared/container';
@@ -66,28 +66,53 @@ describe('SessionService', () => {
   });
   test('offers the app of the selected seat on this machine', async () => {
     const app = await getApp();
-    expect(app.state.selectedDesktopApp).toEqual({ provider: 'claude', label: 'Claude', login: 'separate' });
+    expect(app.state.selectedDesktopApp).toEqual({
+      provider: 'claude',
+      label: 'Claude',
+      login: 'separate',
+      canOpen: true,
+    });
+    expect(app.state.canOpenDesktopApp).toBe(true);
   });
   test('offers nothing for a provider whose app is not installed', async () => {
     const app = await getApp();
     app.state.selectRow('seat:local/personal/codex');
     expect(app.state.selectedDesktopApp).toBeUndefined();
   });
-  test('offers nothing on another machine, even with the same provider', async () => {
+  test('knows the app of a seat on another machine, but opens apps only on this one', async () => {
+    const app = await getApp();
+    mockDb.desktopApps.devbox = [{ provider: 'claude', label: 'Claude', login: 'separate', canOpen: false }];
+    await app.state.refreshMachine('devbox');
+    app.state.selectRow('seat:devbox/personal/claude');
+    expect(app.state.selectedDesktopApp?.label).toBe('Claude');
+    expect(app.state.canOpenDesktopApp).toBe(false);
+  });
+  test('shows the app login but offers no opening where favo has no screen, as over SSH', async () => {
+    const app = await getApp();
+    mockDb.desktopApps.local = [{ provider: 'claude', label: 'Claude', login: 'separate', canOpen: false }];
+    await app.state.refreshMachine('local');
+    expect(app.state.selectedSeat?.hasAppLogin).toBe(true);
+    expect(app.state.canOpenDesktopApp).toBe(false);
+  });
+  test('knows no app on a machine that has none', async () => {
     const app = await getApp();
     app.state.selectRow('seat:devbox/personal/claude');
     expect(app.state.selectedDesktopApp).toBeUndefined();
+    expect(app.state.canOpenDesktopApp).toBe(false);
   });
   test('notices an app installed later, on a refresh of this machine', async () => {
     const app = await getApp();
     app.state.selectRow('seat:local/personal/codex');
-    mockDb.desktopApps.push({ provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli' });
+    mockDb.desktopApps.local = [
+      { provider: 'claude', label: 'Claude', login: 'separate', canOpen: true },
+      { provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli', canOpen: true },
+    ];
     await app.state.refreshMachine('local');
     expect(app.state.selectedDesktopApp?.label).toBe('ChatGPT');
   });
   test('stops offering an app removed later, on a refresh of this machine', async () => {
     const app = await getApp();
-    mockDb.desktopApps = [];
+    mockDb.desktopApps.local = [];
     await app.state.refreshMachine('local');
     expect(app.state.selectedDesktopApp).toBeUndefined();
   });
@@ -108,6 +133,33 @@ describe('SessionService', () => {
     expect(seat('seat:devbox/personal/claude')?.hasAppLogin).toBe(false);
     expect(mockDb.appLoginReads).not.toContain('seat:local/work/codex');
   });
+  test('reads the app login of a seat on another machine, on that machine', async () => {
+    const app = await getApp({ isLoaded: false });
+    mockDb.desktopApps.devbox = [{ provider: 'claude', label: 'Claude', login: 'separate', canOpen: false }];
+    mockDb.appLogins['seat:devbox/personal/claude'] = { login: 'signedIn', isOtherAccount: false };
+    await app.state.loadFleet();
+    const seat = (key: string) => app.state.accounts.flatMap((account) => account.seats).find((s) => s.key === key);
+    expect(seat('seat:devbox/personal/claude')?.isAppSignedIn).toBe(true);
+    expect(mockDb.appLoginReads).toContain('seat:devbox/personal/claude');
+    expect(mockDb.appLoginReads).not.toContain('seat:devbox/personal/codex');
+  });
+  test.each([
+    ['an unknown method', DomainErrorCode.unknownMethod],
+    ['a reply it cannot read', DomainErrorCode.machineOutdated],
+  ])('shows no app for a machine on an older favo, which answers with %s', async (_, code) => {
+    const app = await getApp({ isLoaded: false });
+    mockDb.desktopAppFailures.devbox = new DomainError(code, 'older favo');
+    await app.state.loadFleet();
+    const devboxSeats = app.state.accounts.filter((account) => account.machineId === 'devbox').flatMap((a) => a.seats);
+    expect(devboxSeats.length).toBeGreaterThan(0);
+    expect(devboxSeats.some((seat) => seat.hasAppLogin)).toBe(false);
+  });
+  test('asks a machine for its apps only once it is online', async () => {
+    const app = await getApp({ isLoaded: false });
+    mockDb.desktopAppFailures.studio = new Error('studio: Connection timed out');
+    await app.state.loadFleet();
+    expect(app.state.machines.find((machine) => machine.id === 'studio')?.isOnline).toBe(false);
+  });
   test('reads each app login once per refresh, through the seat it belongs to', async () => {
     const app = await getApp();
     mockDb.appLoginReads = [];
@@ -116,14 +168,14 @@ describe('SessionService', () => {
   });
   test('reads no app login for an app that shares the CLI login', async () => {
     const app = await getApp({ isLoaded: false });
-    mockDb.desktopApps = [{ provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli' }];
+    mockDb.desktopApps.local = [{ provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli', canOpen: true }];
     await app.state.loadFleet();
     expect(mockDb.appLoginReads).toEqual([]);
     expect(app.state.accounts.flatMap((account) => account.seats).some((seat) => seat.hasAppLogin)).toBe(false);
   });
   test('drops the app login once the app is gone', async () => {
     const app = await getApp();
-    mockDb.desktopApps = [];
+    mockDb.desktopApps.local = [];
     await app.state.refreshMachine('local');
     expect(app.state.selectedSeat?.hasAppLogin).toBe(false);
   });

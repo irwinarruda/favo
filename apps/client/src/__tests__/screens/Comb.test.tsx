@@ -41,7 +41,7 @@ describe('the comb', () => {
   });
   test('flags a seat with broken links', async () => {
     const { captureCharFrame } = await open();
-    expect(captureCharFrame()).toMatch(/bee@work\.dev\s+app ⬡ !/);
+    expect(captureCharFrame()).toMatch(/bee@work\.dev\s+app {2}!/);
   });
   test('shows the config path of the selected seat', async () => {
     const { captureCharFrame, press, waitForFrame } = await open();
@@ -86,6 +86,17 @@ describe('the comb', () => {
   test('shows the shared walls when there is room', async () => {
     const { waitForFrame } = await open({ width: 130, height: 36 });
     await waitForFrame((frame) => frame.includes('SHARED WALLS'));
+  });
+  test('cuts a cell too tall for the terminal from the bottom, never a line from the middle', async () => {
+    const { app, select, waitForFrame } = await open({ width: 130, height: 30 });
+    mockDb.appLogins['seat:local/work/claude'] = { login: 'signedIn', isOtherAccount: false };
+    await app.state.refreshMachine('local');
+    await select('seat:local/work/claude');
+    const frame = await waitForFrame((current) => current.includes('bbbb0001') && current.includes('app signed in'));
+    expect(frame).toContain('n rename');
+    expect(frame).toContain('LAST THREAD');
+    expect(frame).toContain('T3 Code: CLAUDE_CONFIG_DIR path');
+    expect(frame).not.toContain('SEALED IN THIS CELL');
   });
   test('lays out for a narrow terminal', async () => {
     const { captureCharFrame } = await open({ width: 80, height: 44 });
@@ -738,22 +749,32 @@ describe('the app login', () => {
     return view;
   }
 
-  function colorOf(frame: ReturnType<Awaited<ReturnType<typeof renderApp>>['captureSpans']>, text: string) {
-    return frame.lines
-      .flatMap((line) => line.spans)
-      .find((span) => span.text.includes(text))
-      ?.fg.toString();
+  type Spans = ReturnType<Awaited<ReturnType<typeof renderApp>>['captureSpans']>;
+
+  function spanOf(frame: Spans, text: string) {
+    return frame.lines.flatMap((line) => line.spans).find((span) => span.text.includes(text));
   }
 
-  test('marks each seat here whose app signs in on its own, apart from its CLI', async () => {
-    const { captureCharFrame } = await openWith({ 'seat:local/personal/claude': signedIn });
+  function colorOf(frame: Spans, text: string) {
+    return spanOf(frame, text)?.fg.toString();
+  }
+
+  function badgesOf(frame: Spans) {
+    return frame.lines.flatMap((line) => line.spans).filter((span) => /^ app[ ?]$/.test(span.text));
+  }
+
+  test('tags each seat here whose app signs in on its own, apart from its CLI', async () => {
+    const { captureCharFrame, captureSpans } = await openWith({ 'seat:local/personal/claude': signedIn });
     const frame = captureCharFrame();
-    expect(frame).toMatch(/bee@hive\.dev\s+app ⬢/);
-    expect(frame).toMatch(/bee@work\.dev\s+app ⬡ !/);
+    expect(frame).toMatch(/bee@hive\.dev\s+app /);
+    expect(frame).toMatch(/bee@work\.dev\s+app {2}!/);
+    const [personal, work] = badgesOf(captureSpans());
+    expect(personal?.bg.toString()).toBe(colorOf(captureSpans(), '⬢'));
+    expect(work?.bg.toString()).not.toBe(personal?.bg.toString());
   });
-  test('marks no app on another machine, or for a provider whose app is not here', async () => {
-    const { captureCharFrame } = await openWith({});
-    expect(captureCharFrame().match(/app [⬢⬡?]/g)).toHaveLength(2);
+  test('tags no app on another machine without one, or for a provider whose app is not here', async () => {
+    const { captureSpans } = await openWith({});
+    expect(badgesOf(captureSpans())).toHaveLength(2);
   });
   test('says in the cell whether the app is signed in', async () => {
     const { select, waitForFrame } = await openWith({ 'seat:local/personal/claude': signedIn });
@@ -767,26 +788,49 @@ describe('the app login', () => {
     await waitForFrame((frame) => frame.includes('⬢ Claude app on another account'));
     const spans = captureSpans();
     expect(colorOf(spans, 'on another account')).toBe(colorOf(spans, ' !'));
-    expect(colorOf(spans, 'app ⬢')).toBe(colorOf(spans, ' !'));
+    expect(badgesOf(spans).some((badge) => badge.bg.toString() === colorOf(spans, ' !'))).toBe(true);
   });
   test('keeps the warning in a small terminal, and leaves out the rest the row already shows', async () => {
     const { select, waitForFrame, captureCharFrame } = await openWith(
       { 'seat:local/personal/claude': signedIn, 'seat:local/work/claude': otherAccount },
       { width: 80, height: 24 }
     );
-    expect(captureCharFrame()).toContain('app ⬢');
+    expect(captureCharFrame()).toMatch(/\.dev\s+app /);
     expect(captureCharFrame()).toContain('CONFIG PATH');
     expect(captureCharFrame()).not.toContain('Claude app signed in');
     await select('seat:local/work/claude');
     const frame = await waitForFrame((current) => current.includes('Claude app on another account'));
     expect(frame).toContain('CONFIG PATH');
   });
-  test('marks an unknown app login the same way in the row and the cell', async () => {
+  test('tags an unknown app login with a question mark, and says so in the cell', async () => {
     const { waitForFrame } = await openWith({
       'seat:local/personal/claude': { login: 'unknown', isOtherAccount: false },
     });
     const frame = await waitForFrame((current) => current.includes('? Claude app sign-in unknown'));
-    expect(frame).toMatch(/bee@hive\.dev\s+app \?/);
+    expect(frame).toMatch(/bee@hive\.dev\s+app\?/);
+  });
+  test('keeps a seat with a long email on one line, and cuts only the email', async () => {
+    const view = await open();
+    mockDb.seatStatuses['seat:local/work/claude'] = {
+      login: 'signedIn',
+      identity: 'irwin.arruda@matchit.example.com.br',
+      problems: 1,
+    };
+    mockDb.appLogins['seat:local/work/claude'] = signedIn;
+    await view.app.state.refreshMachine('local');
+    await view.select('seat:local/work/claude');
+    const frame = await view.waitForFrame((current) => current.includes('▸ ⬢ claude'));
+    expect(frame).toMatch(/▸ ⬢ claude\s+irwin\.\S+\.com\.br\s+app {2}!/);
+  });
+  test('tags the app of a seat on another machine, which opens only there', async () => {
+    const view = await open();
+    mockDb.desktopApps.devbox = [{ provider: 'claude', label: 'Claude', login: 'separate', canOpen: false }];
+    mockDb.appLogins['seat:devbox/personal/claude'] = signedIn;
+    await view.app.state.refreshMachine('devbox');
+    await view.select('seat:devbox/personal/claude');
+    const frame = await view.waitForFrame((current) => current.includes('⬢ Claude app signed in'));
+    expect(badgesOf(view.captureSpans())).toHaveLength(3);
+    expect(frame).not.toContain('p open');
   });
 });
 

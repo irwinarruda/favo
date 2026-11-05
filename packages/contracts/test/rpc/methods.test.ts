@@ -137,10 +137,12 @@ describe('usage', () => {
 });
 
 describe('desktop apps', () => {
-  it('run on the computer you are at, because that is where the window opens', () => {
-    expect(listDesktopApps.routing).toBe('hub');
+  it('open on the computer you are at, because that is where the window opens', () => {
     expect(openDesktopApp.routing).toBe('hub');
-    expect(getAppLogin.routing).toBe('hub');
+  });
+  it('are listed and read on the machine that holds the seat, so a remote hive shows its app', () => {
+    expect(listDesktopApps.routing).toBe('machine');
+    expect(getAppLogin.routing).toBe('machine');
   });
   it('accepts an open request and refuses one for an unknown provider', () => {
     const params = { account: 'work', provider: 'claude', canClose: false };
@@ -151,12 +153,19 @@ describe('desktop apps', () => {
     expect(openDesktopApp.params.safeParse({ account: 'work', provider: 'claude' }).success).toBe(false);
   });
   it('parses the apps found and refuses one with no label', () => {
-    const chatgpt = { provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli' };
+    const chatgpt = { provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli', canOpen: true };
     expect(listDesktopApps.result.safeParse([chatgpt]).success).toBe(true);
-    expect(listDesktopApps.result.safeParse([{ provider: 'codex', login: 'sharedWithCli' }]).success).toBe(false);
+    const { label: _label, ...unlabeled } = chatgpt;
+    expect(listDesktopApps.result.safeParse([unlabeled]).success).toBe(false);
+  });
+  it('says whether this machine can open the app, which an older favo does not, so it reads as none', () => {
+    const claude = { provider: 'claude', label: 'Claude', login: 'separate', canOpen: false };
+    const { canOpen: _canOpen, ...older } = claude;
+    expect(listDesktopApps.result.safeParse([claude]).success).toBe(true);
+    expect(listDesktopApps.result.safeParse([older]).success).toBe(false);
   });
   it('says whether an app signs in on its own', () => {
-    const claude = { provider: 'claude', label: 'Claude', login: 'separate' };
+    const claude = { provider: 'claude', label: 'Claude', login: 'separate', canOpen: true };
     expect(listDesktopApps.result.safeParse([claude]).success).toBe(true);
     expect(listDesktopApps.result.safeParse([{ ...claude, login: 'sometimes' }]).success).toBe(false);
   });

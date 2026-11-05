@@ -9,6 +9,8 @@ const StopTimeoutMs = 5000;
 const PowerShellTimeoutMs = 15_000;
 
 export class WindowsDesktopApps extends DesktopApps {
+  readonly canOpen = true;
+
   constructor(
     private readonly processes: ProcessRunner,
     private readonly localAppData: string,

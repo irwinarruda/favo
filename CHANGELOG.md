@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- Claude seats on your other machines show their Claude app's sign-in too, read on that machine over SSH once favo there is updated to this version. `p` still opens the app only on the computer you are at.
+
+### Changed
+
+- The Claude app's sign-in is a small `app` tag at the end of the seat's row instead of `app ⬢`: filled in honey when the app is signed in, red when it is on another account than Claude Code, plain when it is signed out, and `app?` when favo can't tell.
+
+### Fixed
+
+- A Claude seat with a long email no longer breaks its row onto two lines or squeezes its `⬢` against the name. Only the email is cut.
+- A cell too tall for the terminal cuts its last lines instead of dropping lines from the middle, such as the email or the `LAST THREAD` heading.
+
 ## [0.7.0] - 2026-11-04
 
 ### Added

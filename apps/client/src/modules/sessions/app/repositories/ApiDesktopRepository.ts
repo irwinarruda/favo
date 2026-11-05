@@ -8,8 +8,8 @@ import type { IDesktopRepository } from '@/modules/sessions/app/repositories/IDe
 export class ApiDesktopRepository implements IDesktopRepository {
   constructor(private readonly client: RpcClient) {}
 
-  getApps() {
-    return this.client.call(listDesktopApps, {});
+  getApps(machineId: string) {
+    return this.client.call(listDesktopApps, {}, { machineId });
   }
 
   open(seat: Seat, canClose: boolean) {
@@ -17,6 +17,7 @@ export class ApiDesktopRepository implements IDesktopRepository {
   }
 
   getLogin(seat: Seat) {
-    return this.client.call(getAppLogin, { account: seat.account, provider: seat.provider });
+    const params = { account: seat.account, provider: seat.provider };
+    return this.client.call(getAppLogin, params, { machineId: seat.machineId });
   }
 }

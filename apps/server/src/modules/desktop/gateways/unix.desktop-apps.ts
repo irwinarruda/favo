@@ -8,6 +8,8 @@ const QuitTimeoutMs = 10_000;
 export const CommandTimeoutMs = 10_000;
 
 export abstract class UnixDesktopApps extends DesktopApps {
+  readonly canOpen = true;
+
   constructor(
     protected readonly processes: ProcessRunner,
     private readonly quitTimeoutMs = QuitTimeoutMs

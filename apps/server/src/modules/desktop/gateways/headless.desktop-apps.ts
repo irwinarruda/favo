@@ -1,6 +1,8 @@
 import { DesktopApps } from '@/modules/desktop/gateways/desktop-apps';
 
 export class HeadlessDesktopApps extends DesktopApps {
+  readonly canOpen = false;
+
   async find() {
     return undefined;
   }

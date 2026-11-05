@@ -12,6 +12,7 @@ type KeyBarProps = {
 export function KeyBar(props: KeyBarProps) {
   const selectedSeat = useApp((state) => state.selectedSeat);
   const selectedDesktopApp = useApp((state) => state.selectedDesktopApp);
+  const canOpenDesktopApp = useApp((state) => state.canOpenDesktopApp);
   const selectedMachine = useApp((state) => state.selectedMachine);
   const openSelectedSeat = useApp((state) => state.openSelectedSeat);
   const canKeepThreads = useApp((state) => state.canKeepThreads);
@@ -43,7 +44,7 @@ export function KeyBar(props: KeyBarProps) {
       )}
       {canKeepThreads && <KeyHint keys="b" label="go back" onPress={error.handle(props.onGoBackToThread)} />}
       {!!selectedSeat && <KeyHint keys="c" label="copy path" onPress={error.handle(copySelectedPath)} />}
-      {!!selectedDesktopApp && (
+      {canOpenDesktopApp && !!selectedDesktopApp && (
         <KeyHint keys="p" label={`open ${selectedDesktopApp.label}`} onPress={error.handle(props.onOpenDesktopApp)} />
       )}
       {!!selectedMachine?.canInstall && (

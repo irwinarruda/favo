@@ -1,5 +1,6 @@
 import type { DesktopAppView, ThreadView } from '@favo/contracts/rpc/views';
 import { DesktopLogin, DesktopOpening } from '@favo/domain/desktop/desktop-app';
+import { isOlderFavoError } from '@favo/domain/machines/machine';
 import { ownValue } from '@favo/domain/shared/own-value';
 import { TerminalAction } from '@favo/domain/terminal/terminal-plan';
 import { compute } from '@/libs/zustand';
@@ -9,10 +10,11 @@ import { container } from '@/shared/container';
 import type { ServiceCreator } from '@/shared/stores/app';
 
 export type SessionService = {
-  desktopApps: DesktopAppView[];
+  desktopApps: Record<string, DesktopAppView[]>;
   selectedDesktopApp?: DesktopAppView;
+  canOpenDesktopApp: boolean;
   isDesktopAppBusy: boolean;
-  loadDesktopApps(): Promise<void>;
+  loadDesktopApps(machineId: string): Promise<void>;
   loadAppLogin(seat: Seat): Promise<void>;
   openDesktopApp(seat: Seat, canClose?: boolean): Promise<DesktopOpening | undefined>;
   openSelectedSeat(): Promise<void>;
@@ -25,33 +27,33 @@ export type SessionService = {
 };
 
 export const createSessionService: ServiceCreator<SessionService> = (set, get) => ({
-  ...compute(get, ({ desktopApps, selectedSeat, selectedMachine }) => ({
-    selectedDesktopApp: selectedMachine?.isLocal
-      ? desktopApps.find((app) => app.provider === selectedSeat?.provider)
-      : undefined,
-  })),
-  desktopApps: [],
+  ...compute(get, ({ desktopApps, selectedSeat, selectedMachine }) => {
+    const selectedDesktopApp = selectedSeat && _appOf(desktopApps, selectedSeat);
+    return { selectedDesktopApp, canOpenDesktopApp: !!selectedDesktopApp?.canOpen && !!selectedMachine?.isLocal };
+  }),
+  desktopApps: {},
   isDesktopAppBusy: false,
-  async loadDesktopApps() {
-    const { desktopApps: previousApps } = get();
-    const desktopRepository = container.get('IDesktopRepository');
-    const desktopApps = await desktopRepository.getApps();
-    set({ desktopApps });
+  async loadDesktopApps(machineId) {
+    const previousApps = ownValue(get().desktopApps, machineId) ?? [];
+    const desktopApps = await _appsOn(machineId);
+    set((state) => ({ desktopApps: { ...state.desktopApps, [machineId]: desktopApps } }));
     if (_ownLoginProviders(desktopApps).join() === _ownLoginProviders(previousApps).join()) return;
     const { accounts, loadAppLogin } = get();
-    await Promise.all(accounts.flatMap((account) => account.visibleSeats).map((seat) => loadAppLogin(seat)));
+    const seats = accounts
+      .filter((account) => account.machineId === machineId)
+      .flatMap((account) => account.visibleSeats);
+    await Promise.all(seats.map((seat) => loadAppLogin(seat)));
   },
   async loadAppLogin(seat) {
-    const { machines, desktopApps, updateSeat } = get();
-    const isLocal = machines.some((machine) => machine.id === seat.machineId && machine.isLocal);
-    const hasOwnLogin = isLocal && _ownLoginProviders(desktopApps).includes(seat.provider);
-    if (!hasOwnLogin) {
+    const { desktopApps, updateSeat } = get();
+    if (!_hasOwnLogin(desktopApps, seat)) {
       if (seat.hasAppLogin) updateSeat(seat.key, (current) => current.withAppLogin(undefined));
       return;
     }
     const desktopRepository = container.get('IDesktopRepository');
     const appLogin = await desktopRepository.getLogin(seat);
-    updateSeat(seat.key, (current) => current.withAppLogin(appLogin));
+    const hasOwnLogin = _hasOwnLogin(get().desktopApps, seat);
+    updateSeat(seat.key, (current) => current.withAppLogin(hasOwnLogin ? appLogin : undefined));
   },
   async openDesktopApp(seat, canClose = false) {
     const { accounts, isDesktopAppBusy, refreshSeat, showToast } = get();
@@ -115,6 +117,24 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
     showToast(linked > 0 ? `Mended ${linked} shared links.` : 'Every wall is sound.');
   },
 });
+
+function _appOf(desktopApps: Record<string, DesktopAppView[]>, seat: Seat) {
+  return ownValue(desktopApps, seat.machineId)?.find((app) => app.provider === seat.provider);
+}
+
+async function _appsOn(machineId: string) {
+  try {
+    const desktopRepository = container.get('IDesktopRepository');
+    return await desktopRepository.getApps(machineId);
+  } catch (error) {
+    if (isOlderFavoError(error)) return [];
+    throw error;
+  }
+}
+
+function _hasOwnLogin(desktopApps: Record<string, DesktopAppView[]>, seat: Seat) {
+  return _ownLoginProviders(ownValue(desktopApps, seat.machineId) ?? []).includes(seat.provider);
+}
 
 function _ownLoginProviders(desktopApps: DesktopAppView[]) {
   return desktopApps.filter((app) => app.login === DesktopLogin.separate).map((app) => app.provider);

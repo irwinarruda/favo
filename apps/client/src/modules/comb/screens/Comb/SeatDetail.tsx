@@ -144,7 +144,7 @@ function SeatPanel({ seat, isCompact, onRemoveAccount, onGoBackToThread }: SeatP
   }, [seat.key, selectedDirectory]);
 
   return (
-    <box flexDirection="column">
+    <box flexDirection="column" flexShrink={0}>
       <text>
         <span fg={seat.isSignedIn ? colors.accent : colors.faint}>{seat.isSignedIn ? Hex.filled : Hex.hollow}</span>
         <b fg={colors.text}> {seat.label}</b>
@@ -228,6 +228,7 @@ export function SeatDetail({ width, isCompact, onRemoveAccount, onGoBackToThread
       borderStyle="rounded"
       borderColor={colors.border}
       title=" cell "
+      overflow="hidden"
     >
       {selectedSeat ? (
         <SeatPanel

@@ -293,8 +293,8 @@ function seedDirectoryTrees(): Record<string, Record<string, string[]>> {
   };
 }
 
-function seedDesktopApps(): DesktopAppView[] {
-  return [{ provider: ProviderId.claude, label: 'Claude', login: 'separate' }];
+function seedDesktopApps(): Record<string, DesktopAppView[]> {
+  return { local: [{ provider: ProviderId.claude, label: 'Claude', login: 'separate', canOpen: true }] };
 }
 
 function seedDiscovered(): DiscoveredMachine[] {
@@ -325,6 +325,7 @@ export const mockDb = {
   directoryTrees: seedDirectoryTrees(),
   discovered: seedDiscovered(),
   desktopApps: seedDesktopApps(),
+  desktopAppFailures: {} as Record<string, Error>,
   runningDesktopApps: [] as ProviderId[],
   desktopOpenings: [] as string[],
   desktopFailure: undefined as DomainError | undefined,
@@ -359,6 +360,7 @@ export const mockDb = {
     this.directoryTrees = seedDirectoryTrees();
     this.discovered = seedDiscovered();
     this.desktopApps = seedDesktopApps();
+    this.desktopAppFailures = {};
     this.runningDesktopApps = [];
     this.desktopOpenings = [];
     this.desktopFailure = undefined;

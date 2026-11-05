@@ -4,6 +4,7 @@ import { ProviderId } from '@favo/domain/providers/provider';
 import { HeadlessDesktopApps } from '@/modules/desktop/gateways/headless.desktop-apps';
 import { LinuxDesktopApps } from '@/modules/desktop/gateways/linux.desktop-apps';
 import { MacDesktopApps } from '@/modules/desktop/gateways/mac.desktop-apps';
+import { SshDesktopApps } from '@/modules/desktop/gateways/ssh.desktop-apps';
 import { WindowsDesktopApps } from '@/modules/desktop/gateways/windows.desktop-apps';
 import { CliHerdr } from '@/modules/herdr/gateways/cli.herdr';
 import { CliTailscale } from '@/modules/machines/gateways/cli.tailscale';
@@ -72,10 +73,16 @@ export function createProductionServer(env: Record<string, string | undefined>) 
   );
 
   function desktopAppsFor(isOverSsh: boolean) {
-    if (isOverSsh) return new HeadlessDesktopApps();
+    const installed = installedDesktopApps(isOverSsh);
+    return isOverSsh ? new SshDesktopApps(installed) : installed;
+  }
+
+  function installedDesktopApps(isOverSsh: boolean) {
     if (platform() === 'darwin') return new MacDesktopApps(processes, home);
     if (isWindows) return new WindowsDesktopApps(processes, env.LOCALAPPDATA ?? `${home}/AppData/Local`);
-    if (env.DISPLAY || env.WAYLAND_DISPLAY) return new LinuxDesktopApps(processes, fileSystem, paths.configHome);
+    if (isOverSsh || env.DISPLAY || env.WAYLAND_DISPLAY) {
+      return new LinuxDesktopApps(processes, fileSystem, paths.configHome);
+    }
     return new HeadlessDesktopApps();
   }
 }

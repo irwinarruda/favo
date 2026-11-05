@@ -4,7 +4,7 @@ import { DesktopAppView } from '#contracts/rpc/views';
 
 export const listDesktopApps = defineMethod({
   name: 'desktop.list',
-  routing: MethodRouting.hub,
+  routing: MethodRouting.machine,
   params: z.strictObject({}),
   result: z.array(DesktopAppView),
 });

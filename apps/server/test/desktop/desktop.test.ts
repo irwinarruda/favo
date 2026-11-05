@@ -25,7 +25,15 @@ describe('which apps favo offers', () => {
     const { client, desktopApps } = createTestServer();
     desktopApps.install('codex');
     expect(await client.call(listDesktopApps, {})).toEqual([
-      { provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli' },
+      { provider: 'codex', label: 'ChatGPT', login: 'sharedWithCli', canOpen: true },
+    ]);
+  });
+  it('still lists the apps without a screen, as over SSH, but says it cannot open them', async () => {
+    const { client, desktopApps } = createTestServer();
+    desktopApps.install('claude');
+    desktopApps.refuseWindows();
+    expect(await client.call(listDesktopApps, {})).toEqual([
+      { provider: 'claude', label: 'Claude', login: 'separate', canOpen: false },
     ]);
   });
   it('never offers one for a provider that has no app', async () => {
@@ -34,16 +42,27 @@ describe('which apps favo offers', () => {
     desktopApps.install('antigravity');
     expect(await client.call(listDesktopApps, {})).toEqual([]);
   });
-  it('answers for this computer, whatever machine is asked about', async () => {
-    const { client, desktopApps } = createTestServer();
-    desktopApps.install('claude');
+  it('lists the apps of the machine asked about, on that machine', async () => {
+    const { client, desktopApps, remotes } = createTestServer();
+    const devbox = createTestServer({ hostname: 'devbox' });
+    desktopApps.install('codex');
+    devbox.desktopApps.install('claude');
     await client.call(addMachine, { target: 'bee@devbox' });
+    remotes.connect('devbox', devbox.router);
     const apps = await client.call(listDesktopApps, {}, { machineId: 'devbox' });
-    expect(apps).toEqual([{ provider: 'claude', label: 'Claude', login: 'separate' }]);
+    expect(apps).toEqual([{ provider: 'claude', label: 'Claude', login: 'separate', canOpen: true }]);
   });
 });
 
 describe('opening an app', () => {
+  it('refuses without a screen, as over SSH, and touches nothing', async () => {
+    const { client, desktopApps, fileSystem } = await serverWithWork();
+    desktopApps.install('claude');
+    desktopApps.refuseWindows();
+    await expect(client.call(openDesktopApp, openWork)).rejects.toMatchObject({ code: 'desktopAppFailed' });
+    expect(desktopApps.opened).toEqual([]);
+    expect((await fileSystem.entry(`${Home}/.favo/accounts/work/claude-app`)).kind).toBe(EntryKind.missing);
+  });
   it('refuses when the app is not installed, and touches nothing', async () => {
     const { client, desktopApps, fileSystem } = await serverWithWork();
     await expect(client.call(openDesktopApp, openWork)).rejects.toMatchObject({ code: 'desktopAppMissing' });
@@ -158,6 +177,13 @@ describe('the login of a seat app', () => {
 
   it('is signed in when the app in that seat says so, and keeps nothing else from its settings', async () => {
     const { client, fileSystem } = await serverWithWork();
+    await fileSystem.writePrivateText(`${workProfile}/config.json`, appSettings(true));
+    await fileSystem.writePrivateText(`${Home}/.favo/accounts/work/claude/.claude.json`, cliConfig('uuid-work'));
+    expect(await client.call(getAppLogin, workLogin)).toEqual({ login: 'signedIn', isOtherAccount: false });
+  });
+  it('is read without a screen too, as over SSH', async () => {
+    const { client, desktopApps, fileSystem } = await serverWithWork();
+    desktopApps.refuseWindows();
     await fileSystem.writePrivateText(`${workProfile}/config.json`, appSettings(true));
     await fileSystem.writePrivateText(`${Home}/.favo/accounts/work/claude/.claude.json`, cliConfig('uuid-work'));
     expect(await client.call(getAppLogin, workLogin)).toEqual({ login: 'signedIn', isOtherAccount: false });

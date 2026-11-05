@@ -13,3 +13,10 @@ export function appColorOf(seat: Seat, colors: ThemeColors) {
   if (seat.isOtherAccount) return colors.danger;
   return seat.isAppSignedIn ? colors.accent : colors.faint;
 }
+
+export function appBadgeOf(seat: Seat, colors: ThemeColors) {
+  if (seat.isOtherAccount) return { label: ' app ', fg: colors.background, bg: colors.danger };
+  if (seat.isAppSignedIn) return { label: ' app ', fg: colors.background, bg: colors.accent };
+  if (seat.appLogin?.login === AppLoginState.unknown) return { label: ' app?', fg: colors.faint };
+  return { label: ' app ', fg: colors.faint };
+}

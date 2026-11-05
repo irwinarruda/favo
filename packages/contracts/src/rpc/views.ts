@@ -33,6 +33,7 @@ export const DesktopAppView = z.strictObject({
   provider: z.enum(ProviderId),
   label: z.string(),
   login: z.enum(DesktopLogin),
+  canOpen: z.boolean(),
 });
 export type DesktopAppView = z.infer<typeof DesktopAppView>;
 

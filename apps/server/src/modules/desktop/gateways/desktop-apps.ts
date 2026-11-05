@@ -7,6 +7,7 @@ export type InstalledDesktopApp = {
 };
 
 export abstract class DesktopApps {
+  abstract readonly canOpen: boolean;
   abstract find(spec: DesktopAppSpec): Promise<InstalledDesktopApp | undefined>;
   abstract isRunning(app: InstalledDesktopApp): Promise<boolean>;
   abstract quit(app: InstalledDesktopApp): Promise<boolean>;

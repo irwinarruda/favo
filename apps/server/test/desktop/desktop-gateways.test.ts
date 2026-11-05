@@ -4,6 +4,8 @@ import type { InstalledDesktopApp } from '@/modules/desktop/gateways/desktop-app
 import { HeadlessDesktopApps } from '@/modules/desktop/gateways/headless.desktop-apps';
 import { LinuxDesktopApps } from '@/modules/desktop/gateways/linux.desktop-apps';
 import { MacDesktopApps } from '@/modules/desktop/gateways/mac.desktop-apps';
+import { ScriptedDesktopApps } from '@/modules/desktop/gateways/scripted.desktop-apps';
+import { SshDesktopApps } from '@/modules/desktop/gateways/ssh.desktop-apps';
 import { WindowsDesktopApps } from '@/modules/desktop/gateways/windows.desktop-apps';
 import { BunProcessRunner } from '@/modules/system/gateways/bun.process-runner';
 import { MemoryFileSystem } from '@/modules/system/gateways/memory.file-system';
@@ -263,6 +265,30 @@ describe('with no screen to open a window on', () => {
   it('finds nothing, so favo offers nothing', async () => {
     expect(await new HeadlessDesktopApps().find()).toBeUndefined();
     expect(new HeadlessDesktopApps().defaultProfile()).toBeUndefined();
+  });
+});
+
+describe('over SSH', () => {
+  function overSsh() {
+    const installed = new ScriptedDesktopApps(ConfigHome);
+    installed.install('claude');
+    return { installed, apps: new SshDesktopApps(installed) };
+  }
+
+  it('finds the apps installed there and names their default folder, as on that computer', async () => {
+    const { apps } = overSsh();
+    expect((await apps.find(claude))?.spec).toBe(claude);
+    expect(await apps.find(chatgpt)).toBeUndefined();
+    expect(apps.defaultProfile(claude)).toBe(`${ConfigHome}/Claude`);
+  });
+  it('cannot open, close or look for a window, because there is no screen to reach', async () => {
+    const { installed, apps } = overSsh();
+    const app = (await apps.find(claude))!;
+    expect(apps.canOpen).toBe(false);
+    await expect(apps.open(app)).rejects.toMatchObject({ code: 'desktopAppFailed' });
+    await expect(apps.quit(app)).rejects.toMatchObject({ code: 'desktopAppFailed' });
+    await expect(apps.isRunning(app)).rejects.toMatchObject({ code: 'desktopAppFailed' });
+    expect(installed.opened).toEqual([]);
   });
 });
 

@@ -55,23 +55,25 @@ export const createFleetService: ServiceCreator<FleetService> = (set, get) => ({
     }
   },
   async refreshMachine(machineId) {
-    const { machines, loadMachine, loadDesktopApps } = get();
+    const { machines, loadMachine } = get();
     const machine = machines.find((candidate) => candidate.id === machineId);
-    if (!machine) return;
-    await Promise.all([loadMachine(machine), machine.isLocal ? loadDesktopApps() : undefined]);
+    if (machine) await loadMachine(machine);
   },
   async loadMachine(machine) {
-    const { setMachinePresence } = get();
+    const { setMachinePresence, loadDesktopApps } = get();
     const machineId = machine.id;
     setMachinePresence(machineId, MachinePresence.connecting);
     const fleetRepository = container.get('IFleetRepository');
     const status = await fleetRepository.getMachineStatus(machine);
     const refreshed = machine.withStatus(status);
     set((state) => ({ machines: state.machines.map((item) => (item.id === machineId ? refreshed : item)) }));
-    const accounts = refreshed.isOnline ? await fleetRepository.getAccounts(refreshed) : [];
-    set((state) => ({ accounts: _mergeAccounts(state.machines, state.accounts, machineId, accounts) }));
-    const seats = accounts.flatMap((account) => account.visibleSeats);
-    await Promise.all(seats.map((seat) => get().refreshSeat(seat)));
+    async function loadSeats() {
+      const accounts = refreshed.isOnline ? await fleetRepository.getAccounts(refreshed) : [];
+      set((state) => ({ accounts: _mergeAccounts(state.machines, state.accounts, machineId, accounts) }));
+      const seats = accounts.flatMap((account) => account.visibleSeats);
+      await Promise.all(seats.map((seat) => get().refreshSeat(seat)));
+    }
+    await Promise.all([loadSeats(), refreshed.isOnline ? loadDesktopApps(machineId) : undefined]);
   },
   async refreshSeat(seat) {
     const { updateSeat, loadAppLogin } = get();

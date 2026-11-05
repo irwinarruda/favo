@@ -1,17 +1,22 @@
 import { AppLoginState, DesktopAppSpecs, DesktopLogin, DesktopOpening } from '@favo/domain/desktop/desktop-app';
+import { LocalMachineId } from '@favo/domain/machines/machine';
 import { DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
+import { ownValue } from '@favo/domain/shared/own-value';
 import { mockDb } from '@/__tests__/db';
 import type { Seat } from '@/modules/comb/app/entities/Seat';
 import type { IDesktopRepository } from '@/modules/sessions/app/repositories/IDesktopRepository';
 
 export class TestDesktopRepository implements IDesktopRepository {
-  async getApps() {
-    return mockDb.desktopApps;
+  async getApps(machineId: string) {
+    const failure = ownValue(mockDb.desktopAppFailures, machineId);
+    if (failure) throw failure;
+    return ownValue(mockDb.desktopApps, machineId) ?? [];
   }
 
   async open(seat: Seat, canClose: boolean) {
-    const app = mockDb.desktopApps.find(({ provider }) => provider === seat.provider);
+    const app = ownValue(mockDb.desktopApps, LocalMachineId)?.find(({ provider }) => provider === seat.provider);
     if (!app) throw new DomainError(DomainErrorCode.desktopAppMissing, `${seat.label} has no desktop app here.`);
+    if (!app.canOpen) throw new DomainError(DomainErrorCode.desktopAppFailed, `favo cannot open ${app.label} here.`);
     if (mockDb.desktopFailure) throw mockDb.desktopFailure;
     const isRunning = mockDb.runningDesktopApps.includes(seat.provider);
     if (isRunning && !canClose) return { opening: DesktopOpening.stillOpen, label: app.label };

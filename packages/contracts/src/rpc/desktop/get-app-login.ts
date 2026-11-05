@@ -4,7 +4,7 @@ import { AppLoginStatus } from '#contracts/rpc/views';
 
 export const getAppLogin = defineMethod({
   name: 'desktop.login',
-  routing: MethodRouting.hub,
+  routing: MethodRouting.machine,
   params: SeatParams,
   result: AppLoginStatus,
 });

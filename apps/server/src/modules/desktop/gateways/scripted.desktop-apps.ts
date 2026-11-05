@@ -5,6 +5,7 @@ import { DesktopApps, type InstalledDesktopApp } from '@/modules/desktop/gateway
 export class ScriptedDesktopApps extends DesktopApps {
   readonly opened: { provider: ProviderId; launch: DesktopLaunch }[] = [];
   readonly quitCalls: ProviderId[] = [];
+  canOpen = true;
   private readonly installed = new Set<ProviderId>();
   private readonly running = new Set<ProviderId>();
   private readonly stuck = new Set<ProviderId>();
@@ -23,6 +24,10 @@ export class ScriptedDesktopApps extends DesktopApps {
 
   refuseToQuit(provider: ProviderId) {
     this.stuck.add(provider);
+  }
+
+  refuseWindows() {
+    this.canOpen = false;
   }
 
   async find(spec: DesktopAppSpec) {

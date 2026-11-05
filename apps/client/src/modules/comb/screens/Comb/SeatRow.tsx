@@ -1,11 +1,22 @@
 import type { Seat } from '@/modules/comb/app/entities/Seat';
-import { appColorOf, appMarkOf } from '@/modules/comb/screens/Comb/appMark';
+import { appBadgeOf } from '@/modules/comb/screens/Comb/appMark';
 import { Spinner } from '@/shared/components/Spinner';
 import { useError } from '@/shared/error/useError';
 import { useApp } from '@/shared/stores/app';
 import { Hex } from '@/shared/theme/glyphs';
 
 const CommandWidth = 9;
+
+function AppBadge({ seat }: { seat: Seat }) {
+  const colors = useApp((state) => state.colors);
+  const { label, fg, bg } = appBadgeOf(seat, colors);
+
+  return (
+    <text fg={fg} bg={bg} marginLeft={1} flexShrink={0}>
+      {label}
+    </text>
+  );
+}
 
 export function SeatRow({ seat }: { seat: Seat }) {
   const colors = useApp((state) => state.colors);
@@ -14,7 +25,6 @@ export function SeatRow({ seat }: { seat: Seat }) {
   const openSelectedSeat = useApp((state) => state.openSelectedSeat);
   const error = useError();
   const headlineColor = seat.isSignedIn ? colors.text : colors.faint;
-  const appColor = appColorOf(seat, colors);
 
   async function onSeatClick() {
     if (isSelected) await openSelectedSeat();
@@ -28,22 +38,30 @@ export function SeatRow({ seat }: { seat: Seat }) {
       backgroundColor={isSelected ? colors.selection : undefined}
       onMouseDown={error.handle(onSeatClick)}
     >
-      <text fg={colors.accent}>{isSelected ? '▸' : ' '}</text>
+      <text fg={colors.accent} flexShrink={0}>
+        {isSelected ? '▸' : ' '}
+      </text>
       {seat.isChecking ? (
-        <box marginLeft={1} width={2}>
+        <box marginLeft={1} width={2} flexShrink={0}>
           <Spinner />
         </box>
       ) : (
-        <text
-          fg={seat.isSignedIn ? colors.accent : colors.faint}
-        >{` ${seat.isSignedIn ? Hex.filled : Hex.hollow} `}</text>
+        <text fg={seat.isSignedIn ? colors.accent : colors.faint} flexShrink={0}>
+          {` ${seat.isSignedIn ? Hex.filled : Hex.hollow} `}
+        </text>
       )}
-      <text fg={isSelected ? colors.accentBright : colors.text}>{seat.command.padEnd(CommandWidth)}</text>
+      <text fg={isSelected ? colors.accentBright : colors.text} flexShrink={0}>
+        {seat.command.padEnd(CommandWidth)}
+      </text>
       <text fg={headlineColor} flexGrow={1} flexShrink={1} wrapMode="none" truncate>
         {seat.headline}
       </text>
-      {seat.hasAppLogin && <text fg={appColor}>{` app ${appMarkOf(seat)}`}</text>}
-      {seat.problems > 0 && <text fg={colors.danger}> !</text>}
+      {seat.hasAppLogin && <AppBadge seat={seat} />}
+      {seat.problems > 0 && (
+        <text fg={colors.danger} flexShrink={0}>
+          {' !'}
+        </text>
+      )}
     </box>
   );
 }

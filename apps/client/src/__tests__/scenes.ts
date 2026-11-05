@@ -57,6 +57,7 @@ export const Scenes: Record<string, Scene> = {
     stage() {
       mockDb.machineStatuses.devbox = OlderFavo;
       mockDb.machineStatuses.studio = OlderFavo;
+      mockDb.desktopApps.studio = [];
     },
   },
 };
@@ -107,13 +108,17 @@ function stageHive() {
       ['api', 'hive', 'infra', 'mobile', 'web'].map((name) => [`${RemoteHome}/code/${name}`, [] as string[]])
     ),
   };
-  mockDb.desktopApps = [
-    { provider: ProviderId.claude, label: 'Claude', login: 'separate' },
-    { provider: ProviderId.codex, label: 'ChatGPT', login: 'sharedWithCli' },
-  ];
+  mockDb.desktopApps = {
+    local: [
+      { provider: ProviderId.claude, label: 'Claude', login: 'separate', canOpen: true },
+      { provider: ProviderId.codex, label: 'ChatGPT', login: 'sharedWithCli', canOpen: true },
+    ],
+    studio: [{ provider: ProviderId.claude, label: 'Claude', login: 'separate', canOpen: false }],
+  };
   mockDb.appLogins = {
     'seat:local/personal/claude': { login: 'signedIn', isOtherAccount: false },
     'seat:local/work/claude': { login: 'signedIn', isOtherAccount: false },
+    'seat:studio/personal/claude': { login: 'signedIn', isOtherAccount: false },
   };
 }
 

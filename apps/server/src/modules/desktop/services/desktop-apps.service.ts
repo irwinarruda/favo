@@ -31,8 +31,9 @@ export class DesktopAppsService {
   async list() {
     const specs = ProviderOrder.flatMap((provider) => DesktopAppSpecs[provider] ?? []);
     const found = await Promise.all(specs.map((spec) => this.desktopApps.find(spec)));
+    const { canOpen } = this.desktopApps;
     return found.flatMap((app) =>
-      app ? [{ provider: app.spec.provider, label: app.spec.label, login: app.spec.login }] : []
+      app ? [{ provider: app.spec.provider, label: app.spec.label, login: app.spec.login, canOpen }] : []
     );
   }
 
@@ -58,6 +59,11 @@ export class DesktopAppsService {
   async open({ account, provider, canClose }: OpenDesktopAppParams) {
     const spec = this.requireSpec(provider);
     const { label } = spec;
+    assertDomain(
+      this.desktopApps.canOpen,
+      DomainErrorCode.desktopAppFailed,
+      `favo cannot open ${label} here, because there is no screen to show it on, as over SSH.`
+    );
     const app = await this.desktopApps.find(spec);
     assertDomain(app, DomainErrorCode.desktopAppMissing, `The ${label} app is not installed here.`);
     const isRunning = await this.desktopApps.isRunning(app);

@@ -39,6 +39,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   const updateProviders = useApp((state) => state.updateProviders);
   const selectedSeat = useApp((state) => state.selectedSeat);
   const selectedDesktopApp = useApp((state) => state.selectedDesktopApp);
+  const canOpenDesktopApp = useApp((state) => state.canOpenDesktopApp);
   const isDesktopAppBusy = useApp((state) => state.isDesktopAppBusy);
   const openDesktopApp = useApp((state) => state.openDesktopApp);
   const isAddAccountOpen = useApp((state) => state.isAddAccountOpen);
@@ -107,7 +108,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   }
 
   async function onOpenDesktopApp() {
-    if (!selectedSeat || !selectedDesktopApp) return;
+    if (!selectedSeat || !selectedDesktopApp || !canOpenDesktopApp) return;
     const seat = selectedSeat;
     const { label } = selectedDesktopApp;
     const displayName = selectedAccount?.displayName;
