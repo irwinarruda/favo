@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, jest, test } from 'bun:test';
 import { DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { mockDb } from '@/__tests__/db';
 import { getApp } from '@/__tests__/utils/getApp';
@@ -254,5 +254,84 @@ describe('SessionService', () => {
     expect(mockDb.terminalRuns).toHaveLength(0);
     expect(mockDb.clipboard).toHaveLength(0);
     expect(mockDb.repaired).toHaveLength(0);
+  });
+});
+
+describe('watching the app login after opening the app', () => {
+  const work = 'seat:local/work/claude';
+  const personal = 'seat:local/personal/claude';
+  const signedIn = { login: 'signedIn', isOtherAccount: false } as const;
+
+  async function openWork() {
+    const app = await getApp();
+    jest.useFakeTimers();
+    app.state.selectRow(work);
+    await app.state.openDesktopApp(app.state.selectedSeat!);
+    mockDb.appLoginReads = [];
+    return app;
+  }
+
+  async function wait(ms: number) {
+    jest.advanceTimersByTime(ms);
+    for (let turn = 0; turn < 20; turn++) await Promise.resolve();
+  }
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('shows the sign-in as soon as the app has it, without a refresh', async () => {
+    const app = await openWork();
+    expect(app.state.appLoginWatch?.seatKey).toBe(work);
+    await wait(3_000);
+    expect(mockDb.appLoginReads).toEqual([work]);
+    mockDb.appLogins[work] = signedIn;
+    await wait(3_000);
+    expect(app.state.selectedSeat?.isAppSignedIn).toBe(true);
+    expect(app.state.appLoginWatch).toBeUndefined();
+  });
+  test('reads nothing more once the app is signed in', async () => {
+    await openWork();
+    mockDb.appLogins[work] = signedIn;
+    await wait(3_000);
+    await wait(30_000);
+    expect(mockDb.appLoginReads).toEqual([work]);
+  });
+  test('gives up after three minutes without a sign-in', async () => {
+    const app = await openWork();
+    for (let poll = 0; poll < 70; poll++) await wait(3_000);
+    expect(mockDb.appLoginReads).toHaveLength(60);
+    expect(app.state.appLoginWatch).toBeUndefined();
+  });
+  test('watches nothing when the app is already signed in', async () => {
+    const app = await getApp();
+    mockDb.appLogins[work] = signedIn;
+    app.state.selectRow(work);
+    await app.state.openDesktopApp(app.state.selectedSeat!);
+    expect(app.state.appLoginWatch).toBeUndefined();
+  });
+  test('follows only the seat the app was opened as last', async () => {
+    const app = await openWork();
+    app.state.selectRow(personal);
+    await app.state.openDesktopApp(app.state.selectedSeat!, true);
+    mockDb.appLoginReads = [];
+    await wait(3_000);
+    expect(mockDb.appLoginReads).toEqual([personal]);
+  });
+  test('stops quietly when the account is gone', async () => {
+    const app = await openWork();
+    mockDb.accounts.local = mockDb.accounts.local!.filter(({ name }) => name !== 'work');
+    await app.state.refreshMachine('local');
+    mockDb.appLoginReads = [];
+    await wait(3_000);
+    expect(mockDb.appLoginReads).toEqual([]);
+    expect(app.state.appLoginWatch).toBeUndefined();
+  });
+  test('stops quietly when a read fails', async () => {
+    const app = await openWork();
+    container.get('IDesktopRepository').getLogin = () => Promise.reject(new Error('the files are gone'));
+    await wait(3_000);
+    expect(app.state.appLoginWatch).toBeUndefined();
+    expect(app.state.toast?.message).toBe('Claude is opening as work.');
   });
 });

@@ -674,6 +674,12 @@ describe('opening a desktop app', () => {
     await waitForFrame((frame) => frame.includes('Claude is opening as work.'));
     expect(mockDb.desktopOpenings).toEqual(['seat:local/work/claude']);
   });
+  test('says in the cell that it waits for the sign-in in the app it opened', async () => {
+    const { select, press, waitForFrame } = await open();
+    await select('seat:local/work/claude');
+    await press('p');
+    await waitForFrame((frame) => frame.includes('⬡ Claude app waiting for sign-in'));
+  });
   test('opens with a click', async () => {
     const { select, clickOn, waitFor } = await open();
     await select('seat:local/work/claude');

@@ -96,14 +96,16 @@ function LastThread({ onGoBackToThread }: Pick<CellProps, 'onGoBackToThread'>) {
 function AppLogin({ seat }: { seat: Seat }) {
   const colors = useApp((state) => state.colors);
   const selectedDesktopApp = useApp((state) => state.selectedDesktopApp);
+  const isWatched = useApp((state) => state.appLoginWatch?.seatKey === seat.key);
   const color = appColorOf(seat, colors);
+  const loginLabel = isWatched && !seat.isAppSignedIn ? 'waiting for sign-in' : seat.appLoginLabel;
 
   return (
     <text wrapMode="none" truncate>
       <span fg={color}>{appMarkOf(seat)}</span>
       <span fg={seat.isAppSignedIn && !seat.isOtherAccount ? colors.text : color}>
         {' '}
-        {selectedDesktopApp?.label} app {seat.appLoginLabel}
+        {selectedDesktopApp?.label} app {loginLabel}
       </span>
     </text>
   );

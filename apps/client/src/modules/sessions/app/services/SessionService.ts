@@ -7,15 +7,22 @@ import { compute } from '@/libs/zustand';
 import type { Seat } from '@/modules/comb/app/entities/Seat';
 import { ToastKind } from '@/shared/app/services/ToastService';
 import { container } from '@/shared/container';
-import type { ServiceCreator } from '@/shared/stores/app';
+import type { AppService, ServiceCreator } from '@/shared/stores/app';
+
+const AppLoginPollMs = 3_000;
+const AppLoginPolls = 60;
+
+export type AppLoginWatch = { seatKey: string };
 
 export type SessionService = {
   desktopApps: Record<string, DesktopAppView[]>;
   selectedDesktopApp?: DesktopAppView;
   canOpenDesktopApp: boolean;
   isDesktopAppBusy: boolean;
+  appLoginWatch?: AppLoginWatch;
   loadDesktopApps(machineId: string): Promise<void>;
   loadAppLogin(seat: Seat): Promise<void>;
+  watchAppLogin(seat: Seat): Promise<void>;
   openDesktopApp(seat: Seat, canClose?: boolean): Promise<DesktopOpening | undefined>;
   openSelectedSeat(): Promise<void>;
   launchSelectedSeat(): Promise<void>;
@@ -33,6 +40,7 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
   }),
   desktopApps: {},
   isDesktopAppBusy: false,
+  appLoginWatch: undefined,
   async loadDesktopApps(machineId) {
     const previousApps = ownValue(get().desktopApps, machineId) ?? [];
     const desktopApps = await _appsOn(machineId);
@@ -55,8 +63,17 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
     const hasOwnLogin = _hasOwnLogin(get().desktopApps, seat);
     updateSeat(seat.key, (current) => current.withAppLogin(hasOwnLogin ? appLogin : undefined));
   },
+  async watchAppLogin(seat) {
+    const watch = { seatKey: seat.key };
+    set({ appLoginWatch: watch });
+    for (let poll = 0; poll < AppLoginPolls && _isWaiting(get(), watch); poll++) {
+      await _wait(AppLoginPollMs);
+      if (!_isWaiting(get(), watch) || !(await _isRead(get().loadAppLogin, seat))) break;
+    }
+    if (get().appLoginWatch === watch) set({ appLoginWatch: undefined });
+  },
   async openDesktopApp(seat, canClose = false) {
-    const { accounts, isDesktopAppBusy, refreshSeat, showToast } = get();
+    const { accounts, isDesktopAppBusy, refreshSeat, watchAppLogin, showToast } = get();
     if (isDesktopAppBusy) return undefined;
     try {
       set({ isDesktopAppBusy: true });
@@ -66,6 +83,7 @@ export const createSessionService: ServiceCreator<SessionService> = (set, get) =
       const account = accounts.find(({ machineId, name }) => machineId === seat.machineId && name === seat.account);
       showToast(`${label} is opening as ${account?.displayName}.`);
       await refreshSeat(seat);
+      void watchAppLogin(seat);
       return opening;
     } finally {
       set({ isDesktopAppBusy: false });
@@ -130,6 +148,24 @@ async function _appsOn(machineId: string) {
     if (isOlderFavoError(error)) return [];
     throw error;
   }
+}
+
+function _isWaiting({ appLoginWatch, accounts }: AppService, watch: AppLoginWatch) {
+  const seat = accounts.flatMap((account) => account.seats).find(({ key }) => key === watch.seatKey);
+  return appLoginWatch === watch && !!seat?.hasAppLogin && !seat.isAppSignedIn;
+}
+
+async function _isRead(loadAppLogin: (seat: Seat) => Promise<void>, seat: Seat) {
+  try {
+    await loadAppLogin(seat);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function _wait(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 function _hasOwnLogin(desktopApps: Record<string, DesktopAppView[]>, seat: Seat) {

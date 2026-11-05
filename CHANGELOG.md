@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- After `p` opens the Claude app on a seat that isn't signed in there, the comb watches for your sign-in for three minutes and shows it as soon as it happens, so you no longer need `r`. The cell says it is waiting.
+
 ## [0.8.0] - 2026-11-04
 
 ### Added
