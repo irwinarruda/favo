@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-04
+
 ### Added
 
 - Claude seats on your other machines show their Claude app's sign-in too, read on that machine over SSH once favo there is updated to this version. `p` still opens the app only on the computer you are at.
@@ -103,7 +105,8 @@
 - A TUI that shows every machine, account and login, plus a command for everything it does.
 - Native on macOS, Linux and Windows, installed with `npm install --global favo-cli`.
 
-[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/irwinarruda/favo-cli/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/irwinarruda/favo-cli/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/irwinarruda/favo-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/irwinarruda/favo-cli/compare/v0.4.0...v0.5.0
