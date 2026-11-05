@@ -18,6 +18,7 @@ import type { DesktopApps } from '@/modules/desktop/gateways/desktop-apps';
 import type { ProvidersService } from '@/modules/providers/services/providers.service';
 import type { FileSystem } from '@/modules/system/gateways/file-system';
 import type { FavoPaths } from '@/shared/config/favo-paths';
+import type { HostFacts } from '@/shared/config/host-facts';
 
 export class DesktopAppsService {
   constructor(
@@ -25,7 +26,8 @@ export class DesktopAppsService {
     private readonly seats: SeatsService,
     private readonly providers: ProvidersService,
     private readonly fileSystem: FileSystem,
-    private readonly paths: FavoPaths
+    private readonly paths: FavoPaths,
+    private readonly host: HostFacts
   ) {}
 
   async list() {
@@ -63,6 +65,11 @@ export class DesktopAppsService {
       this.desktopApps.canOpen,
       DomainErrorCode.desktopAppFailed,
       `favo cannot open ${label} here, because there is no screen to show it on, as over SSH.`
+    );
+    assertDomain(
+      spec.linux !== undefined || this.host.platform !== 'linux',
+      DomainErrorCode.desktopAppMissing,
+      `favo opens the ${label} app on macOS and Windows only.`
     );
     const app = await this.desktopApps.find(spec);
     assertDomain(app, DomainErrorCode.desktopAppMissing, `The ${label} app is not installed here.`);

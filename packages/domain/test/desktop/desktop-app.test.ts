@@ -14,16 +14,17 @@ import { Providers } from '#domain/providers/provider';
 const paths = { home: '/h', accounts: '/h/.favo/accounts' };
 const claude = DesktopAppSpecs.claude!;
 const chatgpt = DesktopAppSpecs.codex!;
+const antigravity = DesktopAppSpecs.antigravity!;
 
 describe('desktop apps', () => {
   it('exist only for the providers that ship one', () => {
-    expect(Object.keys(DesktopAppSpecs).toSorted()).toEqual(['claude', 'codex']);
+    expect(Object.keys(DesktopAppSpecs).toSorted()).toEqual(['antigravity', 'claude', 'codex']);
   });
   it('never treat a bare chatgpt command as the app, because other tools use that name', () => {
-    expect(chatgpt.linux.processNames).toEqual(['/usr/lib/chatgpt/ChatGPT']);
+    expect(chatgpt.linux!.processNames).toEqual(['/usr/lib/chatgpt/ChatGPT']);
   });
   it('keep their folder apart from the provider folder, so a cell can hold both', () => {
-    for (const spec of [claude, chatgpt]) {
+    for (const spec of [claude, chatgpt, antigravity]) {
       expect(spec.profileFolder).not.toBe(spec.provider);
       expect(Providers[spec.provider].shared).not.toContain(spec.profileFolder);
     }
@@ -39,6 +40,9 @@ describe('the login of an app', () => {
   it('is the CLI login for ChatGPT, whose Codex signs it in, and its own for Claude', () => {
     expect(chatgpt.login).toBe(DesktopLogin.sharedWithCli);
     expect(claude.login).toBe(DesktopLogin.separate);
+  });
+  it('is the CLI login for Antigravity, whose app and agy read the same keychain entry', () => {
+    expect(antigravity.login).toBe(DesktopLogin.sharedWithCli);
   });
   it('is read from the app folder and from the CLI file that holds the account, never a token', () => {
     expect(appLoginFilesOf(paths, 'work', claude, '/p')).toEqual({
@@ -117,6 +121,13 @@ describe('a launch', () => {
       args: ['--user-data-dir=/profile'],
       env: { CODEX_HOME: '/seat', CODEX_ELECTRON_USER_DATA_PATH: '/profile' },
     });
+  });
+  it('moves the home of Antigravity, where the app and its language server keep conversations', () => {
+    expect(desktopLaunchOf(antigravity, '/seat', '/profile')).toEqual({
+      args: ['--user-data-dir=/profile'],
+      env: { HOME: '/seat', USERPROFILE: '/seat' },
+    });
+    expect(desktopLaunchOf(antigravity, '/seat')).toEqual({ args: [], env: {} });
   });
   it('takes nothing for personal, and clears what favo may have inherited', () => {
     expect(desktopLaunchOf(chatgpt, '/seat')).toEqual({

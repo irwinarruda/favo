@@ -39,8 +39,14 @@ describe('which apps favo offers', () => {
   it('never offers one for a provider that has no app', async () => {
     const { client, desktopApps } = createTestServer();
     desktopApps.install('opencode');
-    desktopApps.install('antigravity');
     expect(await client.call(listDesktopApps, {})).toEqual([]);
+  });
+  it('offers the Antigravity app, which signs in through the same login as agy', async () => {
+    const { client, desktopApps } = createTestServer();
+    desktopApps.install('antigravity');
+    expect(await client.call(listDesktopApps, {})).toEqual([
+      { provider: 'antigravity', label: 'Antigravity', login: 'sharedWithCli', canOpen: true },
+    ]);
   });
   it('lists the apps of the machine asked about, on that machine', async () => {
     const { client, desktopApps, remotes } = createTestServer();
@@ -74,6 +80,17 @@ describe('opening an app', () => {
     const params = { ...openWork, provider: 'opencode' } as const;
     await expect(client.call(openDesktopApp, params)).rejects.toMatchObject({ code: 'desktopAppMissing' });
   });
+  it('says favo opens Antigravity only on macOS and Windows, rather than that it is missing', async () => {
+    const { client, desktopApps } = createTestServer({ platform: 'linux' });
+    desktopApps.install('antigravity');
+    await client.call(createAccount, { name: 'work' });
+    const params = { ...openWork, provider: 'antigravity' } as const;
+    await expect(client.call(openDesktopApp, params)).rejects.toMatchObject({
+      code: 'desktopAppMissing',
+      message: 'favo opens the Antigravity app on macOS and Windows only.',
+    });
+    expect(desktopApps.opened).toEqual([]);
+  });
   it('refuses an account that does not exist', async () => {
     const { client, desktopApps } = await serverWithWork();
     desktopApps.install('claude');
@@ -96,6 +113,23 @@ describe('opening an app', () => {
       },
     ]);
     expect((await fileSystem.entry(profile)).kind).toBe(EntryKind.directory);
+  });
+  it('opens Antigravity with its own folder and the home of its seat, where its conversations live', async () => {
+    const { client, desktopApps, fileSystem } = await serverWithWork();
+    desktopApps.install('antigravity');
+    const params = { ...openWork, provider: 'antigravity' } as const;
+    expect(await client.call(openDesktopApp, params)).toEqual({ opening: 'opened', label: 'Antigravity' });
+    const seat = `${Home}/.favo/accounts/work/antigravity`;
+    expect(desktopApps.opened).toEqual([
+      {
+        provider: 'antigravity',
+        launch: {
+          args: [`--user-data-dir=${Home}/.favo/accounts/work/antigravity-app`],
+          env: { HOME: seat, USERPROFILE: seat },
+        },
+      },
+    ]);
+    expect((await fileSystem.entry(`${Home}/.favo/accounts/work/antigravity-app`)).kind).toBe(EntryKind.directory);
   });
   it('links the shared files first, so the app sees the same setup as the CLI', async () => {
     const { client, desktopApps, fileSystem } = await serverWithWork();

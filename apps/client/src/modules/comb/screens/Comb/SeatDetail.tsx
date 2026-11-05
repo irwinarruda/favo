@@ -177,12 +177,12 @@ function SeatPanel({ seat, isCompact, onRemoveAccount, onGoBackToThread }: SeatP
           {items.length === 0 && <text fg={colors.faint}>nothing to share yet</text>}
           {absent > 0 && <text fg={colors.faint}>· {absent} more not in your base</text>}
           <Heading>SEALED IN THIS CELL</Heading>
-          <text fg={colors.faint}>login, threads, history</text>
+          <text fg={colors.faint}>{seat.sealedItems}</text>
         </>
       )}
       {seat.hasSharedLogin && (
         <text fg={colors.danger} marginTop={1}>
-          Threads are separate, but this login may be shared across accounts.
+          {seat.sharedLoginNote}
         </text>
       )}
     </box>

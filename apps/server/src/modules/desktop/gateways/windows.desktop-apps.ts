@@ -1,7 +1,14 @@
-import type { DesktopAppSpec, DesktopLaunch } from '@favo/domain/desktop/desktop-app';
+import type {
+  DesktopAppSpec,
+  DesktopLaunch,
+  WindowsFolderApp,
+  WindowsPackagedApp,
+} from '@favo/domain/desktop/desktop-app';
 import { assertDomain, DomainErrorCode } from '@favo/domain/shared/domain-error';
+import { EntryKind } from '@favo/domain/sharing/shared-item';
 import { DesktopApps, type InstalledDesktopApp } from '@/modules/desktop/gateways/desktop-apps';
 import { waitUntil } from '@/modules/desktop/utils/wait-until';
+import type { FileSystem } from '@/modules/system/gateways/file-system';
 import type { ProcessRunner } from '@/modules/system/gateways/process-runner';
 
 const CloseTimeoutMs = 3000;
@@ -13,6 +20,7 @@ export class WindowsDesktopApps extends DesktopApps {
 
   constructor(
     private readonly processes: ProcessRunner,
+    private readonly fileSystem: FileSystem,
     private readonly localAppData: string,
     private readonly closeTimeoutMs = CloseTimeoutMs,
     private readonly stopTimeoutMs = StopTimeoutMs
@@ -21,15 +29,8 @@ export class WindowsDesktopApps extends DesktopApps {
   }
 
   async find(spec: DesktopAppSpec) {
-    const { packageName, alias, executable } = spec.windows;
-    const { code, stdout } = await this.powershell(`(Get-AppxPackage -Name ${quoted(packageName)}).InstallLocation`);
-    const location = stdout.split(/\r?\n/)[0]?.trim();
-    if (code !== 0 || !location) return undefined;
-    return {
-      spec,
-      launcher: `${backslashes(this.localAppData)}\\Microsoft\\WindowsApps\\${alias}`,
-      executables: [`${location}\\${executable}`],
-    };
+    const { windows } = spec;
+    return 'packageName' in windows ? this.findPackage(spec, windows) : this.findInFolder(spec, windows);
   }
 
   async isRunning(app: InstalledDesktopApp) {
@@ -57,7 +58,26 @@ export class WindowsDesktopApps extends DesktopApps {
 
   defaultProfile({ windows }: DesktopAppSpec) {
     if (!windows.defaultProfile) return undefined;
-    return `${this.localAppData.replaceAll('\\', '/')}/${windows.defaultProfile}`;
+    return `${forwardSlashes(this.localAppData)}/${windows.defaultProfile}`;
+  }
+
+  private async findPackage(spec: DesktopAppSpec, { packageName, alias, executable }: WindowsPackagedApp) {
+    const { code, stdout } = await this.powershell(`(Get-AppxPackage -Name ${quoted(packageName)}).InstallLocation`);
+    const location = stdout.split(/\r?\n/)[0]?.trim();
+    if (code !== 0 || !location) return undefined;
+    return {
+      spec,
+      launcher: `${backslashes(this.localAppData)}\\Microsoft\\WindowsApps\\${alias}`,
+      executables: [`${location}\\${executable}`],
+    };
+  }
+
+  private async findInFolder(spec: DesktopAppSpec, { folder, executable, requiredFile }: WindowsFolderApp) {
+    const location = `${forwardSlashes(this.localAppData)}/${folder}`;
+    const entry = await this.fileSystem.entry(`${location}/${requiredFile}`);
+    if (entry.kind !== EntryKind.file) return undefined;
+    const path = backslashes(`${location}/${executable}`);
+    return { spec, launcher: path, executables: [path] };
   }
 
   private powershell(script: string) {
@@ -75,6 +95,10 @@ function processesOf({ executables }: InstalledDesktopApp) {
 
 function quoted(text: string) {
   return `'${text.replaceAll("'", "''")}'`;
+}
+
+function forwardSlashes(path: string) {
+  return path.replaceAll('\\', '/');
 }
 
 function backslashes(path: string) {

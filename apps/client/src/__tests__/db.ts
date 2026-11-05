@@ -71,7 +71,7 @@ function seedAccounts(): Record<string, AccountView[]> {
       accountOf(MacHome, 'personal', { antigravity: { isInstalled: false } }),
       accountOf(MacHome, 'work', { antigravity: { isInstalled: false } }),
     ],
-    devbox: [accountOf(DevboxHome, 'personal')],
+    devbox: [accountOf(DevboxHome, 'personal', { antigravity: { loginScope: 'perAccount' } })],
   };
 }
 

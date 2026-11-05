@@ -14,6 +14,8 @@ import { ScriptedProcessRunner } from '@/modules/system/gateways/scripted.proces
 
 const claude = DesktopAppSpecs.claude!;
 const chatgpt = DesktopAppSpecs.codex!;
+const antigravity = DesktopAppSpecs.antigravity!;
+const AntigravityBundle = '/Applications/Antigravity.app';
 const ProcessList = 'ps x -o pid=,args=';
 const PowerShell = 'powershell.exe -NoProfile -NonInteractive -Command';
 const ClaudeBundle = '/Applications/Claude.app';
@@ -44,34 +46,52 @@ describe('on macOS', () => {
   it('finds an app by the id inside its bundle', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(plistLine(ClaudeBundle), { stdout: 'com.anthropic.claudefordesktop\n' });
-    expect(await new MacDesktopApps(processes, '/Users/bee').find(claude)).toEqual(macApp());
+    expect(await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee').find(claude)).toEqual(macApp());
   });
   it('looks in your own Applications folder too', async () => {
     const processes = new ScriptedProcessRunner();
     const bundle = '/Users/bee/Applications/Claude.app';
     processes.reply(plistLine(bundle), { stdout: 'com.anthropic.claudefordesktop\n' });
-    expect((await new MacDesktopApps(processes, '/Users/bee').find(claude))?.launcher).toBe(bundle);
+    expect((await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee').find(claude))?.launcher).toBe(
+      bundle
+    );
   });
   it('finds nothing when nothing is installed', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(plistLine(ClaudeBundle), { code: 1 });
     processes.reply(plistLine('/Users/bee/Applications/Claude.app'), { code: 1 });
-    expect(await new MacDesktopApps(processes, '/Users/bee').find(claude)).toBeUndefined();
+    expect(await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee').find(claude)).toBeUndefined();
   });
   it('does not take ChatGPT Classic for the app that can be isolated', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(plistLine('/Applications/ChatGPT.app'), { stdout: 'com.openai.chat\n' });
-    expect(await new MacDesktopApps(processes, '/Users/bee').find(chatgpt)).toBeUndefined();
+    expect(await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee').find(chatgpt)).toBeUndefined();
   });
   it('still finds an older install named Codex', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(plistLine('/Applications/Codex.app'), { stdout: 'com.openai.codex\n' });
-    const app = await new MacDesktopApps(processes, '/Users/bee').find(chatgpt);
+    const app = await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee').find(chatgpt);
     expect(app?.executables).toEqual(['/Applications/Codex.app/Contents/MacOS/Codex']);
+  });
+  it('finds Antigravity by its id and the language server only the 2.x app carries', async () => {
+    const processes = new ScriptedProcessRunner();
+    const fileSystem = new MemoryFileSystem();
+    processes.reply(plistLine(AntigravityBundle), { stdout: 'com.google.antigravity\n' });
+    await fileSystem.writePrivateText(`${AntigravityBundle}/Contents/Resources/bin/language_server`, '');
+    expect(await new MacDesktopApps(processes, fileSystem, '/Users/bee').find(antigravity)).toEqual({
+      spec: antigravity,
+      launcher: AntigravityBundle,
+      executables: [`${AntigravityBundle}/Contents/MacOS/Antigravity`],
+    });
+  });
+  it('does not take an old Antigravity IDE, which may carry the same id', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.reply(plistLine(AntigravityBundle), { stdout: 'com.google.antigravity\n' });
+    expect(await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee').find(antigravity)).toBeUndefined();
   });
   it('opens a new instance with its folder and variables', async () => {
     const processes = new ScriptedProcessRunner();
-    await new MacDesktopApps(processes, '/Users/bee').open(macApp(), {
+    await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee').open(macApp(), {
       args: ['--user-data-dir=/p'],
       env: { CLAUDE_CONFIG_DIR: '/seat' },
     });
@@ -81,7 +101,7 @@ describe('on macOS', () => {
   });
   it('opens personal the plain way', async () => {
     const processes = new ScriptedProcessRunner();
-    await new MacDesktopApps(processes, '/Users/bee').open(macApp(), {
+    await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee').open(macApp(), {
       args: [],
       env: { CLAUDE_CONFIG_DIR: undefined },
     });
@@ -90,23 +110,23 @@ describe('on macOS', () => {
   it('says so when macOS will not open it', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(`open ${ClaudeBundle}`, { code: 1, stderr: 'no such app' });
-    const gateway = new MacDesktopApps(processes, '/Users/bee');
+    const gateway = new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee');
     await expect(gateway.open(macApp(), { args: [], env: {} })).rejects.toMatchObject({ code: 'desktopAppFailed' });
   });
   it('does not take a failed process list for a closed app', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(ProcessList, { code: 1 });
-    const gateway = new MacDesktopApps(processes, '/Users/bee');
+    const gateway = new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee');
     await expect(gateway.isRunning(macApp())).rejects.toMatchObject({ code: 'desktopAppFailed' });
   });
   it('gives up on a command that hangs', async () => {
     const processes = new ScriptedProcessRunner();
-    await new MacDesktopApps(processes, '/Users/bee').isRunning(macApp());
+    await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee').isRunning(macApp());
     expect(processes.calls[0]?.timeoutMs).toBeGreaterThan(0);
   });
   it('tells a running app from a stopped one', async () => {
     const processes = new ScriptedProcessRunner();
-    const gateway = new MacDesktopApps(processes, '/Users/bee');
+    const gateway = new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee');
     processes.reply(ProcessList, { stdout: ` 9 /bin/zsh\n 12 ${ClaudeMain} --type=gpu-process\n` });
     expect(await gateway.isRunning(macApp())).toBe(false);
     processes.reply(ProcessList, { stdout: ` 11 ${ClaudeMain}\n` });
@@ -115,18 +135,18 @@ describe('on macOS', () => {
   it('asks only the main process to quit, and waits for it', async () => {
     const processes = new EndingProcessRunner();
     processes.reply(ProcessList, { stdout: ` 11 ${ClaudeMain}\n 12 ${ClaudeMain} --type=renderer\n 13 /bin/claude\n` });
-    expect(await new MacDesktopApps(processes, '/Users/bee', 1000).quit(macApp())).toBe(true);
+    expect(await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee', 1000).quit(macApp())).toBe(true);
     expect(commandsOf(processes)).toContain('kill -TERM 11');
   });
   it('knows where the app keeps the default account', () => {
-    const gateway = new MacDesktopApps(new ScriptedProcessRunner(), '/Users/bee');
+    const gateway = new MacDesktopApps(new ScriptedProcessRunner(), new MemoryFileSystem(), '/Users/bee');
     expect(gateway.defaultProfile(claude)).toBe('/Users/bee/Library/Application Support/Claude');
     expect(gateway.defaultProfile(chatgpt)).toBeUndefined();
   });
   it('reports an app that will not quit, and never forces it', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(ProcessList, { stdout: ` 11 ${ClaudeMain}\n` });
-    expect(await new MacDesktopApps(processes, '/Users/bee', 0).quit(macApp())).toBe(false);
+    expect(await new MacDesktopApps(processes, new MemoryFileSystem(), '/Users/bee', 0).quit(macApp())).toBe(false);
     expect(commandsOf(processes).filter((line) => line.startsWith('kill'))).toEqual(['kill -TERM 11']);
   });
 });
@@ -141,7 +161,7 @@ describe('on Linux', () => {
     expect(app).toEqual({
       spec: claude,
       launcher: executable,
-      executables: claude.linux.processNames,
+      executables: claude.linux!.processNames,
     });
   });
   it('finds nothing without it, even with the same command on the PATH', async () => {
@@ -161,7 +181,7 @@ describe('on Linux', () => {
   it('leaves another program called chatgpt alone', async () => {
     const processes = new ScriptedProcessRunner();
     const fileSystem = new MemoryFileSystem();
-    await fileSystem.writePrivateText(chatgpt.linux.executable, '');
+    await fileSystem.writePrivateText(chatgpt.linux!.executable, '');
     const gateway = new LinuxDesktopApps(processes, fileSystem, ConfigHome);
     const app = await gateway.find(chatgpt);
     processes.reply(ProcessList, { stdout: ' 40 chatgpt ask hello\n 41 /home/bee/.local/bin/chatgpt\n' });
@@ -173,6 +193,11 @@ describe('on Linux', () => {
     const app = { spec: claude, launcher: executable, executables: [executable] };
     await new LinuxDesktopApps(processes, new MemoryFileSystem(), ConfigHome).open(app, launch);
     expect(processes.calls).toEqual([{ command: executable, ...launch }]);
+  });
+  it('offers no Antigravity app, because its tarball has no fixed place to live', async () => {
+    const processes = new ScriptedProcessRunner();
+    processes.install('antigravity');
+    expect(await new LinuxDesktopApps(processes, new MemoryFileSystem(), ConfigHome).find(antigravity)).toBeUndefined();
   });
   it('keeps the default account where Electron does, in the config folder', () => {
     const gateway = new LinuxDesktopApps(new ScriptedProcessRunner(), new MemoryFileSystem(), ConfigHome);
@@ -202,52 +227,76 @@ describe('on Windows', () => {
   it('finds the app by its package, and starts it through its alias', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(packageLine, { stdout: `${WindowsClaude}\r\n` });
-    expect(await new WindowsDesktopApps(processes, localAppData).find(claude)).toEqual(app);
+    expect(await new WindowsDesktopApps(processes, new MemoryFileSystem(), localAppData).find(claude)).toEqual(app);
   });
   it('finds nothing when the package is not installed', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(packageLine, { stdout: '\r\n' });
-    expect(await new WindowsDesktopApps(processes, localAppData).find(claude)).toBeUndefined();
+    expect(await new WindowsDesktopApps(processes, new MemoryFileSystem(), localAppData).find(claude)).toBeUndefined();
   });
   it('matches the app by its full path, because Claude Code is claude.exe too', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(countLine, { stdout: '0\r\n' });
-    expect(await new WindowsDesktopApps(processes, localAppData).isRunning(app)).toBe(false);
+    expect(await new WindowsDesktopApps(processes, new MemoryFileSystem(), localAppData).isRunning(app)).toBe(false);
     processes.reply(countLine, { stdout: '15\r\n' });
-    expect(await new WindowsDesktopApps(processes, localAppData).isRunning(app)).toBe(true);
+    expect(await new WindowsDesktopApps(processes, new MemoryFileSystem(), localAppData).isRunning(app)).toBe(true);
     expect(commandsOf(processes).every((line) => !line.includes('-Name'))).toBe(true);
   });
   it('does not take a failed PowerShell for a closed app', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(countLine, { code: 1 });
-    const gateway = new WindowsDesktopApps(processes, localAppData);
+    const gateway = new WindowsDesktopApps(processes, new MemoryFileSystem(), localAppData);
     await expect(gateway.isRunning(app)).rejects.toMatchObject({ code: 'desktopAppFailed' });
   });
   it('gives up on a PowerShell that hangs', async () => {
     const processes = new ScriptedProcessRunner();
-    await new WindowsDesktopApps(processes, localAppData).find(claude);
+    await new WindowsDesktopApps(processes, new MemoryFileSystem(), localAppData).find(claude);
     expect(processes.calls[0]?.timeoutMs).toBeGreaterThan(0);
   });
   it('asks the windows to close, and stops only what stayed behind', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(countLine, { stdout: '0\r\n' });
-    expect(await new WindowsDesktopApps(processes, localAppData, 1000, 1000).quit(app)).toBe(true);
+    expect(await new WindowsDesktopApps(processes, new MemoryFileSystem(), localAppData, 1000, 1000).quit(app)).toBe(
+      true
+    );
     expect(commandsOf(processes)).not.toContain(`${PowerShell} ${processesOfClaude} | Stop-Process -Force`);
   });
   it('stops an app that hides in the tray instead of closing', async () => {
     const processes = new ScriptedProcessRunner();
     processes.reply(countLine, { stdout: '2\r\n' });
-    expect(await new WindowsDesktopApps(processes, localAppData, 0, 0).quit(app)).toBe(false);
+    expect(await new WindowsDesktopApps(processes, new MemoryFileSystem(), localAppData, 0, 0).quit(app)).toBe(false);
     expect(commandsOf(processes)).toContain(`${PowerShell} ${processesOfClaude} | Stop-Process -Force`);
   });
+  it('finds Antigravity in its own folder, which is not a package, and starts it there', async () => {
+    const fileSystem = new MemoryFileSystem();
+    await fileSystem.writePrivateText(`${localAppData}/Programs/antigravity/resources/bin/language_server.exe`, '');
+    const processes = new ScriptedProcessRunner();
+    const executable = 'C:\\Users\\bee\\AppData\\Local\\Programs\\antigravity\\Antigravity.exe';
+    expect(await new WindowsDesktopApps(processes, fileSystem, localAppData).find(antigravity)).toEqual({
+      spec: antigravity,
+      launcher: executable,
+      executables: [executable],
+    });
+    expect(processes.calls).toEqual([]);
+  });
+  it('does not take that folder without the language server, as an old Antigravity IDE left it', async () => {
+    const fileSystem = new MemoryFileSystem();
+    await fileSystem.writePrivateText(`${localAppData}/Programs/antigravity/Antigravity.exe`, '');
+    const gateway = new WindowsDesktopApps(new ScriptedProcessRunner(), fileSystem, localAppData);
+    expect(await gateway.find(antigravity)).toBeUndefined();
+  });
   it('knows the folder the app moves the default account to', () => {
-    const gateway = new WindowsDesktopApps(new ScriptedProcessRunner(), 'C:\\Users\\bee\\AppData\\Local');
+    const gateway = new WindowsDesktopApps(
+      new ScriptedProcessRunner(),
+      new MemoryFileSystem(),
+      'C:\\Users\\bee\\AppData\\Local'
+    );
     expect(gateway.defaultProfile(claude)).toBe('C:/Users/bee/AppData/Local/Claude-Data/claude_pzs8sxrjxfjjc');
     expect(gateway.defaultProfile(chatgpt)).toBeUndefined();
   });
   it('turns favo paths into Windows paths for the app', async () => {
     const processes = new ScriptedProcessRunner();
-    await new WindowsDesktopApps(processes, localAppData).open(app, {
+    await new WindowsDesktopApps(processes, new MemoryFileSystem(), localAppData).open(app, {
       args: ['--user-data-dir=C:/Users/bee/.favo/accounts/work/claude-app'],
       env: { CLAUDE_CONFIG_DIR: 'C:/Users/bee/.favo/accounts/work/claude', OTHER: undefined },
     });

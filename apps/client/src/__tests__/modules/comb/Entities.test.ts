@@ -35,6 +35,14 @@ describe('Seat', () => {
   test('flags a provider whose login favo could not verify as separate', () => {
     expect(Seat.fromJSON('local', { ...view, loginScope: 'unverified' }).hasSharedLogin).toBe(true);
   });
+  test('says a login shared by the whole computer is not sealed in the cell', () => {
+    const seat = Seat.fromJSON('local', { ...view, label: 'Antigravity', loginScope: 'perComputer' });
+    expect(seat.hasSharedLogin).toBe(true);
+    expect(seat.sharedLoginNote).toBe('Every Antigravity cell on this computer shares one login.');
+    expect(seat.sealedItems).toBe('threads, history');
+    expect(Seat.fromJSON('local', view).hasSharedLogin).toBe(false);
+    expect(Seat.fromJSON('local', view).sealedItems).toBe('login, threads, history');
+  });
   test('says how the app is signed in, apart from the CLI', () => {
     const seat = Seat.fromJSON('local', view).withStatus({ login: 'signedOut', problems: 0 });
     expect(seat.hasAppLogin).toBe(false);

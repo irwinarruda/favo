@@ -60,7 +60,7 @@ describe('the comb', () => {
     expect(frame).toContain('SEALED IN THIS CELL');
     expect(frame).toContain('login, threads, history');
   });
-  test('warns when a login may not be separate', async () => {
+  test('warns when an older machine cannot say whether a login is separate', async () => {
     const { app, flush, renderOnce, waitForFrame } = await open();
     mockDb.accounts.devbox![0]!.seats[2]!.loginScope = 'unverified';
     await app.state.refreshMachine('devbox');
@@ -68,6 +68,27 @@ describe('the comb', () => {
     await flush();
     await renderOnce();
     await waitForFrame((frame) => frame.includes('may be shared'));
+  });
+  test('says every cell on a computer shares one login, and keeps it off the sealed list', async () => {
+    const { app, flush, renderOnce, waitForFrame } = await open();
+    mockDb.accounts.devbox![0]!.seats[2]!.loginScope = 'perComputer';
+    await app.state.refreshMachine('devbox');
+    app.state.selectRow('seat:devbox/personal/antigravity');
+    await flush();
+    await renderOnce();
+    const frame = await waitForFrame((current) => current.includes('computer shares one login.'));
+    expect(frame).toContain('Every Antigravity cell on this');
+    expect(frame).toContain('threads, history');
+    expect(frame).not.toContain('login, threads, history');
+  });
+  test('says nothing about sharing where each cell keeps its own login', async () => {
+    const { app, flush, renderOnce, waitForFrame } = await open();
+    app.state.selectRow('seat:devbox/personal/antigravity');
+    await flush();
+    await renderOnce();
+    const frame = await waitForFrame((current) => current.includes('HOME for agy'));
+    expect(frame).not.toContain('keychain');
+    expect(frame).not.toContain('may be shared');
   });
   test('changes the main action with the login state', async () => {
     const { captureCharFrame, press } = await open();

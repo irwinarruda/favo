@@ -119,7 +119,7 @@ export class AccountsService {
       label: spec.label,
       path: nativePath(this.providers.seatHome(account, provider), this.paths.isWindows),
       pathHint: spec.pathHint,
-      loginScope: spec.loginScope,
+      loginScope: await this.providers.loginScopeOf(provider),
       isInstalled: (await this.providers.binaryOf(provider)) !== undefined,
       isProvisioned: await this.seats.isProvisioned(account, provider),
       canLogout: this.providers.cliOf(provider).logoutArguments() !== undefined,

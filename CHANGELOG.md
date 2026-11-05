@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `favo app antigravity <account>` and `p` in the comb open the Antigravity app as an account, on macOS and Windows, with that account's conversations. The app signs in through the same login as `agy`, so it needs no sign-in of its own.
+
+### Changed
+
+- An Antigravity cell no longer says its login "may be shared". On a Mac, Windows or Linux desktop, `agy` keeps one Google login in the system keychain for every cell on that computer, and the cell now says so plainly. Over SSH, in WSL and in containers, `agy` keeps the login in each cell, and the cell says nothing.
+
 ## [0.9.0] - 2026-11-04
 
 ### Added

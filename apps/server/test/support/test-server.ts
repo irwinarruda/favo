@@ -20,10 +20,12 @@ export const UpdaterPid = 7000;
 
 type TestServerOptions = {
   hostname?: string;
+  platform?: string;
   directory?: string;
   isWindows?: boolean;
   peers?: TailscalePeer[];
   callerEnv?: Record<string, string | undefined>;
+  uid?: number;
   installed?: string[];
   binary?: string;
   shellVariables?: Record<string, string>;
@@ -76,13 +78,14 @@ export function createTestServer(options: TestServerOptions = {}) {
       paths,
       host: {
         hostname: options.hostname ?? 'macbook',
-        platform: 'darwin',
+        platform: options.platform ?? 'darwin',
         arch: 'arm64',
         home: Home,
         directory: options.directory ?? `${Home}/projects/hive`,
       },
       callerEnv: options.callerEnv ?? {},
       pid: UpdaterPid,
+      uid: options.uid,
       binary: options.binary,
     }
   );
