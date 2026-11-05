@@ -83,6 +83,7 @@ describe('antigravity private home', () => {
     await fileSystem.writePrivateText(`${Home}/.gitconfig`, '[user]');
     await fileSystem.ensureDirectory(`${Home}/.ssh`);
     await fileSystem.writePrivateText(`${Home}/.gemini/antigravity-cli/settings.json`, '{}');
+    await fileSystem.ensureDirectory(`${Home}/.gemini/antigravity-cli/skills`);
     await fileSystem.ensureDirectory(`${Home}/.gemini/antigravity-cli/conversations`);
     await client.call(createAccount, { name: 'work' });
     await client.call(provisionSeat, { account: 'work', provider: 'antigravity' });
@@ -90,10 +91,26 @@ describe('antigravity private home', () => {
     expect((await fileSystem.entry(`${seat}/.gitconfig`)).target).toBe(`${Home}/.gitconfig`);
     expect((await fileSystem.entry(`${seat}/.ssh`)).target).toBe(`${Home}/.ssh`);
     expect((await fileSystem.entry(`${seat}/.gemini`)).kind).toBe(EntryKind.directory);
-    expect((await fileSystem.entry(`${seat}/.gemini/antigravity-cli/settings.json`)).kind).toBe(EntryKind.link);
+    expect((await fileSystem.entry(`${seat}/.gemini/antigravity-cli/skills`)).kind).toBe(EntryKind.link);
+    expect((await fileSystem.entry(`${seat}/.gemini/antigravity-cli/settings.json`)).kind).toBe(EntryKind.missing);
     expect((await fileSystem.entry(`${seat}/.gemini/antigravity-cli/conversations`)).kind).toBe(EntryKind.missing);
     const inspection = await client.call(inspectSeat, { account: 'work', provider: 'antigravity' });
     expect(inspection.mirrored).toBeGreaterThan(1);
+  });
+});
+
+describe('antigravity settings', () => {
+  it('leaves each cell its own settings.json, which agy replaces on every save', async () => {
+    const { client, fileSystem } = createTestServer();
+    await fileSystem.writePrivateText(`${Home}/.gemini/antigravity-cli/settings.json`, '{"model":"base"}');
+    await client.call(createAccount, { name: 'work' });
+    const seat = `${Home}/.favo/accounts/work/antigravity`;
+    await fileSystem.writePrivateText(`${seat}/.gemini/antigravity-cli/settings.json`, '{"model":"work"}');
+    const repair = await client.call(provisionSeat, { account: 'work', provider: 'antigravity' });
+    expect(repair.problems).toEqual([]);
+    expect(await fileSystem.readText(`${seat}/.gemini/antigravity-cli/settings.json`)).toBe('{"model":"work"}');
+    const { items } = await client.call(inspectSeat, { account: 'work', provider: 'antigravity' });
+    expect(items.map((item) => item.name)).not.toContain('.gemini/antigravity-cli/settings.json');
   });
 });
 

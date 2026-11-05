@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- An Antigravity account no longer shows a red `!` on `settings.json` once `agy` has saved its settings there. `agy` replaces that file on every save, which broke favo's link, so each account now keeps its own `settings.json` and `keybindings.json`. Pick a model or trust a folder once per account; skills, plugins and `.gemini/config` stay shared.
+
 ## [0.10.1] - 2026-11-05
 
 ### Fixed

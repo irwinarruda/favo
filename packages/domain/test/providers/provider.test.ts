@@ -45,6 +45,12 @@ describe('providers', () => {
   it('refuses an unknown provider', () => {
     expect(() => requireProvider('gemini')).toThrow('Unknown provider');
   });
+  it('never links a file that agy saves by renaming a new copy over it, which would break the link', () => {
+    for (const name of ['settings.json', 'keybindings.json']) {
+      expect(Providers.antigravity.shared).not.toContain(`.gemini/antigravity-cli/${name}`);
+      expect(Providers.antigravity.private).toContain(`.gemini/antigravity-cli/${name}`);
+    }
+  });
   it('never shares a credential or a thread', () => {
     const secrets = ['auth.json', '.claude.json', 'projects', 'sessions', 'history.jsonl', 'memories'];
     for (const id of ProviderOrder) {

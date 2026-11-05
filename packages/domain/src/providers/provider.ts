@@ -144,12 +144,15 @@ export const Providers: Record<ProviderId, ProviderSpec> = {
     shared: [
       '.gemini/GEMINI.md',
       '.gemini/config',
-      '.gemini/antigravity-cli/settings.json',
-      '.gemini/antigravity-cli/keybindings.json',
       '.gemini/antigravity-cli/skills',
       '.gemini/antigravity-cli/plugins',
     ],
-    private: ['.gemini/antigravity-cli/conversations', '.gemini/antigravity-cli/brain'],
+    private: [
+      '.gemini/antigravity-cli/conversations',
+      '.gemini/antigravity-cli/brain',
+      '.gemini/antigravity-cli/settings.json',
+      '.gemini/antigravity-cli/keybindings.json',
+    ],
     mirrorsHome: true,
     loginScope: LoginScope.perAccount,
     pathHint: 'HOME for agy',
