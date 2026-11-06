@@ -27,6 +27,7 @@ import { listProviderVersions } from '#contracts/rpc/updates/list-provider-versi
 import { planFavoUpdate } from '#contracts/rpc/updates/plan-favo-update';
 import { planUpdate } from '#contracts/rpc/updates/plan-update';
 import { recordProviderUpdate } from '#contracts/rpc/updates/record-provider-update';
+import { startProviderUpdates } from '#contracts/rpc/updates/start-provider-updates';
 
 const seat = {
   account: 'work',
@@ -298,7 +299,7 @@ describe('updates', () => {
     expect(planFavoUpdate.result.safeParse({ version: '0.5.0', upgrade: step, restart: step }).success).toBe(true);
     expect(planFavoUpdate.result.safeParse({ upgrade: step }).success).toBe(false);
     expect(planUpdate.routing).toBe('hub');
-    expect(planUpdate.params.safeParse({ machineId: 'devbox', isHeld: true }).success).toBe(true);
+    expect(planUpdate.params.safeParse({ machineId: 'devbox' }).success).toBe(true);
     expect(planUpdate.params.safeParse({ machine: 'devbox' }).success).toBe(false);
   });
   it('show the installed version of each provider on the machine that has it', () => {
@@ -317,6 +318,18 @@ describe('updates', () => {
     expect(
       recordProviderUpdate.params.safeParse({ provider: 'claude', outcome: { ...outcome, at: 'now' } }).success
     ).toBe(false);
+  });
+  it('start on the machine whose provider CLIs they update, and answer at once', () => {
+    expect(startProviderUpdates.routing).toBe('machine');
+    expect(startProviderUpdates.params.safeParse({}).success).toBe(true);
+    expect(
+      startProviderUpdates.params.safeParse({ providers: ['claude', 'codex'], isRunningIncluded: true }).success
+    ).toBe(true);
+    expect(startProviderUpdates.params.safeParse({ providers: ['vim'] }).success).toBe(false);
+    expect(
+      startProviderUpdates.result.safeParse({ started: [{ provider: 'claude', version: '2.1.290' }] }).success
+    ).toBe(true);
+    expect(startProviderUpdates.result.safeParse({}).success).toBe(false);
   });
   it('refresh hooks on the machine that has them', () => {
     expect(refreshHooks.routing).toBe('machine');

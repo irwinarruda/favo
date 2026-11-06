@@ -17,7 +17,7 @@ const Keys = [
   ['m / X', 'add / forget a machine'],
   ['i', 'install or update favo there'],
   ['U', 'update favo everywhere'],
-  ['P', 'update the provider CLIs'],
+  ['P', 'update every provider CLI'],
   ['r / R', 'refresh / mend shared links'],
   ['d', 'choose the launch folder'],
   ['t', 'change the theme'],

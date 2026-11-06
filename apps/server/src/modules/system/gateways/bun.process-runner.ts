@@ -84,9 +84,9 @@ export class BunProcessRunner extends ProcessRunner {
         detached: true,
       });
       child.unref();
-      return true;
+      return child.pid;
     } catch {
-      return false;
+      return undefined;
     }
   }
 

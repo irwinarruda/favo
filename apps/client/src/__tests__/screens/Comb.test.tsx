@@ -11,6 +11,13 @@ async function open(screen?: Parameters<typeof renderApp>[0]) {
   return view;
 }
 
+async function dismissNotice(view: Awaited<ReturnType<typeof open>>) {
+  await view.waitFor(() => view.app.state.isProviderCliDriftNoticed);
+  view.app.state.clearToast(view.app.state.toast!.id);
+  await view.flush();
+  await view.renderOnce();
+}
+
 afterEach(async () => {
   await dispose?.();
   dispose = undefined;
@@ -97,8 +104,9 @@ describe('the comb', () => {
     expect(captureCharFrame()).toContain('enter sign in');
   });
   test('keeps the machines and the path on a default 80 by 24 terminal', async () => {
-    const { captureCharFrame } = await open({ width: 80, height: 24 });
-    const frame = captureCharFrame();
+    const view = await open({ width: 80, height: 24 });
+    await dismissNotice(view);
+    const frame = view.captureCharFrame();
     expect(frame).toContain('macbook · this machine');
     expect(frame).toContain('CONFIG PATH');
     expect(frame).toContain('LAUNCHES IN');
@@ -628,37 +636,98 @@ describe('adding a machine', () => {
     await press('i');
     await waitFor(() => mockDb.installed.includes('devbox'));
   });
-  test('offers to update the provider CLIs of a machine, and asks first', async () => {
-    const { select, press, captureCharFrame, waitFor } = await open();
-    await select('seat:devbox/personal/antigravity');
+  test('offers to update every provider CLI, and asks first', async () => {
+    const { app, press, captureCharFrame, waitFor } = await open();
     await press('P');
-    expect(captureCharFrame()).toContain('Update the provider CLIs on devbox?');
-    expect(mockDb.terminalRuns).toEqual([]);
+    expect(captureCharFrame()).toContain('Update the provider CLIs on every machine?');
+    expect(mockDb.providerUpdateStarts).toEqual([]);
     await press('y');
-    await waitFor(() => mockDb.terminalRuns.length === 1);
-    expect(mockDb.terminalRuns[0]?.args).toEqual(['update', 'devbox']);
+    await waitFor(() => mockDb.providerUpdateStarts.length === 2);
+    expect(app.state.isProviderClisOpen).toBe(true);
   });
-  test('updates the machine the dialog named, even if the selection moved', async () => {
-    const { app, select, press, captureCharFrame, waitFor } = await open();
-    await select('seat:devbox/personal/antigravity');
+  test('says favo goes first on a machine that runs an older one', async () => {
+    const { app, press, captureCharFrame, flush, renderOnce } = await open();
+    mockDb.machineStatuses.devbox = { state: 'online', version: '0.0.1', isBehind: true };
+    await app.state.refreshMachine('devbox');
+    await flush();
+    await renderOnce();
     await press('P');
-    expect(captureCharFrame()).toContain('Update the provider CLIs on devbox?');
-    app.state.selectRow('seat:local/personal/claude');
+    expect(captureCharFrame()).toContain('favo on devbox is older');
+  });
+  test('shows P in the key bar while a provider CLI is older on one machine', async () => {
+    const { clickOn, captureCharFrame, waitForFrame } = await open();
+    await waitForFrame((frame) => frame.includes('P update CLIs'));
+    await clickOn('update CLIs');
+    expect(captureCharFrame()).toContain('Update the provider CLIs on every machine?');
+  });
+  test('says when a provider CLI is older on one machine than on another', async () => {
+    const { waitForFrame } = await open();
+    await waitForFrame((frame) => frame.includes('Claude Code on devbox is older than on another machine.'));
+  });
+  test('asks again about one it left alone because it was running', async () => {
+    const { press, captureCharFrame, waitFor, waitForFrame } = await open();
+    const at = new Date().toISOString();
+    mockDb.providerUpdateOutcomes.local = {
+      codex: { lastUpdate: { state: 'leftAlone', reason: 'it is running', at } },
+    };
+    mockDb.providerUpdateOutcomes.devbox = {};
+    await press('P');
     await press('y');
-    await waitFor(() => mockDb.terminalRuns.length === 1);
-    expect(mockDb.terminalRuns[0]?.args).toEqual(['update', 'devbox']);
-  });
-  test('does not offer that on a machine it cannot reach', async () => {
-    const { select, press, captureCharFrame } = await open();
-    await select('machine:studio');
-    await press('P');
-    expect(captureCharFrame()).not.toContain('Update the provider CLIs');
+    await waitForFrame((frame) => frame.includes('Codex on macbook is running'));
+    expect(captureCharFrame()).toContain('update running CLIs');
+    await press('y');
+    await waitFor(() => mockDb.providerUpdateStarts.length === 3);
+    expect(mockDb.providerUpdateStarts.at(-1)).toEqual({
+      machineId: 'local',
+      providers: ['codex'],
+      isRunningIncluded: true,
+    });
   });
   test('lists the key in the help', async () => {
     const { select, press, captureCharFrame } = await open();
     await select('seat:local/personal/claude');
     await press('?');
-    expect(captureCharFrame()).toContain('update the provider CLIs');
+    expect(captureCharFrame()).toContain('update every provider CLI');
+  });
+  async function finishWhileHeld(view: Awaited<ReturnType<typeof open>>) {
+    const at = new Date().toISOString();
+    mockDb.providerUpdateOutcomes.local = {
+      codex: { lastUpdate: { state: 'leftAlone', reason: 'it is running', at } },
+    };
+    mockDb.providerUpdateOutcomes.devbox = {};
+    const { promise, resolve } = Promise.withResolvers<void>();
+    mockDb.providerVersionHold = promise;
+    await view.press('P');
+    await view.press('y');
+    await view.waitFor(() => view.app.state.isProviderClisOpen);
+    await view.pressEscape();
+    return resolve;
+  }
+  test('waits to ask about a running CLI until the open question is answered', async () => {
+    const view = await open();
+    const release = await finishWhileHeld(view);
+    await view.select('machine:studio');
+    await view.press('X');
+    release();
+    await view.waitFor(() => !view.app.state.isUpdatingProviderClis);
+    await view.renderOnce();
+    expect(view.captureCharFrame()).toContain('Forget studio?');
+    expect(view.captureCharFrame()).not.toContain('update running CLIs');
+    await view.press('n');
+    await view.waitForFrame((frame) => frame.includes('Codex on macbook is running'));
+  });
+  test('does not ask about a running CLI while a name is being typed', async () => {
+    const view = await open();
+    const release = await finishWhileHeld(view);
+    await view.press('a');
+    await view.waitFor(() => view.app.state.isAddAccountOpen);
+    release();
+    await view.waitFor(() => !view.app.state.isUpdatingProviderClis);
+    await view.press('y');
+    expect(view.captureCharFrame()).not.toContain('update running CLIs');
+    expect(mockDb.providerUpdateStarts).toHaveLength(2);
+    await view.pressEscape();
+    await view.waitForFrame((frame) => frame.includes('Codex on macbook is running'));
   });
   test('forgets a machine after asking', async () => {
     const { app, select, press, captureCharFrame, waitFor } = await open();
@@ -818,10 +887,12 @@ describe('the app login', () => {
     expect(badgesOf(spans).some((badge) => badge.bg.toString() === colorOf(spans, ' !'))).toBe(true);
   });
   test('keeps the warning in a small terminal, and leaves out the rest the row already shows', async () => {
-    const { select, waitForFrame, captureCharFrame } = await openWith(
+    const view = await openWith(
       { 'seat:local/personal/claude': signedIn, 'seat:local/work/claude': otherAccount },
       { width: 80, height: 24 }
     );
+    const { select, waitForFrame, captureCharFrame } = view;
+    await dismissNotice(view);
     expect(captureCharFrame()).toMatch(/\.dev\s+app /);
     expect(captureCharFrame()).toContain('CONFIG PATH');
     expect(captureCharFrame()).not.toContain('Claude app signed in');
@@ -950,7 +1021,7 @@ describe('going back to a thread', () => {
     mockDb.threadFailures.devbox = new DomainError(DomainErrorCode.unknownMethod, 'Unknown method.');
     await view.select('seat:devbox/personal/claude');
     await view.waitFor(() => view.app.state.machinesWithoutThreads.includes('devbox'));
-    await view.flush();
+    await dismissNotice(view);
     await view.press('b');
     expect(view.app.state.toast).toBeUndefined();
     expect(view.app.state.isThreadPickerOpen).toBe(false);

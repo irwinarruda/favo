@@ -4,6 +4,7 @@ import { listProviderVersions } from '@favo/contracts/rpc/updates/list-provider-
 import { planFavoUpdate } from '@favo/contracts/rpc/updates/plan-favo-update';
 import { planUpdate } from '@favo/contracts/rpc/updates/plan-update';
 import { recordProviderUpdate } from '@favo/contracts/rpc/updates/record-provider-update';
+import { startProviderUpdates } from '@favo/contracts/rpc/updates/start-provider-updates';
 import type { ProviderUpdatesService } from '@/modules/providers/services/provider-updates.service';
 import type { TerminalService } from '@/modules/terminal/services/terminal.service';
 import type { UpdateService } from '@/modules/terminal/services/update.service';
@@ -21,4 +22,5 @@ export function registerTerminalController(
   router.handle(listProviderUpdates, ({ provider }) => providerUpdates.list(provider));
   router.handle(listProviderVersions, ({ provider }) => providerUpdates.versions(provider));
   router.handle(recordProviderUpdate, ({ provider, outcome }) => providerUpdates.record(provider, outcome));
+  router.handle(startProviderUpdates, (params) => updates.startProviders(params));
 }

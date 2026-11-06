@@ -171,6 +171,14 @@ describe('parseCommand', () => {
     expect(parseCommand(['update', '--skip-favo', '--machine', 'local']).hasProviders).toBe(true);
     expect(parseCommand(['update', '--skip-favo', '--favo-only']).hasProviders).toBe(false);
     expect(() => parseCommand(['update', 'claude'])).toThrow('favo update --machine <machine>');
+    expect(parseCommand(['update', '--provider', 'claude', '--provider', 'codex']).providers).toEqual([
+      'claude',
+      'codex',
+    ]);
+    expect(parseCommand(['update']).providers).toBeUndefined();
+    expect(parseCommand(['update', '--update-running']).isRunningIncluded).toBe(true);
+    expect(() => parseCommand(['update', '--provider', 'vim'])).toThrow('Unknown provider "vim".');
+    expect(() => parseCommand(['update', '--provider'])).toThrow('--provider <provider>');
     expect(parseCommand(['rename', 'work', 'side'])).toMatchObject({
       kind: CommandKind.rename,
       account: 'work',

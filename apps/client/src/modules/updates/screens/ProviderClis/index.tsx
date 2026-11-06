@@ -12,13 +12,14 @@ import { Hex } from '@/shared/theme/glyphs';
 const NameGap = 2;
 const MinimumNameWidth = 8;
 
-type ProviderClisProps = { isEnabled: boolean; onHelp(): void; onQuit(): void };
+type ProviderClisProps = { isEnabled: boolean; onHelp(): void; onQuit(): void; onUpdate(): void };
 
-export function ProviderClis({ isEnabled, onHelp, onQuit }: ProviderClisProps) {
+export function ProviderClis({ isEnabled, onHelp, onQuit, onUpdate }: ProviderClisProps) {
   const colors = useApp((state) => state.colors);
   const groups = useApp((state) => state.providerCliGroups);
   const lines = useApp((state) => state.providerCliMachineLines);
   const isReading = useApp((state) => state.isProviderClisReading);
+  const isUpdating = useApp((state) => state.isUpdatingProviderClis);
   const closeProviderClis = useApp((state) => state.closeProviderClis);
   const refreshProviderClis = useApp((state) => state.refreshProviderClis);
   const scrollRef = useRef<ScrollBoxRenderable>(null);
@@ -29,6 +30,7 @@ export function ProviderClis({ isEnabled, onHelp, onQuit }: ProviderClisProps) {
   useKeyboard((key) => {
     if (!isEnabled) return;
     if (key.sequence === '?') onHelp();
+    else if (key.shift && key.name === 'p') onUpdate();
     else if (key.name === 'escape' || key.name === 'v') closeProviderClis();
     else if (key.name === 'q') onQuit();
     else if (key.name === 'r') void error.handle(refreshProviderClis)();
@@ -51,7 +53,8 @@ export function ProviderClis({ isEnabled, onHelp, onQuit }: ProviderClisProps) {
           <span fg={colors.accent}>{Hex.filled}</span>
           <b fg={colors.text}> Provider CLIs</b>
         </text>
-        <text fg={colors.muted}>what each machine has installed</text>
+        {isUpdating && <Spinner label="updating in the background" />}
+        {!isUpdating && <text fg={colors.muted}>what each machine has installed</text>}
       </box>
       <box flexDirection="row" flexWrap="wrap" columnGap={2} paddingX={2} paddingBottom={1} flexShrink={0}>
         {lines.map(({ id, name, label, isOld }) => (
@@ -72,6 +75,7 @@ export function ProviderClis({ isEnabled, onHelp, onQuit }: ProviderClisProps) {
       </scrollbox>
       <ToastLine />
       <box flexDirection="row" paddingX={2} flexShrink={0} height={1} overflow="hidden">
+        <KeyHint keys="P" label={isUpdating ? 'updating…' : 'update all'} onPress={onUpdate} />
         <KeyHint keys="r" label="refresh" onPress={error.handle(refreshProviderClis)} />
         <KeyHint keys="↑↓" label="scroll" />
         <KeyHint keys="esc" label="back" onPress={closeProviderClis} />

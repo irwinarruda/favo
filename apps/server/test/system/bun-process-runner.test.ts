@@ -29,18 +29,18 @@ describe.skipIf(process.platform === 'win32')('the process runner', () => {
   });
   it('leaves a detached process running with what it was given', async () => {
     const file = `${tmpdir()}/favo-detach-${process.pid}-${Date.now()}`;
-    const isDetached = runner.detach({
+    const pid = runner.detach({
       ...sh('sleep 0.1; echo "$FAVO_DETACHED" > "$FILE"'),
       env: { FAVO_DETACHED: 'yes', FILE: file },
     });
-    expect(isDetached).toBe(true);
+    expect(pid).toBeNumber();
     await waitFor(() => Bun.file(file).exists());
     await Bun.sleep(50);
     expect(await Bun.file(file).text()).toBe('yes\n');
     await Bun.file(file).delete();
   });
   it('says so when there is nothing to detach', () => {
-    expect(runner.detach({ command: '/nonexistent/favo-app', args: [] })).toBe(false);
+    expect(runner.detach({ command: '/nonexistent/favo-app', args: [] })).toBeUndefined();
   });
   it('keeps a bounded tail of stderr on a long connection, with its last line', async () => {
     const child = runner.open(sh(`head -c 500000 /dev/zero | tr '\\0' y >&2; echo; echo last words >&2; exit 3`));

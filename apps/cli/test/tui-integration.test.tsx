@@ -65,11 +65,34 @@ afterEach(async () => {
 });
 
 describe('updating the provider CLIs from the comb', () => {
-  test('plans the update for the selected machine through the real backend', async () => {
+  test('starts favo in the background on every machine, and follows it until each CLI is done', async () => {
     const view = await openFleet();
-    await useApp.getState().updateProviders('local');
-    expect(view.plans.at(-1)?.command).toBe('favo');
-    expect(view.plans.at(-1)?.args).toEqual(['update', '--skip-favo', '--machine', 'local', '--hold']);
+    view.mac.processes.reply('/usr/bin/claude --version', { stdout: '2.1.316 (Claude Code)\n' });
+    view.devbox.processes.reply('/usr/bin/claude --version', { stdout: '2.1.290 (Claude Code)\n' });
+    await useApp.getState().refreshProviderClis();
+    function startsOn(server: typeof view.mac) {
+      return server.processes.calls.filter(({ command, args }) => command === 'favo' && args[0] === 'update');
+    }
+    const run = useApp.getState().updateProviderClis();
+    await view.waitFor(() => startsOn(view.mac).length === 1 && startsOn(view.devbox).length === 1);
+    expect(startsOn(view.devbox)[0]?.args.slice(0, 6)).toEqual([
+      'update',
+      '--skip-favo',
+      '--machine',
+      'local',
+      '--provider',
+      'claude',
+    ]);
+    const updating = await view.waitForFrame((frame) => /[⬡⬢] updating · /.test(frame));
+    expect(updating).toContain('devbox updating…');
+    view.devbox.processes.reply('/usr/bin/claude --version', { stdout: '2.1.316 (Claude Code)\n' });
+    for (const provider of ['claude', 'codex', 'antigravity', 'opencode'] as const) {
+      await view.mac.client.call(recordProviderUpdate, { provider });
+      await view.devbox.client.call(recordProviderUpdate, { provider });
+    }
+    expect(await run).toEqual([]);
+    await view.waitForFrame((frame) => frame.includes('updated from 2.1.290'));
+    expect(useApp.getState().toast?.message).toBe('Updated Claude Code on devbox.');
   });
   test('reads each machine on its own favo, and shows the last update recorded there', async () => {
     const view = await openFleet();

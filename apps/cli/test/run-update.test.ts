@@ -398,6 +398,23 @@ describe('favo update, for the provider CLIs', () => {
     await server.run('update', '--skip-favo', '--providers');
     expect(server.plans).toHaveLength(1);
   });
+  it('updates one that runs through favo without asking when the comb already did', async () => {
+    const server = await updater({ answer: false });
+    await withProvider(server, 'codex', CaskCodex);
+    const runs = new ProviderRunRepository(server.fileSystem, server.processes, server.paths);
+    await server.fileSystem.writePrivateText(runs.pidFile('work', 'codex', 'launch'), '4242');
+    await server.run('update', '--skip-favo', '--machine', 'local', '--update-running');
+    expect(server.questions).toEqual([]);
+    expect(server.plans).toHaveLength(1);
+  });
+  it('updates only the provider CLIs it is told to', async () => {
+    const server = await updater();
+    await withProvider(server, 'codex', CaskCodex);
+    await withProvider(server, 'claude', CaskClaude);
+    await server.run('update', '--skip-favo', '--machine', 'local', '--provider', 'codex');
+    expect(commandsOf(server.plans)).toEqual(['/opt/homebrew/bin/codex update']);
+    expect(server.text()).not.toContain('Claude Code');
+  });
   it('reports a disabled provider and leaves it', async () => {
     const server = await updater();
     await withProvider(server, 'claude', CaskClaude);

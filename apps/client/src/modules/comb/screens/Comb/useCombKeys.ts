@@ -8,13 +8,13 @@ type CombKeys = {
   onQuit(): void;
   onRemoveAccount(): void;
   onForgetMachine(): void;
-  onUpdateProviders(): void;
+  onUpdateProviderClis(): void;
   onOpenDesktopApp(): Promise<void>;
   onGoBackToThread(): Promise<void>;
 };
 
 export function useCombKeys(props: CombKeys) {
-  const { isEnabled, onHelp, onQuit, onRemoveAccount, onForgetMachine, onUpdateProviders } = props;
+  const { isEnabled, onHelp, onQuit, onRemoveAccount, onForgetMachine, onUpdateProviderClis } = props;
   const { onOpenDesktopApp, onGoBackToThread } = props;
   const moveRow = useApp((state) => state.moveRow);
   const moveAccount = useApp((state) => state.moveAccount);
@@ -48,7 +48,7 @@ export function useCombKeys(props: CombKeys) {
     else if (key.shift && key.name === 'x') onForgetMachine();
     else if (key.shift && key.name === 'r') void error.handle(repairSelectedMachine)();
     else if (key.shift && key.name === 'u') void error.handle(updateAllMachines)();
-    else if (key.shift && key.name === 'p') onUpdateProviders();
+    else if (key.shift && key.name === 'p') onUpdateProviderClis();
     else if (key.shift && key.name === 'tab') moveMachine(-1);
     else if (key.name === 'q') onQuit();
     else if (key.name === 'down' || key.name === 'j') moveRow(1);

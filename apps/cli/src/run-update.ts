@@ -12,14 +12,13 @@ import { FavoVersion } from '@favo/contracts/version';
 import { LocalMachineId, type Machine, MachineState } from '@favo/domain/machines/machine';
 import { DomainError } from '@favo/domain/shared/domain-error';
 import { updateArgumentsFor } from '@favo/domain/terminal/terminal-plan';
-import { type UpdateOutcome, UpdateState } from '@favo/domain/updates/update-outcome';
+import { RunningReason, type UpdateOutcome, UpdateState } from '@favo/domain/updates/update-outcome';
 import type { Command } from '@/parse-command';
 import type { CommandContext } from '@/run-command';
 
 const UnknownVersion = 'an unknown version';
 const InterruptedCode = 130;
 const UpdatesItselfReason = 'it updates itself, or through whatever installed it';
-const RunningReason = 'it is running';
 
 export async function runUpdate(command: Command, context: CommandContext) {
   try {
@@ -50,7 +49,7 @@ async function updateFromHere(command: Command, context: CommandContext) {
     return fleet.exitCode;
   }
   if (fleet.reachable.length > 0) print(paint.bold('\nProvider CLIs here'));
-  const providers = await updateProviders(context);
+  const providers = await updateProviders(context, command);
   if (providers === InterruptedCode) return stopped(context);
   const elsewhere = await updateProvidersOn(context, fleet.reachable);
   if (elsewhere === InterruptedCode) return stopped(context);
@@ -163,20 +162,22 @@ async function updateProvidersOn(context: CommandContext, machines: Machine[]) {
   return exitCode;
 }
 
-async function updateProviders(context: CommandContext) {
+async function updateProviders(context: CommandContext, command: Command) {
   const { client, print } = context;
-  const updates = await client.call(listProviderUpdates, {});
-  if (updates.length === 0) print('No provider CLI is installed here.');
+  const { providers, isRunningIncluded = false } = command;
+  const installed = await client.call(listProviderUpdates, {});
+  const updates = installed.filter(({ provider }) => providers === undefined || providers.includes(provider));
+  if (installed.length === 0) print('No provider CLI is installed here.');
   let exitCode = 0;
   for (const update of updates) {
-    const code = await updateProvider(context, update);
+    const code = await updateProvider(context, update, isRunningIncluded);
     if (code === InterruptedCode) return code;
     if (code !== 0) exitCode = 1;
   }
   return exitCode;
 }
 
-async function updateProvider(context: CommandContext, update: ProviderUpdateView) {
+async function updateProvider(context: CommandContext, update: ProviderUpdateView, isRunningIncluded: boolean) {
   const { client, print, paint, ask } = context;
   const { provider, label, installedWith, otherCopies, heldBack, runningAccounts, steps } = update;
   const from = update.version;
@@ -197,7 +198,8 @@ async function updateProvider(context: CommandContext, update: ProviderUpdateVie
     return 0;
   }
   if (runningAccounts.length > 0) {
-    const isConfirmed = await ask(`${label} is running as ${runningAccounts.join(', ')}. Update it anyway?`);
+    const question = `${label} is running as ${runningAccounts.join(', ')}. Update it anyway?`;
+    const isConfirmed = isRunningIncluded || (await ask(question));
     if (!isConfirmed) {
       print(`  Left at ${version}: ${RunningReason}.`);
       await record({ state: UpdateState.leftAlone, reason: RunningReason });

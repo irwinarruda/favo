@@ -9,6 +9,8 @@ export const UpdateState = {
 } as const;
 export type UpdateState = ValueOf<typeof UpdateState>;
 
+export const RunningReason = 'it is running';
+
 export const UpdateOutcome = z.strictObject({
   state: z.enum(UpdateState),
   from: z.string().optional(),
@@ -31,4 +33,8 @@ export type SavedUpdate = z.infer<typeof SavedUpdate>;
 export function settledRecordOf({ pid: _, ...record }: SavedUpdate, isUpdaterAlive: boolean): UpdateRecord {
   if (record.state !== UpdateState.updating || isUpdaterAlive) return record;
   return { ...record, state: UpdateState.stopped };
+}
+
+export function isLeftWhileRunning(record?: UpdateRecord) {
+  return record?.state === UpdateState.leftAlone && record.reason === RunningReason;
 }

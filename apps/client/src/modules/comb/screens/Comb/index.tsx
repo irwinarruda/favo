@@ -14,6 +14,7 @@ import { DirectoryPicker } from '@/modules/directories/screens/DirectoryPicker';
 import { AddMachine } from '@/modules/machines/screens/AddMachine';
 import { ThemePicker } from '@/modules/themes/screens/ThemePicker';
 import { ThreadPicker } from '@/modules/threads/screens/ThreadPicker';
+import type { ProviderCliTarget } from '@/modules/updates/app/services/ProviderCliService';
 import { ProviderClis } from '@/modules/updates/screens/ProviderClis';
 import { Usage } from '@/modules/usage/screens/Usage';
 import { type Confirmation, ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -36,7 +37,9 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   const selectedMachine = useApp((state) => state.selectedMachine);
   const removeSelectedAccount = useApp((state) => state.removeSelectedAccount);
   const forgetSelectedMachine = useApp((state) => state.forgetSelectedMachine);
-  const updateProviders = useApp((state) => state.updateProviders);
+  const updateProviderClis = useApp((state) => state.updateProviderClis);
+  const isUpdatingProviderClis = useApp((state) => state.isUpdatingProviderClis);
+  const openProviderClis = useApp((state) => state.openProviderClis);
   const selectedSeat = useApp((state) => state.selectedSeat);
   const selectedDesktopApp = useApp((state) => state.selectedDesktopApp);
   const canOpenDesktopApp = useApp((state) => state.canOpenDesktopApp);
@@ -56,11 +59,12 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   const isProviderClisOpen = useApp((state) => state.isProviderClisOpen);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation>();
+  const [runningClis, setRunningClis] = useState<ProviderCliTarget[]>([]);
   const scrollRef = useRef<ScrollBoxRenderable>(null);
   const error = useError();
   const isWide = width >= WideWidth;
   const isCompact = !isWide || height < TallHeight;
-  const isDialogOpen =
+  const isScreenOpen =
     isHelpOpen ||
     isAddAccountOpen ||
     isRenameAccountOpen ||
@@ -68,9 +72,9 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     isThemePickerOpen ||
     isDirectoryPickerOpen ||
     isThreadPickerOpen ||
-    isUsageOpen ||
-    isProviderClisOpen ||
-    confirmation !== undefined;
+    isUsageOpen;
+  const isDialogOpen = isScreenOpen || isProviderClisOpen || confirmation !== undefined;
+  const canAskAboutRunning = runningClis.length > 0 && !isScreenOpen && confirmation === undefined;
 
   function onRemoveAccount() {
     if (!selectedAccount) return;
@@ -94,16 +98,37 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     });
   }
 
-  function onUpdateProviders() {
-    if (!selectedMachine?.isOnline) return;
-    const { id, name } = selectedMachine;
-    async function onUpdateAccept() {
-      await updateProviders(id);
+  function onUpdateProviderClis() {
+    if (confirmation) return;
+    if (isUpdatingProviderClis) {
+      void error.handle(openProviderClis)();
+      return;
     }
+    const behind = machines.filter((machine) => machine.canUpdate).map((machine) => machine.name);
+    const favoFirst = behind.length > 0 ? ` favo on ${behind.join(', ')} is older, so it updates first.` : '';
     setConfirmation({
       title: 'update CLIs',
-      message: `Update the provider CLIs on ${name}? favo shows what each one is, asks before touching one that is running, and lists what happened when you come back.`,
+      message: `Update the provider CLIs on every machine? They update in the background, and the list shows each one as it goes. One that is running is left alone until you say so.${favoFirst}`,
       onAccept: () => void error.handle(onUpdateAccept)(),
+    });
+  }
+
+  async function onUpdateAccept() {
+    setRunningClis(await updateProviderClis());
+  }
+
+  function askAboutRunning() {
+    const running = runningClis;
+    const isOne = running.length === 1;
+    const names = running.map(({ label, machineName }) => `${label} on ${machineName}`).join(', ');
+    async function onUpdateRunningAccept() {
+      setRunningClis(await updateProviderClis({ targets: running, isRunningIncluded: true }));
+    }
+    setRunningClis([]);
+    setConfirmation({
+      title: 'update running CLIs',
+      message: `${names} ${isOne ? 'is' : 'are'} running, so favo left ${isOne ? 'it' : 'them'} alone. Update anyway?`,
+      onAccept: () => void error.handle(onUpdateRunningAccept)(),
     });
   }
 
@@ -143,7 +168,7 @@ export function Comb({ onQuit }: { onQuit(): void }) {
     onQuit,
     onRemoveAccount,
     onForgetMachine,
-    onUpdateProviders,
+    onUpdateProviderClis,
     onOpenDesktopApp,
     onGoBackToThread,
   });
@@ -155,6 +180,10 @@ export function Comb({ onQuit }: { onQuit(): void }) {
   useEffect(() => {
     if (selectedRow) scrollRef.current?.scrollChildIntoView(selectedRow.key);
   }, [selectedRow?.key]);
+
+  useEffect(() => {
+    if (canAskAboutRunning) askAboutRunning();
+  }, [canAskAboutRunning]);
 
   return (
     <box flexDirection="column" width="100%" height="100%" backgroundColor={colors.background}>
@@ -184,10 +213,16 @@ export function Comb({ onQuit }: { onQuit(): void }) {
         onQuit={onQuit}
         onOpenDesktopApp={onOpenDesktopApp}
         onGoBackToThread={onGoBackToThread}
+        onUpdateProviderClis={onUpdateProviderClis}
       />
       {isUsageOpen && <Usage isEnabled={!isHelpOpen} onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} />}
       {isProviderClisOpen && (
-        <ProviderClis isEnabled={!isHelpOpen} onHelp={() => setIsHelpOpen(true)} onQuit={onQuit} />
+        <ProviderClis
+          isEnabled={!isHelpOpen && !confirmation}
+          onHelp={() => setIsHelpOpen(true)}
+          onQuit={onQuit}
+          onUpdate={onUpdateProviderClis}
+        />
       )}
       {isHelpOpen && <HelpDialog onClose={() => setIsHelpOpen(false)} />}
       {isAddAccountOpen && <AddAccount />}

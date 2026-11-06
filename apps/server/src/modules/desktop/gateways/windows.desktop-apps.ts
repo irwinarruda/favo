@@ -48,12 +48,12 @@ export class WindowsDesktopApps extends DesktopApps {
   }
 
   async open({ spec, launcher }: InstalledDesktopApp, { args, env }: DesktopLaunch) {
-    const isDetached = this.processes.detach({
+    const pid = this.processes.detach({
       command: launcher,
       args: args.map(backslashes),
       env: Object.fromEntries(Object.entries(env).map(([name, value]) => [name, value && backslashes(value)])),
     });
-    assertDomain(isDetached, DomainErrorCode.desktopAppFailed, `Could not start ${spec.label}.`);
+    assertDomain(pid !== undefined, DomainErrorCode.desktopAppFailed, `Could not start ${spec.label}.`);
   }
 
   defaultProfile({ windows }: DesktopAppSpec) {

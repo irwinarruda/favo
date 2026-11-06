@@ -4,7 +4,6 @@ import { defineMethod, MethodRouting } from '#contracts/rpc/method';
 
 export const PlanUpdateParams = z.strictObject({
   machineId: z.string().optional(),
-  isHeld: z.boolean().optional(),
 });
 export type PlanUpdateParams = z.infer<typeof PlanUpdateParams>;
 

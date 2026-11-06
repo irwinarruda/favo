@@ -138,7 +138,16 @@ export function createServer(gateways: ServerGateways, options: ServerOptions) {
     callerEnv,
     binary
   );
-  const updates = new UpdateService(providerUpdates, machines, fileSystem, paths, callerEnv, FavoVersion, binary);
+  const updates = new UpdateService(
+    providerUpdates,
+    machines,
+    processes,
+    fileSystem,
+    paths,
+    callerEnv,
+    FavoVersion,
+    binary
+  );
   const themes = new ThemesService(new ThemeRepository(fileSystem, paths), config);
   const desktop = new DesktopAppsService(desktopApps, seats, providers, fileSystem, paths, host);
   registerSystemController(router, host);

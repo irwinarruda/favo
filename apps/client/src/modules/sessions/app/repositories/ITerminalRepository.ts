@@ -3,5 +3,4 @@ import type { Seat } from '@/modules/comb/app/entities/Seat';
 
 export type ITerminalRepository = {
   plan(seat: Seat, action: TerminalAction, directory?: string, thread?: string): Promise<TerminalPlan>;
-  planUpdate(machineId: string): Promise<TerminalPlan>;
 };

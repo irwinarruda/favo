@@ -76,22 +76,39 @@ describe('the provider CLIs screen', () => {
     expect(frame).toMatch(/devbox\s+2\.1\.290 older/);
     expect(frame).toContain('esc back');
   });
-  test('opens with what happened after the provider CLIs of a machine are updated', async () => {
-    const { app, select, press, waitFor, waitForFrame } = await open();
-    await select('seat:devbox/personal/antigravity');
+  test('updates every machine with P, showing each CLI as it goes', async () => {
+    const { press, captureCharFrame, waitForFrame } = await openClis();
+    expect(captureCharFrame()).toContain('P update all');
     await press('P');
+    expect(captureCharFrame()).toContain('Update the provider CLIs on every machine?');
     await press('y');
-    await waitFor(() => app.state.isProviderClisOpen);
-    await waitForFrame((frame) => frame.includes('Provider CLIs'));
+    const frame = await waitForFrame((current) => current.includes('updating · just now'));
+    expect(frame).toContain('updating in the background');
+    expect(frame).toContain('devbox updating…');
   });
-  test('keeps the warning in sight when the update there did not finish', async () => {
-    const { app, select, press, waitFor, waitForFrame } = await open();
-    mockDb.terminalExitCode = 255;
-    await select('seat:devbox/personal/antigravity');
+  test('shows what changed once each machine is done', async () => {
+    const { press, waitForFrame } = await openClis();
+    mockDb.providerUpdateOutcomes.local = {};
+    mockDb.providerUpdateOutcomes.devbox = { claude: { version: '2.1.316' } };
     await press('P');
     await press('y');
-    await waitFor(() => app.state.isProviderClisOpen);
-    await waitForFrame((frame) => frame.includes('The update on devbox did not finish.'));
+    const frame = await waitForFrame((current) => current.includes('updated from 2.1.290'));
+    expect(frame).toContain('no change');
+    expect(frame).toContain('Updated Claude Code on devbox.');
+    expect(frame).not.toContain('2.1.290 older');
+  });
+  test('asks to update every machine from the key bar too', async () => {
+    const { clickOn, waitForFrame } = await openClis();
+    await clickOn('update all');
+    await waitForFrame((frame) => frame.includes('Update the provider CLIs on every machine?'));
+  });
+  test('goes back to the list when the question is turned down', async () => {
+    const { app, press, pressEscape, captureCharFrame } = await openClis();
+    await press('P');
+    await pressEscape();
+    expect(app.state.isProviderClisOpen).toBe(true);
+    expect(captureCharFrame()).not.toContain('Update the provider CLIs on every machine?');
+    expect(mockDb.providerUpdateStarts).toEqual([]);
   });
   test('lists the key in the help', async () => {
     const { press, captureCharFrame } = await open();
