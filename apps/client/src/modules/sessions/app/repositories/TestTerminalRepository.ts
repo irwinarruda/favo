@@ -11,8 +11,4 @@ export class TestTerminalRepository implements ITerminalRepository {
     const args = [action, seat.account, ...(thread ? [thread] : [])];
     return { command: seat.command, args, env: {}, unsetEnv: [], cwd: directory };
   }
-
-  async planUpdate(machineId: string) {
-    return { command: 'favo', args: ['update', machineId], env: {}, unsetEnv: [] };
-  }
 }

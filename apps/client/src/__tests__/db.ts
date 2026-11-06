@@ -1,6 +1,7 @@
 import type { DiscoveredMachine } from '@favo/contracts/rpc/machines/discover-machines';
 import type { MachineStatus } from '@favo/contracts/rpc/machines/get-machine-status';
 import type { ThemeList } from '@favo/contracts/rpc/themes/list-themes';
+import type { StartProviderUpdatesParams } from '@favo/contracts/rpc/updates/start-provider-updates';
 import type {
   AccountView,
   AppLoginStatus,
@@ -317,6 +318,9 @@ export const mockDb = {
   providerVersionFailures: {} as Record<string, Error>,
   providerVersionReads: [] as string[],
   providerVersionHold: undefined as Promise<void> | undefined,
+  providerUpdateStarts: [] as ({ machineId: string } & StartProviderUpdatesParams)[],
+  providerUpdateFailures: {} as Record<string, Error>,
+  providerUpdateOutcomes: {} as Record<string, Record<string, Partial<ProviderVersionView>>>,
   threads: seedThreads(),
   hooks: seedHooks(),
   threadFailures: {} as Record<string, Error>,
@@ -339,6 +343,7 @@ export const mockDb = {
   repaired: [] as string[],
   repairedLinks: 0,
   installed: [] as string[],
+  installFailures: {} as Record<string, Error>,
   reset() {
     this.machines = seedMachines();
     this.machineStatuses = seedMachineStatuses();
@@ -352,6 +357,9 @@ export const mockDb = {
     this.providerVersionFailures = {};
     this.providerVersionReads = [];
     this.providerVersionHold = undefined;
+    this.providerUpdateStarts = [];
+    this.providerUpdateFailures = {};
+    this.providerUpdateOutcomes = {};
     this.threads = seedThreads();
     this.hooks = seedHooks();
     this.threadFailures = {};
@@ -374,5 +382,6 @@ export const mockDb = {
     this.repaired = [];
     this.repairedLinks = 0;
     this.installed = [];
+    this.installFailures = {};
   },
 };

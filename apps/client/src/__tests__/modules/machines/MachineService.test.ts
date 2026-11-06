@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { DomainError, DomainErrorCode } from '@favo/domain/shared/domain-error';
 import { mockDb } from '@/__tests__/db';
 import { getApp } from '@/__tests__/utils/getApp';
 
@@ -53,6 +54,17 @@ describe('MachineService', () => {
     expect(mockDb.installed.toSorted()).toEqual(['devbox', 'studio']);
     expect(app.state.toast?.message).toBe('favo 0.1.0 is running on devbox, studio.');
     expect(app.state.hasMachinesBehind).toBe(false);
+  });
+  test('finishes every other machine when one fails, then says which failed', async () => {
+    const app = await getApp();
+    mockDb.machineStatuses.devbox = { state: 'online', version: '0.0.1', isBehind: true };
+    mockDb.machineStatuses.studio = { state: 'outdated' };
+    mockDb.installFailures.devbox = new DomainError(DomainErrorCode.machineUnreachable, 'devbox: gone');
+    await app.state.loadFleet();
+    await app.state.updateAllMachines();
+    expect(mockDb.installed).toEqual(['studio']);
+    expect(app.state.machines.find(({ id }) => id === 'studio')?.isOnline).toBe(true);
+    expect(app.state.toast).toMatchObject({ message: 'devbox: gone', kind: 'error' });
   });
   test('does not install where it is not needed', async () => {
     const app = await getApp();

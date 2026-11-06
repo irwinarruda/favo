@@ -25,8 +25,8 @@ export class LinuxDesktopApps extends UnixDesktopApps {
   }
 
   async open({ spec, launcher }: InstalledDesktopApp, { args, env }: DesktopLaunch) {
-    const isDetached = this.processes.detach({ command: launcher, args, env });
-    assertDomain(isDetached, DomainErrorCode.desktopAppFailed, `Could not start ${spec.label}.`);
+    const pid = this.processes.detach({ command: launcher, args, env });
+    assertDomain(pid !== undefined, DomainErrorCode.desktopAppFailed, `Could not start ${spec.label}.`);
   }
 
   defaultProfile({ linux }: DesktopAppSpec) {

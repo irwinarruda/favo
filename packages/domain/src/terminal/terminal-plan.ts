@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LocalMachineId, type RemoteSystem, remoteBinaryOf } from '#domain/machines/machine';
+import type { ProviderId } from '#domain/providers/provider';
 import { assertDomain, DomainError, DomainErrorCode } from '#domain/shared/domain-error';
 import type { ValueOf } from '#domain/shared/value-of';
 
@@ -8,6 +9,8 @@ export const SkipFavoFlag = '--skip-favo';
 export const HoldFlag = '--hold';
 export const ProvidersFlag = '--providers';
 export const FavoOnlyFlag = '--favo-only';
+export const ProviderFlag = '--provider';
+export const UpdateRunningFlag = '--update-running';
 
 const EncodedArguments = z.array(z.string());
 const Base64UrlPattern = /^[A-Za-z0-9_-]+$/;
@@ -88,10 +91,19 @@ function assertSafeForCmd(argument: string, command: string) {
   );
 }
 
-export function updateArgumentsFor(input: { isHereOnly: boolean; hasProviders: boolean; isHeld?: boolean }) {
+export type UpdateArguments = {
+  isHereOnly: boolean;
+  hasProviders: boolean;
+  providers?: ProviderId[];
+  isRunningIncluded?: boolean;
+};
+
+export function updateArgumentsFor(input: UpdateArguments) {
   const favoOnly = input.hasProviders ? [] : [FavoOnlyFlag];
   const here = input.isHereOnly ? ['--machine', LocalMachineId] : [];
-  return ['update', SkipFavoFlag, ...favoOnly, ...here, ...(input.isHeld ? [HoldFlag] : [])];
+  const providers = (input.providers ?? []).flatMap((provider) => [ProviderFlag, provider]);
+  const running = input.isRunningIncluded ? [UpdateRunningFlag] : [];
+  return ['update', SkipFavoFlag, ...favoOnly, ...here, ...providers, ...running];
 }
 
 export function hasProvidersIn(flags: { isFavoSkipped: boolean; hasProviders: boolean; isFavoOnly: boolean }) {

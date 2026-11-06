@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { settledRecordOf, UpdateState } from '#domain/updates/update-outcome';
+import { isLeftWhileRunning, RunningReason, settledRecordOf, UpdateState } from '#domain/updates/update-outcome';
 
 const At = '2026-11-04T12:00:00.000Z';
 
@@ -15,5 +15,16 @@ describe('what the last update of a provider says', () => {
   it('leaves a finished update as it is', () => {
     const record = { state: UpdateState.failed, from: '2.1.300', reason: 'exit 1', at: At };
     expect(settledRecordOf(record, false)).toEqual(record);
+  });
+});
+
+describe('an update left alone because the provider was running', () => {
+  it('is told apart from one left alone for another reason', () => {
+    expect(isLeftWhileRunning({ state: UpdateState.leftAlone, reason: RunningReason, at: At })).toBe(true);
+    expect(isLeftWhileRunning({ state: UpdateState.leftAlone, reason: 'it is pinned in Homebrew', at: At })).toBe(
+      false
+    );
+    expect(isLeftWhileRunning({ state: UpdateState.failed, reason: RunningReason, at: At })).toBe(false);
+    expect(isLeftWhileRunning(undefined)).toBe(false);
   });
 });

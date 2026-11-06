@@ -9,8 +9,10 @@ import {
   FavoOnlyFlag,
   HoldFlag,
   hasProvidersIn,
+  ProviderFlag,
   ProvidersFlag,
   SkipFavoFlag,
+  UpdateRunningFlag,
 } from '@favo/domain/terminal/terminal-plan';
 
 export const CommandKind = {
@@ -62,6 +64,8 @@ export type Command = {
   isFavoSkipped?: boolean;
   hasProviders?: boolean;
   isHeld?: boolean;
+  providers?: ProviderId[];
+  isRunningIncluded?: boolean;
 };
 
 export function parseCommand(rawArgv: string[]): Command {
@@ -147,6 +151,8 @@ export function parseCommand(rawArgv: string[]): Command {
         isFavoSkipped: flags.isFavoSkipped,
         hasProviders: hasProvidersIn(flags),
         isHeld: flags.isHeld,
+        providers: flags.providers.length > 0 ? flags.providers : undefined,
+        isRunningIncluded: flags.isRunningIncluded,
       };
     case 'machine':
       return parseMachine(base, flags.name, second, third);
@@ -207,6 +213,8 @@ function readArguments(argv: string[]) {
     hasProviders: false,
     isFavoOnly: false,
     isHeld: false,
+    isRunningIncluded: false,
+    providers: [] as ProviderId[],
     machine: undefined as string | undefined,
     name: undefined as string | undefined,
     directory: undefined as string | undefined,
@@ -223,6 +231,8 @@ function readArguments(argv: string[]) {
     else if (word === ProvidersFlag) flags.hasProviders = true;
     else if (word === FavoOnlyFlag) flags.isFavoOnly = true;
     else if (word === HoldFlag) flags.isHeld = true;
+    else if (word === UpdateRunningFlag) flags.isRunningIncluded = true;
+    else if (word === ProviderFlag) flags.providers.push(providerIdOf(argv[++index]));
     else if (word === '--stdio') continue;
     else if (word === '--machine' || word === '-m') flags.machine = required(argv[++index], '--machine <machine>');
     else if (word === '--name') flags.name = required(argv[++index], '--name <name>');
@@ -245,6 +255,12 @@ function seatOf(provider: string | undefined, account: string | undefined, usage
   const spec = findProvider(required(provider, usage));
   if (!spec) throw new DomainError(DomainErrorCode.unknownProvider, `Unknown provider "${provider}". Usage: ${usage}`);
   return { provider: spec.id, account: required(account, usage) };
+}
+
+function providerIdOf(value: string | undefined) {
+  const spec = findProvider(required(value, `${ProviderFlag} <provider>`));
+  if (!spec) throw new DomainError(DomainErrorCode.unknownProvider, `Unknown provider "${value}".`);
+  return spec.id;
 }
 
 function required(value: string | undefined, usage: string) {

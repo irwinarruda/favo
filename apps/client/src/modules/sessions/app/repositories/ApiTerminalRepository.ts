@@ -1,6 +1,5 @@
 import type { RpcClient } from '@favo/contracts/rpc/client';
 import { planTerminal } from '@favo/contracts/rpc/terminal/plan-terminal';
-import { planUpdate } from '@favo/contracts/rpc/updates/plan-update';
 import type { TerminalAction } from '@favo/domain/terminal/terminal-plan';
 import type { Seat } from '@/modules/comb/app/entities/Seat';
 import type { ITerminalRepository } from '@/modules/sessions/app/repositories/ITerminalRepository';
@@ -18,9 +17,5 @@ export class ApiTerminalRepository implements ITerminalRepository {
       directory,
       thread,
     });
-  }
-
-  planUpdate(machineId: string) {
-    return this.client.call(planUpdate, { machineId, isHeld: true });
   }
 }

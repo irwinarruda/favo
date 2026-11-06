@@ -163,8 +163,24 @@ describe('the arguments of a second favo update', () => {
       '--favo-only',
     ]);
   });
-  it('can hold the report on screen', () => {
-    expect(updateArgumentsFor({ isHereOnly: true, hasProviders: true, isHeld: true }).at(-1)).toBe('--hold');
+  it('can name the provider CLIs to update, and update them while they run', () => {
+    const args = updateArgumentsFor({
+      isHereOnly: true,
+      hasProviders: true,
+      providers: ['claude', 'codex'],
+      isRunningIncluded: true,
+    });
+    expect(args).toEqual([
+      'update',
+      '--skip-favo',
+      '--machine',
+      'local',
+      '--provider',
+      'claude',
+      '--provider',
+      'codex',
+      '--update-running',
+    ]);
   });
 });
 

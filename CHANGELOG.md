@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- The comb notices when a provider CLI is older on one machine than on another. It says so when it opens, and the key bar offers `P update CLIs` until they match.
+
+### Changed
+
+- `P` now updates the provider CLIs on every machine at once, without leaving the comb. The list of CLIs opens, each one spins while it updates and then shows the version it came from, and a toast sums it up. favo updates itself first on a machine that runs an older one. A CLI that is running is left alone, and favo asks at the end whether to update it anyway. Quitting favo does not stop an update, and opening it again follows the update where it is instead of starting a second one.
+
 ## [0.10.2] - 2026-11-05
 
 ### Fixed

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import { Protocol, type RpcRequest } from '@favo/contracts/rpc/envelope';
 import { addMachine } from '@favo/contracts/rpc/machines/add-machine';
+import { listProviderVersions } from '@favo/contracts/rpc/updates/list-provider-versions';
 import { planFavoUpdate } from '@favo/contracts/rpc/updates/plan-favo-update';
 import { planUpdate } from '@favo/contracts/rpc/updates/plan-update';
+import { startProviderUpdates } from '@favo/contracts/rpc/updates/start-provider-updates';
 import { FavoVersion } from '@favo/contracts/version';
 import { decodeArguments } from '@favo/domain/terminal/terminal-plan';
 import { createTestServer, Home } from '#test/support/test-server';
@@ -152,10 +154,6 @@ describe('updating the provider CLIs on a machine', () => {
     const encoded = plan.args[3]!.split(' ').at(-1)!;
     expect(decodeArguments(encoded)).toEqual(['update', '--skip-favo', '--machine', 'local']);
   });
-  it('holds the report on screen when the TUI asks', async () => {
-    const plan = await (await fleet(FavoVersion)).client.call(planUpdate, { machineId: 'devbox', isHeld: true });
-    expect(decodeArguments(plan.args[3]!.split(' ').at(-1)!)).toContain('--hold');
-  });
   it('refuses a machine on an older favo, which has no such command', async () => {
     const server = await fleet('0.0.1');
     await expect(server.client.call(planUpdate, { machineId: 'devbox' })).rejects.toMatchObject({
@@ -182,5 +180,106 @@ describe('updating the provider CLIs on a machine', () => {
     await expect(createTestServer().client.call(planUpdate, { machineId: 'nope' })).rejects.toMatchObject({
       code: 'machineNotFound',
     });
+  });
+});
+
+describe('updating the provider CLIs in the background', () => {
+  const FirstPid = 7_000;
+
+  function serverWith(installed: string[], { isFromSource = false } = {}) {
+    const server = createTestServer({ binary: isFromSource ? undefined : HomebrewBinary, installed });
+    server.processes.reply('/usr/bin/claude --version', { stdout: '2.1.290 (Claude Code)\n' });
+    server.processes.reply('/usr/bin/codex --version', { stdout: 'codex-cli 0.164.0\n' });
+    return server;
+  }
+
+  function startsOf(server: ReturnType<typeof createTestServer>, command = HomebrewBinary) {
+    return server.processes.calls.filter((call) => call.command === command).map(({ args }) => args);
+  }
+
+  it('starts favo apart from itself, naming each provider CLI installed here', async () => {
+    const server = serverWith(['claude', 'codex']);
+    expect(await server.client.call(startProviderUpdates, {})).toEqual({
+      started: [
+        { provider: 'claude', version: '2.1.290' },
+        { provider: 'codex', version: '0.164.0' },
+      ],
+    });
+    expect(startsOf(server)).toEqual([
+      ['update', '--skip-favo', '--machine', 'local', '--provider', 'claude', '--provider', 'codex'],
+    ]);
+  });
+  it('shows each of them updating at once, from the version it had', async () => {
+    const server = serverWith(['claude', 'codex']);
+    await server.client.call(startProviderUpdates, {});
+    const [claude, codex] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate).toMatchObject({ state: 'updating', from: '2.1.290' });
+    expect(codex?.lastUpdate).toMatchObject({ state: 'updating', from: '0.164.0' });
+  });
+  it('ties the update to the favo it started, so it reads stopped once that one is gone', async () => {
+    const server = serverWith(['claude']);
+    await server.client.call(startProviderUpdates, {});
+    server.processes.gone.add(FirstPid);
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate?.state).toBe('stopped');
+  });
+  it('updates only the provider CLIs it is asked for, and can include running ones', async () => {
+    const server = serverWith(['claude', 'codex']);
+    await server.client.call(startProviderUpdates, { providers: ['codex'], isRunningIncluded: true });
+    expect(startsOf(server)).toEqual([
+      ['update', '--skip-favo', '--machine', 'local', '--provider', 'codex', '--update-running'],
+    ]);
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate).toBeUndefined();
+  });
+  it('leaves alone a provider CLI another favo is still updating', async () => {
+    const server = serverWith(['claude', 'codex']);
+    await server.client.call(startProviderUpdates, { providers: ['claude'] });
+    const { started } = await server.client.call(startProviderUpdates, {});
+    expect(started.map(({ provider }) => provider)).toEqual(['codex']);
+    expect(startsOf(server).at(-1)).toEqual(['update', '--skip-favo', '--machine', 'local', '--provider', 'codex']);
+  });
+  it('starts nothing at all when every provider CLI is already updating', async () => {
+    const server = serverWith(['claude']);
+    await server.client.call(startProviderUpdates, {});
+    expect(await server.client.call(startProviderUpdates, {})).toEqual({ started: [] });
+    expect(startsOf(server)).toHaveLength(1);
+  });
+  it('keeps showing a provider CLI whose binary is gone for a moment while it updates', async () => {
+    const server = serverWith(['claude']);
+    await server.client.call(startProviderUpdates, {});
+    server.processes.uninstall('claude');
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude).toMatchObject({ provider: 'claude', installedWith: 'being replaced by its update' });
+    expect(claude?.version).toBeUndefined();
+    expect(claude?.lastUpdate?.state).toBe('updating');
+    server.processes.gone.add(FirstPid);
+    expect(await server.client.call(listProviderVersions, {})).toEqual([]);
+  });
+  it('starts nothing when no provider CLI is installed', async () => {
+    const server = serverWith([]);
+    expect(await server.client.call(startProviderUpdates, {})).toEqual({ started: [] });
+    expect(startsOf(server)).toEqual([]);
+  });
+  it('says so when favo cannot start, and marks nothing as updating', async () => {
+    const server = serverWith(['claude']);
+    server.processes.failToDetach(HomebrewBinary);
+    await expect(server.client.call(startProviderUpdates, {})).rejects.toMatchObject({ code: 'updateNotStarted' });
+    const [claude] = await server.client.call(listProviderVersions, {});
+    expect(claude?.lastUpdate).toBeUndefined();
+  });
+  it('falls back to the favo on the PATH from source', async () => {
+    const server = serverWith(['claude'], { isFromSource: true });
+    await server.client.call(startProviderUpdates, {});
+    expect(startsOf(server, 'favo')).toHaveLength(1);
+  });
+  it('runs on the machine it is sent to', async () => {
+    const mac = serverWith(['claude']);
+    const devbox = serverWith(['claude']);
+    await mac.client.call(addMachine, { target: 'bee@devbox' });
+    mac.remotes.connect('devbox', devbox.router);
+    await mac.client.call(startProviderUpdates, {}, { machineId: 'devbox' });
+    expect(startsOf(devbox)).toHaveLength(1);
+    expect(startsOf(mac)).toEqual([]);
   });
 });

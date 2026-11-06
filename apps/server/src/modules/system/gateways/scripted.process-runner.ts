@@ -18,9 +18,14 @@ export class ScriptedProcessRunner extends ProcessRunner {
   private readonly installed = new Map<string, string>();
   private readonly elsewhere = new Map<string, string>();
   private readonly undetachable = new Set<string>();
+  private nextPid = 7_000;
 
   install(command: string, path = `/usr/bin/${command}`) {
     this.installed.set(command, path);
+  }
+
+  uninstall(command: string) {
+    this.installed.delete(command);
   }
 
   installIn(folder: string, command: string) {
@@ -66,7 +71,7 @@ export class ScriptedProcessRunner extends ProcessRunner {
 
   detach(request: ProcessRequest) {
     this.calls.push(request);
-    return !this.undetachable.has(request.command);
+    return this.undetachable.has(request.command) ? undefined : this.nextPid++;
   }
 
   killOpen() {

@@ -31,6 +31,7 @@ import type { ConfigRepository } from '@/modules/system/repositories/config.repo
 import type { FavoPaths } from '@/shared/config/favo-paths';
 
 const CheckTimeoutMs = 15_000;
+const ReplacedLabel = 'being replaced by its update';
 const ShimHeadBytes = 4_096;
 
 export class ProviderUpdatesService {
@@ -58,10 +59,10 @@ export class ProviderUpdatesService {
     return views.filter((view) => view !== undefined);
   }
 
-  async record(provider: ProviderId, outcome?: UpdateOutcome) {
+  async record(provider: ProviderId, outcome?: UpdateOutcome, updaterPid = this.pid) {
     if (!outcome) await this.updates.clear(provider);
     else {
-      const pid = outcome.state === UpdateState.updating ? this.pid : undefined;
+      const pid = outcome.state === UpdateState.updating ? updaterPid : undefined;
       await this.updates.save(provider, { ...outcome, at: this.clock.now().toISOString(), pid });
     }
     return {};
@@ -110,10 +111,14 @@ export class ProviderUpdatesService {
 
   private async versionOf(provider: ProviderId): Promise<ProviderVersionView | undefined> {
     const [install, saved] = await Promise.all([this.installOf(provider), this.updates.last(provider)]);
-    if (!install) return undefined;
-    const { label } = install.spec;
+    const { label } = Providers[provider];
     const isUpdaterAlive = saved?.pid !== undefined && this.processes.isAlive(saved.pid);
     const lastUpdate = saved && settledRecordOf(saved, isUpdaterAlive);
+    if (!install) {
+      return lastUpdate?.state === UpdateState.updating
+        ? { provider, label, installedWith: ReplacedLabel, lastUpdate }
+        : undefined;
+    }
     return { provider, label, version: install.version, installedWith: install.installedWith, lastUpdate };
   }
 

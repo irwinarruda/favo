@@ -61,12 +61,13 @@ export const createMachineService: ServiceCreator<MachineService> = (set, get) =
     const { machines, showToast } = get();
     const behind = machines.filter((machine) => machine.canUpdate);
     if (behind.length === 0) return;
-    try {
-      const [version] = await Promise.all(behind.map((machine) => _installMachine(get, machine)));
-      showToast(`favo ${version} is running on ${behind.map((machine) => machine.name).join(', ')}.`);
-    } catch (error) {
-      showToast(_messageOf(error), ToastKind.error);
-    }
+    const results = await Promise.allSettled(behind.map((machine) => _installMachine(get, machine)));
+    const failure = results.find((result) => result.status === 'rejected');
+    const installed = results.flatMap((result, index) =>
+      result.status === 'fulfilled' ? [{ version: result.value, name: behind[index]!.name }] : []
+    );
+    if (failure) showToast(_messageOf(failure.reason), ToastKind.error);
+    else showToast(`favo ${installed[0]!.version} is running on ${installed.map(({ name }) => name).join(', ')}.`);
   },
   async forgetSelectedMachine() {
     const { selectedMachine, loadFleet, showToast } = get();
