@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-06
+
 ### Added
 
 - The comb notices when a provider CLI is older on one machine than on another. It says so when it opens, and the key bar offers `P update CLIs` until they match.
@@ -145,7 +147,8 @@
 - A TUI that shows every machine, account and login, plus a command for everything it does.
 - Native on macOS, Linux and Windows, installed with `npm install --global favo-cli`.
 
-[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/irwinarruda/favo-cli/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/irwinarruda/favo-cli/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/irwinarruda/favo-cli/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/irwinarruda/favo-cli/compare/v0.9.0...v0.10.0
