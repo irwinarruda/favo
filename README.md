@@ -318,7 +318,7 @@ Without the hook, favo still lists what Codex and OpenCode keep for this folder.
 
 Press `t` to pick a theme with a live preview, or use `favo theme <name>`.
 
-Built in: `honey`, `wax` (light), `catppuccin`, `catppuccin-latte` (light), `dracula`, `everforest`, `gruvbox`, `kanagawa`, `nord`, `one-dark`, `rose-pine`, `tokyo-night`.
+Built in: `honey`, `wax` (light), `smoke`, `veil` (light), `catppuccin`, `catppuccin-latte` (light), `dracula`, `everforest`, `gruvbox`, `kanagawa`, `nord`, `one-dark`, `rose-pine`, `tokyo-night`.
 
 A custom theme is a JSON file in `~/.favo/themes`, and its file name is its id. Leave out any color and it comes from the theme it extends, `honey` by default:
 

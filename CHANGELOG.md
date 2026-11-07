@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Two new built-in themes, `smoke` and `veil` (light): Honey and Wax on a calm warm gray, matching Favo Smoke and Favo Veil in your editor. Pick them with `t` or `favo theme smoke`.
+
 ## [0.11.0] - 2026-11-06
 
 ### Added
