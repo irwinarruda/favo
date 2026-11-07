@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-06
+
 ### Added
 
 - Two new built-in themes, `smoke` and `veil` (light): Honey and Wax on a calm warm gray, matching Favo Smoke and Favo Veil in your editor. Pick them with `t` or `favo theme smoke`.
@@ -151,7 +153,8 @@
 - A TUI that shows every machine, account and login, plus a command for everything it does.
 - Native on macOS, Linux and Windows, installed with `npm install --global favo-cli`.
 
-[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/irwinarruda/favo-cli/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/irwinarruda/favo-cli/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/irwinarruda/favo-cli/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/irwinarruda/favo-cli/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/irwinarruda/favo-cli/compare/v0.10.0...v0.10.1
