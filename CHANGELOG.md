@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The `smoke` and `veil` themes are less sandy, matching Favo Smoke and Favo Veil in favo-theme 0.3.0: their gray keeps half as much of the honey tint.
+
 ## [0.12.0] - 2026-11-06
 
 ### Added
